@@ -203,14 +203,16 @@ export const facturasService = {
   // Guardar una factura nueva
   async crear(factura: Invoice): Promise<string> {
     try {
-      // Usar el número de factura como ID del documento
-      const docRef = doc(db, 'facturas', factura.number);
+      // Generar ID único para la factura
+      const facturaId = `FC-${Date.now()}`;
+      const docRef = doc(db, 'facturas', facturaId);
       await setDoc(docRef, {
         ...factura,
+        id: facturaId,
         fechaCreacion: Timestamp.now()
       });
-      console.log('✅ Factura guardada en Firebase:', factura.number);
-      return factura.number;
+      console.log('✅ Factura guardada en Firebase:', facturaId);
+      return facturaId;
     } catch (error) {
       console.error('❌ Error creando factura:', error);
       throw error;
