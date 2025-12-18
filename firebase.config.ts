@@ -5,15 +5,15 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Tu configuración de Firebase
+// Configuración de Firebase desde variables de entorno
 const firebaseConfig = {
-  apiKey: "AIzaSyD2EuYZTDZHujlYnReaZcZGY9UZTcMFqXk",
-  authDomain: "sistema-bruzzone.firebaseapp.com",
-  projectId: "sistema-bruzzone",
-  storageBucket: "sistema-bruzzone.firebasestorage.app",
-  messagingSenderId: "786471905936",
-  appId: "1:786471905936:web:72b53b652e205bfaa00615",
-  measurementId: "G-XTW53QZ3EH"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD2EuYZTDZHujlYnReaZcZGY9UZTcMFqXk",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "sistema-bruzzone.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "sistema-bruzzone",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "sistema-bruzzone.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "786471905936",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:786471905936:web:72b53b652e205bfaa00615",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-XTW53QZ3EH"
 };
 
 // Inicializar Firebase
