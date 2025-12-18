@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FerreCloud - Gestión Inteligente</title>
-    <!-- Tailwind via CDN -->
+    <title>SISTEMA BRUZZONE 18-12</title>
+    <!-- Tailwind via CDN para asegurar que el diseño cargue rápido -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -19,12 +19,11 @@
         }
       }
     </script>
-    <!-- NO usar index.css aquí, impórtalo dentro de index.tsx -->
   </head>
   <body class="bg-gray-50 text-slate-800 antialiased">
     <div id="root"></div>
     
-    <!-- Apuntamos directamente al archivo en la raíz -->
+    <!-- Al estar en la raíz, usamos la ruta directa -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

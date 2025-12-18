@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import TopBar from './components/TopBar';
@@ -30,6 +30,10 @@ import LabelPrinting from './components/LabelPrinting';
 import { ViewState, ReplenishmentItem, Client } from './types';
 
 const App: React.FC = () => {
+  // --- MENSAJE DE CONTROL PARA SABER SI LA WEB SE ACTUALIZÓ ---
+  console.log("¡ESTOY CARGANDO LA VERSION 50!"); 
+  // -----------------------------------------------------------
+
   const [currentView, setCurrentView] = useState<ViewState>(() => {
       const saved = localStorage.getItem('ferrecloud_current_view');
       return (saved as ViewState) || ViewState.DASHBOARD;
