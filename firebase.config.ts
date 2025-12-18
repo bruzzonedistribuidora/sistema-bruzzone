@@ -1,11 +1,8 @@
-// firebase.config.ts
-// Configuración de Firebase para Sistema Bruzzone
-
-import { initializeApp } from 'firebase/app';
+﻿import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
-// Configuración de Firebase
+// Configuración con valores fijos (Hardcoded)
 const firebaseConfig = {
   apiKey: "AIzaSyD2EuYZTDZHujlYnReaZcZGY9UZTcMFqXk",
   authDomain: "sistema-bruzzone.firebaseapp.com",
@@ -16,10 +13,8 @@ const firebaseConfig = {
   measurementId: "G-XTW53QZ3EH"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
-// Inicializar servicios
 export const db = getFirestore(app);
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 

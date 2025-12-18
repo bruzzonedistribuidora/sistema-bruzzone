@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FerreCloud - Gestión Inteligente</title>
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'ferre-orange': '#f97316',
+              'ferre-dark': '#0f172a',
+              'ferre-light': '#f1f5f9',
+            }
+          }
+        }
+      }
+    </script>
+    <!-- NO usar index.css aquí, impórtalo dentro de index.tsx -->
+  </head>
+  <body class="bg-gray-50 text-slate-800 antialiased">
+    <div id="root"></div>
+    
+    <!-- Apuntamos directamente al archivo en la raíz -->
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
