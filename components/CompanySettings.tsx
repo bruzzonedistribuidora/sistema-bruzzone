@@ -1,216 +1,381 @@
+export enum ViewState {
+  DASHBOARD = 'DASHBOARD',
+  INVENTORY = 'INVENTORY',
+  POS = 'POS',
+  REMITOS = 'REMITOS',
+  PRESUPUESTOS = 'PRESUPUESTOS',
+  CLIENTS = 'CLIENTS',
+  PURCHASES = 'PURCHASES',
+  PROVIDERS = 'PROVIDERS',
+  TREASURY = 'TREASURY',
+  ACCOUNTING = 'ACCOUNTING',
+  STATISTICS = 'STATISTICS',
+  REPORTS = 'REPORTS',
+  BACKUP = 'BACKUP',
+  BRANCHES = 'BRANCHES',
+  AI_ASSISTANT = 'AI_ASSISTANT',
+  PRICE_UPDATES = 'PRICE_UPDATES',
+  USERS = 'USERS',
+  REPLENISHMENT = 'REPLENISHMENT',
+  SHORTAGES = 'SHORTAGES',
+  SALES_ORDERS = 'SALES_ORDERS',
+  ONLINE_SALES = 'ONLINE_SALES',
+  PRINT_CONFIG = 'PRINT_CONFIG',
+  LABEL_PRINTING = 'LABEL_PRINTING',
+  COMPANY_SETTINGS = 'COMPANY_SETTINGS',
+  AFIP_CONFIG = 'AFIP_CONFIG',
+  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL'
+}
 
-import React, { useState } from 'react';
-import { Save, Building2, MapPin, Phone, Mail, Globe, Upload, Image as ImageIcon, Briefcase, FileText } from 'lucide-react';
-import { CompanyConfig, TaxCondition } from '../types';
+export interface PaymentAccount {
+    id: string;
+    type: 'BANK' | 'VIRTUAL_WALLET';
+    bankName: string; // Ej: Mercado Pago, Galicia
+    alias: string;
+    cbu: string;
+    owner: string;
+    qrImage?: string | null;
+    active: boolean;
+}
 
-const CompanySettings: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<CompanyConfig>({
-      name: 'FERRETERIA FERRECLOUD S.A.',
-      fantasyName: 'FerreCloud',
-      cuit: '30-12345678-9',
-      taxCondition: 'Responsable Inscripto',
-      iibb: '901-123456-1',
-      startDate: '2020-01-01',
-      address: 'Av. del Libertador 1200',
-      city: 'Ciudad Autónoma de Buenos Aires',
-      zipCode: '1425',
-      phone: '+54 11 4455-6677',
-      email: 'contacto@ferrecloud.com',
-      web: 'www.ferrecloud.com',
-      logo: null,
-      slogan: 'Herramientas y Materiales para Profesionales'
-  });
+export interface CompanyConfig {
+    name: string;
+    fantasyName: string;
+    cuit: string;
+    taxCondition: string;
+    iibb: string;
+    startDate: string;
+    address: string;
+    city: string;
+    zipCode: string;
+    phone: string;
+    email: string;
+    web: string;
+    logo: string | null;
+    slogan: string;
+    paymentAccounts: PaymentAccount[];
+}
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-  };
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone: string;
+  manager: string;
+  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
+  active: boolean;
+}
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-              if (event.target?.result) {
-                  setFormData(prev => ({ ...prev, logo: event.target?.result as string }));
-              }
-          };
-          reader.readAsDataURL(e.target.files[0]);
-      }
-  };
+export interface ProductStock {
+  branchId: string;
+  branchName: string;
+  quantity: number;
+}
 
-  const handleSave = () => {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-          setIsLoading(false);
-          alert('Datos de la empresa guardados correctamente.');
-      }, 1500);
-  };
+export interface EcommerceConfig {
+  mercadoLibre: boolean;
+  tiendaNube: boolean;
+  webPropia: boolean;
+}
 
-  return (
-    <div className="p-8 max-w-7xl mx-auto h-full overflow-y-auto">
-        <div className="flex justify-between items-center mb-8">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-800">Identidad de la Empresa</h2>
-                <p className="text-gray-500 text-sm">Configura la información que aparecerá en tus comprobantes y reportes.</p>
-            </div>
-            <button 
-                onClick={handleSave}
-                disabled={isLoading}
-                className="bg-ferre-orange hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-bold shadow-md flex items-center gap-2 transition-colors disabled:opacity-50">
-                {isLoading ? 'Guardando...' : <><Save size={20}/> Guardar Cambios</>}
-            </button>
-        </div>
+export interface Product {
+  id: string;
+  internalCode: string;
+  barcodes: string[];
+  providerCodes: string[];
+  name: string;
+  brand: string;
+  provider: string;
+  description: string;
+  category: string;
+  measureUnitSale: string;
+  measureUnitPurchase: string;
+  conversionFactor: number;
+  purchaseCurrency: 'ARS' | 'USD';
+  saleCurrency: 'ARS' | 'USD';
+  vatRate: 10.5 | 21.0 | 27.0 | 0;
+  listCost: number;
+  discounts: [number, number, number, number];
+  costAfterDiscounts: number;
+  profitMargin: number;
+  priceNeto: number;
+  priceFinal: number;
+  stock: number;
+  stockDetails: ProductStock[];
+  minStock: number;
+  desiredStock: number;
+  reorderPoint: number;
+  location: string;
+  ecommerce: EcommerceConfig;
+}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Left Column: Visual Identity & Basic Info */}
-            <div className="space-y-6">
-                
-                {/* Logo Section */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 text-left">Logotipo</h3>
-                    <div className="flex flex-col items-center">
-                        <div className="w-full max-w-[280px] h-40 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden mb-4 relative group hover:border-ferre-orange hover:bg-orange-50/20 transition-all">
-                            {formData.logo ? (
-                                <img src={formData.logo} alt="Logo Empresa" className="w-full h-full object-contain p-2" />
-                            ) : (
-                                <div className="flex flex-col items-center text-gray-400">
-                                    <ImageIcon size={48} className="mb-2 opacity-50" />
-                                    <span className="text-xs font-medium">Subir Imagen</span>
-                                </div>
-                            )}
-                            <label className="absolute inset-0 bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-sm">
-                                <div className="flex flex-col items-center gap-2">
-                                    <Upload size={32} />
-                                    <span className="text-sm font-bold">Cambiar Logo</span>
-                                </div>
-                                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                            </label>
-                        </div>
-                        <p className="text-xs text-gray-400">Soporta formatos cuadrados y rectangulares (PNG, JPG).</p>
-                    </div>
-                </div>
+export interface PriceList {
+    id: string;
+    name: string;
+    type: 'BASE' | 'CUSTOM';
+    fixedMargin?: number;
+    active: boolean;
+}
 
-                {/* Slogan */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Marketing</h3>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Eslogan / Bajada</label>
-                        <textarea 
-                            name="slogan"
-                            rows={3}
-                            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ferre-orange outline-none resize-none"
-                            placeholder="Ej: Soluciones para el hogar"
-                            value={formData.slogan}
-                            onChange={handleInputChange}
-                        ></textarea>
-                    </div>
-                </div>
-            </div>
+export enum TaxCondition {
+  RESPONSABLE_INSCRIPTO = 'Responsable Inscripto',
+  MONOTRIBUTO = 'Monotributo',
+  CONSUMIDOR_FINAL = 'Consumidor Final',
+  EXENTO = 'Exento'
+}
 
-            {/* Middle & Right Columns: Form Data */}
-            <div className="lg:col-span-2 space-y-6">
-                
-                {/* General Information */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Building2 className="text-ferre-orange"/> Datos Generales
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Razón Social</label>
-                            <input type="text" name="name" className="w-full p-3 border border-gray-300 rounded-lg font-bold text-gray-800 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.name} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nombre de Fantasía</label>
-                            <input type="text" name="fantasyName" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.fantasyName} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Inicio de Actividades</label>
-                            <input type="date" name="startDate" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.startDate} onChange={handleInputChange} />
-                        </div>
-                    </div>
-                </div>
+export interface InvoiceItem {
+  product: Product;
+  quantity: number;
+  subtotal: number;
+  appliedPrice: number;
+  priceListId?: string;
+}
 
-                {/* Fiscal Data */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <FileText className="text-blue-600"/> Datos Fiscales (AFIP / IIBB)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">CUIT</label>
-                            <input type="text" name="cuit" className="w-full p-3 border border-gray-300 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.cuit} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Condición IVA</label>
-                            <select name="taxCondition" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={formData.taxCondition} onChange={handleInputChange}>
-                                {Object.values(TaxCondition).map(cond => (
-                                    <option key={cond} value={cond}>{cond}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nro. Ingresos Brutos</label>
-                            <input type="text" name="iibb" className="w-full p-3 border border-gray-300 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.iibb} onChange={handleInputChange} />
-                        </div>
-                    </div>
-                </div>
+export interface Invoice {
+  customerName: string;
+  customerCuit: string;
+  taxCondition: TaxCondition;
+  items: InvoiceItem[];
+  total: number;
+  cae?: string;
+  date: string;
+}
 
-                {/* Contact & Address */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <MapPin className="text-green-600"/> Ubicación y Contacto
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Dirección Comercial</label>
-                            <div className="relative">
-                                <MapPin className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="address" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.address} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Ciudad / Localidad</label>
-                            <input type="text" name="city" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.city} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Código Postal</label>
-                            <input type="text" name="zipCode" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.zipCode} onChange={handleInputChange} />
-                        </div>
-                        
-                        <div className="col-span-2 border-t border-gray-100 my-2"></div>
+export interface RemitoItem {
+  product: Product;
+  quantity: number;
+  historicalPrice: number;
+}
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Teléfono / WhatsApp</label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="phone" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.phone} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Email Principal</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="email" name="email" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.email} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Sitio Web</label>
-                            <div className="relative">
-                                <Globe className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="web" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.web} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
+export interface Remito {
+  id: string;
+  clientId: string;
+  clientName: string;
+  items: RemitoItem[];
+  date: string;
+  status: 'PENDING' | 'BILLED' | 'PAID_INTERNAL';
+  relatedInvoice?: string;
+}
 
-            </div>
-        </div>
-    </div>
-  );
-};
+export interface Budget {
+  id: string;
+  clientName: string;
+  date: string;
+  validUntil: string;
+  items: InvoiceItem[];
+  total: number;
+  status: 'OPEN' | 'CONVERTED' | 'EXPIRED';
+}
 
-export default CompanySettings;
+export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
+
+export interface SalesOrder {
+    id: string;
+    clientName: string;
+    date: string;
+    priority: 'NORMAL' | 'URGENTE';
+    items: InvoiceItem[];
+    status: SalesOrderStatus;
+    notes: string;
+    total: number;
+}
+
+export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WOOCOMMERCE';
+export type ShippingMethod = 'MERCADOENVIOS' | 'FLEX' | 'CORREO' | 'RETIRO_SUCURSAL';
+export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+
+export interface OnlineOrder {
+    id: string;
+    platformId: string;
+    platform: OnlinePlatform;
+    date: string;
+    customer: {
+        name: string;
+        nickname?: string;
+        address: string;
+        city: string;
+        zipCode: string;
+        phone: string;
+        dni: string;
+    };
+    items: InvoiceItem[];
+    total: number;
+    shippingCost: number;
+    shippingMethod: ShippingMethod;
+    status: OnlineOrderStatus;
+    trackingCode?: string;
+    labelPrinted: boolean;
+    invoiced: boolean;
+}
+
+export type DocumentType = 'FACTURA' | 'TICKET_INTERNO' | 'REMITO' | 'PRESUPUESTO' | 'ORDEN_PEDIDO';
+export type PaperSize = 'A4' | 'TICKET_80MM' | 'A4_QUARTER' | 'CUSTOM';
+
+export interface Position {
+    x: number;
+    y: number;
+    visible: boolean;
+}
+
+export interface PrintTemplate {
+    id: DocumentType;
+    name: string;
+    paperSize: PaperSize;
+    customWidth?: number;
+    customHeight?: number;
+    headerText: string;
+    subHeaderText: string;
+    footerText: string;
+    showLogo: boolean;
+    showPrice: boolean;
+    showTotal: boolean;
+    fontSize: 'SMALL' | 'MEDIUM' | 'LARGE';
+    positions: {
+        logo: Position;
+        header: Position;
+        docInfo: Position;
+        client: Position;
+        table: Position;
+        totals: Position;
+        footer: Position;
+        qr: Position;
+    }
+}
+
+export interface DashboardStats {
+  totalSales: number;
+  lowStockCount: number;
+  dailyRevenue: number;
+  pendingShipments: number;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  cuit: string;
+  phone: string;
+  address: string;
+  balance: number;
+  limit: number;
+  portalEnabled?: boolean;
+  portalHash?: string;
+  email?: string;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  cuit: string;
+  contact: string;
+  balance: number;
+  defaultDiscounts: [number, number, number]; 
+}
+
+export interface PurchaseItem {
+    id: string;
+    productCode: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+}
+
+export interface Purchase {
+  id: string;
+  providerId: string;
+  providerName: string;
+  date: string;
+  type: 'FACTURA_A' | 'FACTURA_B' | 'PRESUPUESTO_X';
+  items: number;
+  details?: PurchaseItem[];
+  total: number;
+  status: 'PAID' | 'PENDING' | 'PARTIAL';
+}
+
+export interface CashRegister {
+  id: string;
+  name: string;
+  balance: number;
+  isOpen: boolean;
+}
+
+export interface Check {
+  id: string;
+  bank: string;
+  number: string;
+  amount: number;
+  paymentDate: string;
+  status: 'CARTERA' | 'DEPOSITADO' | 'RECHAZADO' | 'ENTREGADO';
+  origin: string;
+}
+
+export interface TreasuryMovement {
+    id: string;
+    date: string;
+    type: 'INCOME' | 'EXPENSE';
+    subtype: 'VENTA' | 'COBRO_CTACTE' | 'PAGO_PROVEEDOR' | 'GASTO_VARIO' | 'RETIRO_SOCIO';
+    paymentMethod: 'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CHEQUE' | 'ECHEQ';
+    amount: number;
+    description: string;
+    cashRegisterId: string;
+}
+
+export interface CurrentAccountMovement {
+    id: string;
+    date: string;
+    voucherType: string;
+    description: string;
+    debit: number;
+    credit: number;
+    balance: number;
+}
+
+export interface ReplenishmentItem {
+    product: Product;
+    quantity: number;
+    selectedProviderId: string;
+    selectedProviderName: string;
+}
+
+export interface ReplenishmentOrder {
+    id: string;
+    date: string;
+    providerId: string;
+    providerName: string;
+    items: ReplenishmentItem[];
+    status: 'DRAFT' | 'SENT' | 'RECEIVED' | 'CANCELLED';
+    totalItems: number;
+    estimatedCost: number;
+}
+
+export interface JournalEntry {
+    id: string;
+    date: string;
+    concept: string;
+    debit: number;
+    credit: number;
+    details: {
+        account: string;
+        debit: number;
+        credit: number;
+    }[];
+}
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    roleId: string;
+    active: boolean;
+    lastLogin: string;
+    branchId: string;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    color: string;
+    permissions: string[];
+}
