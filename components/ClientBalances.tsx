@@ -43,6 +43,16 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
         window.open(`https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
+    const sendEmailSummary = (client: Client) => {
+        const subject = encodeURIComponent(`Resumen de Cuenta - Ferretería Bruzzone`);
+        const portalLink = `${window.location.origin}/portal/${client.portalHash || 'default'}`;
+        const body = encodeURIComponent(`Hola ${client.name},\n\nTe contactamos para informarte que el saldo actual de tu cuenta corriente es de $${client.balance.toLocaleString('es-AR')}.\n\nPuedes consultar el detalle de tus facturas y los medios de pago disponibles en tu portal de autogestión: ${portalLink}\n\nSaludos,\nFerretería Bruzzone.`);
+        
+        const mailtoLink = `mailto:${client.email || ''}?subject=${subject}&body=${body}`;
+        window.location.href = mailtoLink;
+        alert(`Se ha abierto el gestor de correo para enviar el resumen a ${client.name}.`);
+    };
+
     const sendPaymentLink = (client: Client) => {
         const link = `${window.location.origin}/portal/${client.portalHash || 'default'}`;
         navigator.clipboard.writeText(link);
@@ -206,6 +216,7 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                                     <MessageCircle size={16}/>
                                                 </button>
                                                 <button 
+                                                    onClick={() => sendEmailSummary(client)}
                                                     className="p-2.5 text-slate-400 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-xl transition-all border border-slate-100" 
                                                     title="Enviar Resumen por Email">
                                                     <Mail size={16}/>
