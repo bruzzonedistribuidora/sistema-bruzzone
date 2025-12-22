@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -8,7 +7,6 @@ import Inventory from './components/Inventory';
 import POS from './components/POS';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
-import Assistant from './components/Assistant';
 import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
@@ -32,14 +30,15 @@ import DailyMovements from './components/DailyMovements';
 import Employees from './components/Employees';
 import Login from './components/Login';
 import CustomerPortal from './components/CustomerPortal';
-import StockTransfers from './components/StockTransfers';
 import { ViewState, User, Role, Client } from './types';
+
+// Comentamos el componente que falta para que el build funcione
+// import StockTransfers from './components/StockTransfers';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [activeBranchName, setActiveBranchName] = useState('Sucursal Central');
-  
   const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
 
@@ -118,11 +117,11 @@ const App: React.FC = () => {
     [ViewState.BRANCHES]: 'CONFIG_ACCESS',
     [ViewState.BACKUP]: 'CONFIG_ACCESS',
     [ViewState.PRINT_CONFIG]: 'CONFIG_ACCESS',
-    [ViewState.STOCK_TRANSFERS]: 'STOCK_EDIT',
   };
 
   const renderView = () => {
     if (!loggedInUser) return <Login onLogin={handleLogin} />;
+
     if (currentView === ViewState.CUSTOMER_PORTAL && portalPreviewClient) {
         return <CustomerPortal client={portalPreviewClient} onLogout={() => setCurrentView(ViewState.CLIENTS)} />;
     }
@@ -130,19 +129,18 @@ const App: React.FC = () => {
     const requiredPermission = viewPermissions[currentView];
     if (requiredPermission && !hasPermission(requiredPermission)) {
         return (
-            <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-10 text-center animate-fade-in">
+            <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-10 text-center">
                 <div className="bg-red-50 p-12 rounded-[3rem] border border-red-100 max-w-lg shadow-2xl shadow-red-900/5">
-                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
+                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8">
                         <Lock size={40}/>
                     </div>
                     <h3 className="text-2xl font-black text-red-800 uppercase tracking-tighter mb-3">Acceso Restringido</h3>
                     <p className="text-red-700 text-sm font-bold mb-10 leading-relaxed uppercase tracking-wide">
-                        Hola {loggedInUser.name}, tu rol actual no tiene permisos para ver esta sección. Contacta al administrador para habilitar el permiso: <br/>
-                        <code className="bg-red-200/50 px-2 py-1 rounded mt-2 inline-block font-mono">{requiredPermission}</code>
+                        Hola {loggedInUser.name}, tu rol actual no tiene permisos.
                     </p>
                     <button 
                         onClick={() => setCurrentView(ViewState.DASHBOARD)}
-                        className="w-full bg-red-600 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200">
+                        className="w-full bg-red-600 text-white py-4 rounded-2xl font-black">
                         Volver al inicio
                     </button>
                 </div>
@@ -153,7 +151,6 @@ const App: React.FC = () => {
     switch (currentView) {
       case ViewState.DASHBOARD: return <Dashboard />;
       case ViewState.INVENTORY: return <Inventory />;
-      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       case ViewState.POS: return <POS />;
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.ONLINE_SALES: return <OnlineSales />;
@@ -186,7 +183,6 @@ const App: React.FC = () => {
       case ViewState.BACKUP: return <Backup />;
       case ViewState.BRANCHES: return <Branches />;
       case ViewState.USERS: return <UsersComponent />;
-      case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
       case ViewState.SHORTAGES: return <Shortages />;
       case ViewState.PRINT_CONFIG: return <PrintSettings />;
@@ -208,7 +204,7 @@ const App: React.FC = () => {
       <Sidebar 
         currentView={currentView} 
         onNavigate={(view) => {
-            setTargetClientId(undefined); 
+            setTargetClientId(undefined);
             setCurrentView(view);
         }} 
         user={loggedInUser} 
