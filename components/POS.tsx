@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
-import POS from './components/POS';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
 import Treasury from './components/Treasury';
