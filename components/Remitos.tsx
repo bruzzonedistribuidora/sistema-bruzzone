@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
-import { Search, Plus, Printer, CheckSquare, Square, RefreshCw, FileText, CreditCard, User, ClipboardList, AlertCircle, X, Send, Mail, Minus, Package, Trash2, History, Link, CheckCircle, Globe } from 'lucide-react';
-import { Product, Remito, RemitoItem } from '../types';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    Search, Plus, Printer, CheckSquare, Square, RefreshCw, FileText, 
+    CreditCard, User, ClipboardList, AlertCircle, X, Send, Mail, 
+    Minus, Package, Trash2, History, Link, CheckCircle, Globe, 
+    ChevronRight, ArrowRight, DollarSign, UserSearch, Filter,
+    TrendingUp, Receipt, Pencil
+} from 'lucide-react';
+import { Product, Remito, RemitoItem, Client } from '../types';
 
 // Helper to create valid Product objects compatible with the interface
 const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string, brand: string = 'Genérico'): Product => ({
@@ -41,75 +48,42 @@ const Remitos: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   
+  // Historial & Search State
+  const [historyClientSearch, setHistoryClientSearch] = useState('');
+  const [historySelectedClient, setHistorySelectedClient] = useState<string | null>(null);
+  const [showHistoryClientResults, setShowHistoryClientResults] = useState(false);
+
   // Pending Remitos Management
   const [selectedRemitoIds, setSelectedRemitoIds] = useState<string[]>([]);
-  const [updatePrices, setUpdatePrices] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState<Remito | null>(null);
   
-  // Billing Modal State (For "Facturar Directamente")
-  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
-  const [billingStep, setBillingStep] = useState<'SELECTION' | 'PROCESSING' | 'SUCCESS'>('SELECTION');
-  const [billingType, setBillingType] = useState<'FISCAL' | 'INTERNAL'>('FISCAL');
-  
-  // Relations Modal State
-  const [relationsModalData, setRelationsModalData] = useState<Remito | null>(null);
-
   // Filter for history
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
 
-  // Mock Data
-  const sampleProducts: Product[] = [
-    createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante 2"', 150, 5000, 'Fijaciones', 'Fischer'),
-    createMockProduct('2', 'MAR-055', 'Martillo Galponero', 12500, 45, 'Herramientas', 'Stanley'),
-    createMockProduct('3', 'CEM-LOM', 'Cemento Loma Negra 50kg', 9500, 200, 'Construcción', 'Loma Negra'),
-    createMockProduct('4', 'AMOL-700', 'Amoladora Angular 700W', 45000, 10, 'Herramientas', 'Bosch'),
-    createMockProduct('5', 'DISC-COR', 'Disco Corte Metal 115mm', 850, 100, 'Abrasivos', 'Aliafor'),
-  ];
-  
-  const filteredProducts = sampleProducts.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.internalCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.brand.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Load Clients for Search
+  const [allClients] = useState<Client[]>(() => {
+      const saved = localStorage.getItem('ferrecloud_clients');
+      return saved ? JSON.parse(saved) : [];
+  });
 
-  const clients = ['Constructora del Norte', 'Juan Perez (Obras)', 'Estudio Arq. Lopez'];
+  // --- PERSISTENCIA REAL ---
+  const [existingRemitos, setExistingRemitos] = useState<(Remito & { relatedInvoice?: string })[]>(() => {
+      const saved = localStorage.getItem('ferrecloud_remitos');
+      return saved ? JSON.parse(saved) : [];
+  });
 
-  // Mock Existing Remitos for "Pending" tab
-  // Added relatedInvoice field for traceability
-  const [existingRemitos, setExistingRemitos] = useState<(Remito & { relatedInvoice?: string })[]>([
-    {
-      id: 'R-0001',
-      clientId: 'Juan Perez (Obras)',
-      clientName: 'Juan Perez (Obras)',
-      date: '2023-10-15', // Older date to show price diff
-      status: 'PENDING',
-      items: [
-        { product: sampleProducts[0], quantity: 100, historicalPrice: 120 }, // Was cheaper back then
-        { product: sampleProducts[2], quantity: 2, historicalPrice: 8000 }
-      ]
-    },
-    {
-      id: 'R-0002',
-      clientId: 'Juan Perez (Obras)',
-      clientName: 'Juan Perez (Obras)',
-      date: '2023-10-20',
-      status: 'PENDING',
-      items: [
-        { product: sampleProducts[1], quantity: 1, historicalPrice: 11000 }
-      ]
-    },
-    {
-      id: 'R-0003',
-      clientId: 'Constructora del Norte',
-      clientName: 'Constructora del Norte',
-      date: '2023-10-22',
-      status: 'BILLED',
-      relatedInvoice: 'FC-A-0005-00000023',
-      items: [
-        { product: sampleProducts[3], quantity: 1, historicalPrice: 45000 }
-      ]
-    }
-  ]);
+  useEffect(() => {
+      localStorage.setItem('ferrecloud_remitos', JSON.stringify(existingRemitos));
+  }, [existingRemitos]);
+
+  const filteredHistoryClients = useMemo(() => {
+      const term = historyClientSearch.toLowerCase().trim();
+      if (!term) return [];
+      return allClients.filter(c => 
+          c.name.toLowerCase().includes(term) || 
+          c.cuit.includes(term)
+      ).slice(0, 5);
+  }, [historyClientSearch, allClients]);
 
   // Actions
   const addToCart = (product: Product) => {
@@ -148,9 +122,24 @@ const Remitos: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       status: 'PENDING'
     };
-    setExistingRemitos([...existingRemitos, newRemito]);
+    setExistingRemitos([newRemito, ...existingRemitos]);
     setCart([]);
-    setShowPrintModal(newRemito); // Auto show print preview
+    setShowPrintModal(newRemito);
+  };
+
+  const handleDeleteRemito = (id: string) => {
+    if (window.confirm('¿Está seguro de que desea eliminar este remito? Esta acción es irreversible.')) {
+        setExistingRemitos(prev => prev.filter(r => r.id !== id));
+        setSelectedRemitoIds(prev => prev.filter(rid => rid !== id));
+    }
+  };
+
+  const handleEditRemito = (remito: Remito) => {
+    setSelectedClient(remito.clientName);
+    setCart(remito.items);
+    setActiveTab('NEW');
+    // Eliminamos el viejo para que sea un "reemplazo" al guardar de nuevo
+    setExistingRemitos(prev => prev.filter(r => r.id !== remito.id));
   };
 
   const toggleRemitoSelection = (id: string) => {
@@ -160,200 +149,164 @@ const Remitos: React.FC = () => {
   };
 
   const getBillingTotal = () => {
-    let total = 0;
     const selectedRemitos = existingRemitos.filter(r => selectedRemitoIds.includes(r.id));
-    
-    selectedRemitos.forEach(remito => {
-      remito.items.forEach(item => {
-        // If updatePrices is true, use the Current Product Price (sampleProducts), else use historical
-        const priceToUse = updatePrices 
-          ? (sampleProducts.find(p => p.id === item.product.id)?.priceFinal || item.historicalPrice)
-          : item.historicalPrice;
-        total += priceToUse * item.quantity;
-      });
-    });
-    return total;
+    return selectedRemitos.reduce((acc, remito) => {
+        return acc + remito.items.reduce((a, i) => a + (i.historicalPrice * i.quantity), 0);
+    }, 0);
   };
 
-  // Direct Billing from "New Remito"
-  const getCartTotal = () => {
-      return cart.reduce((acc, item) => acc + (item.quantity * item.historicalPrice), 0);
-  }
+  const getCartTotal = () => cart.reduce((acc, item) => acc + (item.quantity * item.historicalPrice), 0);
 
-  const handleDirectBilling = (type: 'FISCAL' | 'INTERNAL') => {
-      setBillingType(type);
-      setBillingStep('PROCESSING');
-      // Simulate Processing
-      setTimeout(() => {
-          setBillingStep('SUCCESS');
-          setCart([]);
-          // In a real app, this would save to SalesHistory
-      }, 1500);
-  };
-
-  // Process from History Tab
   const handleBillHistory = (type: 'ARCA' | 'INTERNAL') => {
     const invoiceNumber = type === 'ARCA' ? `FC-A-${Date.now().toString().slice(-8)}` : `INT-${Date.now().toString().slice(-8)}`;
-    alert(`Generando ${type === 'ARCA' ? 'Factura Fiscal' : 'Comprobante Interno'} (${invoiceNumber}) por $${getBillingTotal().toLocaleString('es-AR')}.\n\nRemitos cerrados: ${selectedRemitoIds.join(', ')}`);
-    
-    // Logic to update remito status would go here
     setExistingRemitos(prev => prev.map(r => selectedRemitoIds.includes(r.id) ? { ...r, status: 'BILLED', relatedInvoice: invoiceNumber } : r));
+    
+    if (type === 'INTERNAL') {
+        const amount = getBillingTotal();
+        const tMovs = JSON.parse(localStorage.getItem('ferrecloud_treasury_movements') || '[]');
+        const newT = {
+            id: `T-${Date.now()}`,
+            date: new Date().toLocaleString(),
+            type: 'INCOME',
+            subtype: 'VENTA',
+            paymentMethod: 'EFECTIVO',
+            amount,
+            description: `Cobro Remitos: ${selectedRemitoIds.join(', ')}`,
+            cashRegisterId: '1'
+        };
+        localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify([newT, ...tMovs]));
+    }
+
     setSelectedRemitoIds([]);
+    alert(`Comprobante ${invoiceNumber} generado con éxito.`);
   };
 
-  const handleShowRelations = (remito: any) => {
-      setRelationsModalData(remito);
-  };
+  const filteredRemitos = existingRemitos.filter(r => {
+      const matchStatus = historyFilter === 'ALL' || r.status === historyFilter;
+      const matchClient = !historySelectedClient || r.clientId === historySelectedClient || r.clientName === historySelectedClient;
+      return matchStatus && matchClient;
+  });
 
-  const filteredRemitos = existingRemitos.filter(r => 
-      historyFilter === 'ALL' || r.status === historyFilter
-  );
+  const clientsWithDebt = useMemo(() => {
+      const debtClients = existingRemitos.filter(r => r.status === 'PENDING');
+      const uniqueClients = Array.from(new Set(debtClients.map(r => r.clientName)));
+      return uniqueClients.map(name => ({
+          name,
+          count: debtClients.filter(r => r.clientName === name).length,
+          total: debtClients.filter(r => r.clientName === name).reduce((acc, r) => acc + r.items.reduce((a,i) => a + (i.quantity * i.historicalPrice), 0), 0)
+      })).sort((a,b) => b.total - a.total);
+  }, [existingRemitos]);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
-      {/* Header Tabs */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6">
+      <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Gestión de Remitos</h2>
-          <p className="text-gray-500 text-sm">Entrega de mercadería, cuentas corrientes y facturación diferida.</p>
+          <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Módulo de Remitos</h2>
+          <p className="text-gray-500 font-medium text-sm flex items-center gap-2 mt-1">
+              <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-black text-[10px] uppercase tracking-widest">Gestión de Entregas y Cuentas Corrientes</span>
+          </p>
         </div>
-        <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+        <div className="flex bg-white rounded-2xl p-1.5 border border-gray-200 shadow-sm">
           <button 
             onClick={() => setActiveTab('NEW')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'NEW' ? 'bg-ferre-orange text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all tracking-widest ${activeTab === 'NEW' ? 'bg-slate-900 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
             Nuevo Remito
           </button>
           <button 
              onClick={() => setActiveTab('HISTORY')}
-             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'HISTORY' ? 'bg-ferre-orange text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
+             className={`px-6 py-2 rounded-xl text-xs font-black uppercase transition-all tracking-widest ${activeTab === 'HISTORY' ? 'bg-slate-900 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
             Historial y Facturación
           </button>
         </div>
       </div>
 
       {activeTab === 'NEW' && (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col flex-1 overflow-hidden">
-            {/* Top Bar: Client & Search */}
-            <div className="p-6 bg-slate-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                
-                {/* Client Select */}
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente (Destinatario)</label>
-                    <select 
-                      className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-1 focus:ring-ferre-orange outline-none shadow-sm"
-                      value={selectedClient}
-                      onChange={(e) => setSelectedClient(e.target.value)}
-                    >
-                      <option value="">Seleccionar Cliente...</option>
-                      {clients.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                </div>
-
-                {/* Product Search */}
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden animate-fade-in">
+            <div className="p-8 bg-slate-50 border-b border-gray-200 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 <div className="relative">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar y Filtrar Producto (Nombre, Marca, Código)</label>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Seleccionar Cliente</label>
+                    <div className="relative group">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20}/>
+                        <select 
+                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 shadow-sm outline-none font-bold text-slate-700 transition-all appearance-none"
+                        value={selectedClient}
+                        onChange={(e) => setSelectedClient(e.target.value)}
+                        >
+                        <option value="">-- Buscar cliente en base de datos --</option>
+                        {allClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 rotate-90" size={16}/>
+                    </div>
+                </div>
+                <div className="relative">
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Añadir Productos</label>
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
                         <input 
                             type="text" 
-                            placeholder="Ej: Stanley, Tornillo, FIS-001..." 
-                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-ferre-orange outline-none shadow-sm"
+                            placeholder="Escanee código o busque nombre..." 
+                            className="w-full pl-12 pr-4 py-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 shadow-sm outline-none font-bold text-slate-700 transition-all uppercase"
                             value={searchTerm}
                             onChange={e => {
                                 setSearchTerm(e.target.value);
                                 setShowSearchResults(true);
                             }}
                             onFocus={() => setShowSearchResults(true)}
-                            onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
                         />
                     </div>
-                    {/* Search Dropdown */}
                     {showSearchResults && searchTerm && (
-                        <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-xl shadow-2xl mt-1 max-h-60 overflow-y-auto z-50">
-                            {filteredProducts.map(p => (
-                                <button 
-                                    key={p.id}
-                                    onClick={() => addToCart(p)}
-                                    className="w-full text-left px-4 py-3 hover:bg-orange-50 border-b border-gray-50 flex justify-between items-center group"
-                                >
-                                    <div>
-                                        <div className="font-bold text-gray-800 text-sm">{p.name}</div>
-                                        <div className="text-xs text-gray-500 font-mono flex items-center gap-1.5">
-                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{p.internalCode}</span>
-                                            <span>•</span>
-                                            <span className="font-bold text-ferre-orange uppercase">{p.brand}</span>
-                                            <span>•</span>
-                                            <span>{p.category}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className={`text-xs font-bold ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>Stock: {p.stock}</div>
-                                    </div>
-                                </button>
-                            ))}
-                            {filteredProducts.length === 0 && (
-                                <div className="p-4 text-center text-gray-400 text-sm italic">No se encontraron productos coincidentes.</div>
-                            )}
+                        <div className="absolute top-full left-0 w-full bg-white border border-gray-100 rounded-3xl shadow-2xl mt-2 max-h-64 overflow-y-auto z-50 animate-fade-in p-2">
+                            <p className="p-4 text-[10px] font-black text-gray-400 uppercase border-b mb-2">Resultados de búsqueda</p>
+                            <button onClick={() => addToCart(createMockProduct('1', 'DEMO', 'PRODUCTO DEMO', 1500, 10, 'GRAL'))} className="w-full text-left p-4 hover:bg-indigo-50 rounded-2xl transition-colors flex justify-between items-center group">
+                                <div>
+                                    <p className="font-black text-slate-800 uppercase tracking-tight">Producto Demo</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase">SKU: DEMO-001</p>
+                                </div>
+                                <Plus size={20} className="text-indigo-300 group-hover:text-indigo-600"/>
+                            </button>
                         </div>
                     )}
                 </div>
             </div>
             
-            {/* Items Table */}
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase border-b border-gray-200">
+                        <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
                             <tr>
-                                <th className="px-4 py-3 w-32">Código</th>
-                                <th className="px-4 py-3">Descripción</th>
-                                <th className="px-4 py-3">Marca</th>
-                                <th className="px-4 py-3 text-center w-40">Cantidad</th>
-                                <th className="px-4 py-3 text-center w-20">Acción</th>
+                                <th className="px-8 py-5">Identificación</th>
+                                <th className="px-8 py-5">Descripción</th>
+                                <th className="px-8 py-5 text-center">Cantidad</th>
+                                <th className="px-8 py-5 text-right">Unitario</th>
+                                <th className="px-8 py-5 text-center"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {cart.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-4 py-3 font-mono text-sm text-gray-600">{item.product.internalCode}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="font-bold text-gray-800 text-sm">{item.product.name}</div>
-                                        <div className="text-xs text-gray-400">{item.product.category}</div>
+                                <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="px-8 py-6 font-mono text-xs font-bold text-slate-400 uppercase">{item.product.internalCode}</td>
+                                    <td className="px-8 py-6">
+                                        <div className="font-black text-slate-800 uppercase tracking-tight">{item.product.name}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase">{item.product.category}</div>
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-tighter">
-                                            {item.product.brand}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-center border border-gray-300 rounded-lg w-fit mx-auto bg-white">
-                                            <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded-l-lg transition-colors"><Minus size={14}/></button>
-                                            <input 
-                                                className="w-12 text-center outline-none font-bold text-gray-700 text-sm" 
-                                                value={item.quantity} 
-                                                onChange={(e) => updateQuantity(item.product.id, parseInt(e.target.value) || 1)}
-                                            />
-                                            <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="p-1.5 hover:bg-gray-100 text-gray-500 rounded-r-lg transition-colors"><Plus size={14}/></button>
+                                    <td className="px-8 py-6">
+                                        <div className="flex items-center justify-center gap-4 bg-slate-50 rounded-2xl p-2 w-fit mx-auto border border-slate-100">
+                                            <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="p-2 hover:text-red-500 transition-colors"><Minus size={14}/></button>
+                                            <span className="font-black text-lg w-8 text-center">{item.quantity}</span>
+                                            <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="p-2 hover:text-green-500 transition-colors"><Plus size={14}/></button>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <button 
-                                            onClick={() => removeItem(item.product.id)}
-                                            className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
-                                        >
-                                            <Trash2 size={18}/>
-                                        </button>
+                                    <td className="px-8 py-6 text-right font-black text-slate-900">${item.historicalPrice.toLocaleString('es-AR')}</td>
+                                    <td className="px-8 py-6 text-center">
+                                        <button onClick={() => removeItem(item.product.id)} className="text-gray-300 hover:text-red-500 p-2 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={20}/></button>
                                     </td>
                                 </tr>
                             ))}
                             {cart.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="p-12 text-center">
-                                        <div className="flex flex-col items-center justify-center text-gray-300">
-                                            <ClipboardList size={48} className="mb-4 opacity-50"/>
-                                            <p className="text-lg font-medium text-gray-400">Sin artículos cargados</p>
-                                            <p className="text-sm mt-1">Busca productos por nombre, código o marca arriba.</p>
-                                        </div>
+                                    <td colSpan={5} className="py-32 text-center">
+                                        <ClipboardList size={80} strokeWidth={1} className="mx-auto text-gray-200 mb-4 opacity-30"/>
+                                        <p className="text-xl font-black text-slate-300 uppercase tracking-tighter">Sin artículos en el remito</p>
                                     </td>
                                 </tr>
                             )}
@@ -362,27 +315,20 @@ const Remitos: React.FC = () => {
                 </div>
             </div>
 
-            {/* Footer Actions */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-yellow-700 text-xs bg-yellow-50 px-3 py-2 rounded border border-yellow-200">
-                    <AlertCircle size={14} />
-                    <span>Total Estimado: ${getCartTotal().toLocaleString('es-AR')} (Solo referencia).</span>
+            <div className="p-8 border-t border-gray-100 bg-white flex items-center justify-between">
+                <div className="bg-indigo-50 px-6 py-4 rounded-[1.5rem] border border-indigo-100 flex items-center gap-4">
+                    <div className="p-2 bg-white rounded-xl shadow-sm text-indigo-600"><AlertCircle size={20}/></div>
+                    <div>
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1">Total a Devengar</p>
+                        <p className="text-2xl font-black text-indigo-700 tracking-tighter">${getCartTotal().toLocaleString('es-AR')}</p>
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={() => {
-                            setBillingStep('SELECTION');
-                            setIsBillingModalOpen(true);
-                        }}
-                        disabled={!selectedClient || cart.length === 0}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm">
-                        <FileText size={18} /> Facturar Directamente
-                    </button>
+                <div className="flex gap-4">
                     <button 
                         onClick={handleCreateRemito}
                         disabled={!selectedClient || cart.length === 0}
-                        className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg">
-                        <Printer size={18} /> Generar Remito
+                        className="bg-slate-900 hover:bg-slate-800 text-white px-12 py-5 rounded-[2rem] font-black uppercase text-sm tracking-widest shadow-2xl disabled:opacity-20 transition-all flex items-center gap-3">
+                        <Printer size={20}/> EMITIR REMITO R
                     </button>
                 </div>
             </div>
@@ -390,133 +336,170 @@ const Remitos: React.FC = () => {
       )}
 
       {activeTab === 'HISTORY' && (
-        <div className="flex gap-6 h-full">
-           <div className="w-1/4 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-             <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2"><User size={18}/> Clientes con Deuda</h3>
-             <ul className="space-y-2">
-               {/* Just filtering unique clients for demo */}
-               {Array.from(new Set(existingRemitos.filter(r => r.status === 'PENDING').map(r => r.clientId))).map(client => (
-                 <li key={client} className="p-3 bg-blue-50 text-blue-800 rounded-lg cursor-pointer font-medium border border-blue-100 flex justify-between items-center hover:bg-blue-100 transition-colors">
-                   {client}
-                   <span className="bg-blue-200 text-blue-900 text-xs px-2 py-0.5 rounded-full">
-                     {existingRemitos.filter(r => r.clientId === client && r.status === 'PENDING').length}
-                   </span>
-                 </li>
-               ))}
-             </ul>
+        <div className="flex gap-8 h-full animate-fade-in overflow-hidden">
+           {/* SIDEBAR: BUSCADOR DE CLIENTES Y DEUDORES */}
+           <div className="w-[350px] bg-white rounded-[2.5rem] shadow-sm border border-gray-200 p-8 flex flex-col gap-8 shrink-0 overflow-hidden">
+                <div className="space-y-4">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
+                        <UserSearch size={22} className="text-indigo-600"/> Buscar Cliente
+                    </h3>
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
+                        <input 
+                            type="text"
+                            placeholder="Nombre o CUIT..."
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-slate-700 text-sm transition-all"
+                            value={historyClientSearch}
+                            onChange={e => { setHistoryClientSearch(e.target.value); setShowHistoryClientResults(true); }}
+                            onFocus={() => setShowHistoryClientResults(true)}
+                        />
+                        {historySelectedClient && (
+                            <button onClick={() => { setHistorySelectedClient(null); setHistoryClientSearch(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-red-500 hover:bg-red-50 p-1 rounded-full"><X size={14}/></button>
+                        )}
+                    </div>
+                    {showHistoryClientResults && historyClientSearch.length > 0 && (
+                        <div className="absolute z-[60] left-8 w-[285px] bg-white rounded-3xl shadow-2xl border border-gray-100 p-2 animate-fade-in">
+                            {filteredHistoryClients.map(c => (
+                                <button key={c.id} onClick={() => { setHistorySelectedClient(c.name); setShowHistoryClientResults(false); setHistoryClientSearch(c.name); }} className="w-full text-left p-4 hover:bg-indigo-50 rounded-2xl flex items-center gap-3 transition-colors group">
+                                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-black text-xs group-hover:bg-white group-hover:text-indigo-600">{c.name.charAt(0)}</div>
+                                    <div className="overflow-hidden">
+                                        <p className="font-black text-slate-800 text-xs uppercase truncate leading-none mb-1">{c.name}</p>
+                                        <p className="text-[9px] text-gray-400 font-mono">{c.cuit}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <h3 className="font-black text-slate-400 text-[10px] uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <TrendingUp size={14} className="text-red-400"/> Clientes con Mayor Deuda
+                    </h3>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                        {clientsWithDebt.map(client => (
+                            <button 
+                                key={client.name} 
+                                onClick={() => { setHistorySelectedClient(client.name); setHistoryClientSearch(client.name); }}
+                                className={`w-full p-5 rounded-3xl border-2 transition-all text-left flex justify-between items-center group ${historySelectedClient === client.name ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-50' : 'border-gray-50 hover:border-gray-200'}`}>
+                                <div className="overflow-hidden">
+                                    <p className={`font-black uppercase tracking-tight truncate text-sm leading-none mb-2 ${historySelectedClient === client.name ? 'text-indigo-900' : 'text-slate-800'}`}>{client.name}</p>
+                                    <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest">{client.count} Remitos</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className={`text-sm font-black tracking-tighter ${historySelectedClient === client.name ? 'text-indigo-600' : 'text-slate-400'}`}>${client.total.toLocaleString('es-AR')}</p>
+                                    <ChevronRight size={14} className={`mt-1 transition-transform ${historySelectedClient === client.name ? 'translate-x-1 text-indigo-400' : 'text-gray-300 opacity-0 group-hover:opacity-100'}`}/>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
            </div>
 
-           <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200">
-             <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <div className="flex gap-2">
-                    <button onClick={() => setHistoryFilter('PENDING')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${historyFilter === 'PENDING' ? 'bg-orange-100 text-orange-700' : 'text-gray-500 hover:bg-gray-100'}`}>Pendientes de Facturar</button>
-                    <button onClick={() => setHistoryFilter('BILLED')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${historyFilter === 'BILLED' ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-100'}`}>Histórico / Facturados</button>
-                    <button onClick={() => setHistoryFilter('ALL')} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${historyFilter === 'ALL' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}>Todos</button>
+           {/* MAIN: LISTA DE REMITOS FILTRADA */}
+           <div className="flex-1 flex flex-col bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden">
+             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div className="flex gap-3">
+                    <button onClick={() => { setHistoryFilter('PENDING'); setSelectedRemitoIds([]); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyFilter === 'PENDING' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>Pendientes de Pago</button>
+                    <button onClick={() => { setHistoryFilter('BILLED'); setSelectedRemitoIds([]); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyFilter === 'BILLED' ? 'bg-green-600 text-white shadow-xl shadow-green-100' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>Ya Facturados</button>
+                    <button onClick={() => { setHistoryFilter('ALL'); setSelectedRemitoIds([]); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyFilter === 'ALL' ? 'bg-slate-900 text-white shadow-xl shadow-slate-100' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>Todo el Historial</button>
                 </div>
-                
-                {historyFilter === 'PENDING' && (
-                    <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                        <span className={`text-xs font-bold ${updatePrices ? 'text-gray-400' : 'text-green-600'}`}>Precios Históricos</span>
-                        <button 
-                            onClick={() => setUpdatePrices(!updatePrices)}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${updatePrices ? 'bg-ferre-orange' : 'bg-gray-300'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${updatePrices ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
-                        <span className={`text-xs font-bold ${updatePrices ? 'text-ferre-orange' : 'text-gray-400'}`}>Actualizar al Hoy</span>
+                {historySelectedClient && (
+                    <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-indigo-100 shadow-sm animate-fade-in">
+                        <User size={14} className="text-indigo-600"/>
+                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight">Filtro: {historySelectedClient}</span>
+                        <button onClick={() => { setHistorySelectedClient(null); setHistoryClientSearch(''); }} className="text-gray-300 hover:text-red-500"><X size={14}/></button>
                     </div>
                 )}
              </div>
 
-             <div className="flex-1 overflow-y-auto p-4">
-               <table className="w-full text-left border-collapse">
+             <div className="flex-1 overflow-y-auto">
+               <table className="w-full text-left">
                  <thead>
-                   <tr className="text-xs text-gray-500 uppercase border-b border-gray-200">
-                     <th className="py-2 pl-2">Sel.</th>
-                     <th className="py-2">Fecha</th>
-                     <th className="py-2">Nro Remito</th>
-                     <th className="py-2">Estado</th>
-                     <th className="py-2">Items</th>
-                     <th className="py-2 text-right">Total (Est.)</th>
-                     <th className="py-2 text-center">Acciones</th>
+                   <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 bg-white sticky top-0 z-10">
+                     <th className="px-8 py-5 text-center w-16">
+                         {historyFilter === 'PENDING' && (
+                             <button onClick={() => setSelectedRemitoIds(selectedRemitoIds.length === filteredRemitos.length ? [] : filteredRemitos.map(r => r.id))} className="text-gray-300 hover:text-indigo-600 transition-colors">
+                                {selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0 ? <CheckSquare size={20} className="text-indigo-600"/> : <Square size={20}/>}
+                             </button>
+                         )}
+                     </th>
+                     <th className="px-8 py-5">Comprobante / Fecha</th>
+                     <th className="px-8 py-5">Cliente</th>
+                     <th className="px-8 py-5 text-center">Estado</th>
+                     <th className="px-8 py-5 text-right">Importe Total</th>
+                     <th className="px-8 py-5 text-center">Acciones</th>
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100">
-                   {filteredRemitos.map(remito => {
-                      // Calculate row total based on strategy
-                      const rowTotal = remito.items.reduce((acc, item) => {
-                        const price = (updatePrices && remito.status === 'PENDING')
-                          ? (sampleProducts.find(p => p.id === item.product.id)?.priceFinal || item.historicalPrice)
-                          : item.historicalPrice;
-                        return acc + (price * item.quantity);
-                      }, 0);
-
-                      return (
-                        <tr key={remito.id} className="hover:bg-gray-50 group">
-                          <td className="py-3 pl-2">
+                   {filteredRemitos.map(remito => (
+                        <tr key={remito.id} className={`hover:bg-slate-50/50 transition-colors group ${selectedRemitoIds.includes(remito.id) ? 'bg-indigo-50/30' : ''}`}>
+                          <td className="px-8 py-6 text-center">
                             {remito.status === 'PENDING' && (
-                                <button onClick={() => toggleRemitoSelection(remito.id)} className="text-gray-400 hover:text-ferre-orange">
-                                {selectedRemitoIds.includes(remito.id) ? <CheckSquare className="text-ferre-orange" /> : <Square />}
+                                <button onClick={() => toggleRemitoSelection(remito.id)} className="text-gray-300 hover:text-indigo-600">
+                                {selectedRemitoIds.includes(remito.id) ? <CheckSquare size={20} className="text-indigo-600" /> : <Square size={20} />}
                                 </button>
                             )}
                           </td>
-                          <td className="py-3 text-sm text-gray-600">{remito.date}</td>
-                          <td className="py-3 text-sm font-mono font-medium">{remito.id}</td>
-                          <td className="py-3">
-                              <span className={`text-[10px] font-bold px-2 py-1 rounded ${remito.status === 'PENDING' ? 'bg-orange-50 text-orange-600' : 'bg-green-50 text-green-600'}`}>
-                                  {remito.status === 'PENDING' ? 'PENDIENTE' : 'FACTURADO'}
+                          <td className="px-8 py-6">
+                            <p className="font-mono text-xs font-black text-slate-800 leading-none mb-1">{remito.id}</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{remito.date}</p>
+                          </td>
+                          <td className="px-8 py-6 font-black text-slate-600 uppercase text-xs tracking-tight">{remito.clientName}</td>
+                          <td className="px-8 py-6 text-center">
+                              <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest border ${remito.status === 'PENDING' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                                  {remito.status === 'PENDING' ? 'DEUDA' : 'FACTURADO'}
                               </span>
                           </td>
-                          <td className="py-3 text-sm text-gray-600">
-                             {remito.items.map(i => `${i.quantity}x ${i.product.name}`).join(', ')}
+                          <td className="px-8 py-6 text-right font-black text-lg text-slate-900 tracking-tighter">
+                            ${remito.items.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString('es-AR')}
                           </td>
-                          <td className="py-3 text-sm font-bold text-right text-gray-800">
-                            ${rowTotal.toLocaleString('es-AR')}
-                          </td>
-                          <td className="py-3 text-center">
-                              <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={() => setShowPrintModal(remito)} className="text-gray-400 hover:text-gray-600 p-1" title="Ver Remito">
-                                    <Printer size={16}/>
-                                </button>
-                                {/* Relationship Button */}
-                                <button 
-                                    onClick={() => handleShowRelations(remito)}
-                                    className={`p-1 rounded hover:bg-indigo-50 ${remito.relatedInvoice ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'}`}
-                                    title="Ver Relaciones (Facturas)"
-                                >
-                                    <Link size={16} />
-                                </button>
+                          <td className="px-8 py-6 text-center">
+                              <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleEditRemito(remito)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Editar Remito"><Pencil size={18}/></button>
+                                <button onClick={() => setShowPrintModal(remito)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Imprimir"><Printer size={18}/></button>
+                                <button onClick={() => handleDeleteRemito(remito.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Eliminar"><Trash2 size={18}/></button>
                               </div>
                           </td>
                         </tr>
-                      )
-                   })}
+                   ))}
+                   {filteredRemitos.length === 0 && (
+                        <tr>
+                            <td colSpan={6} className="py-32 text-center text-gray-300">
+                                <Filter size={48} className="mx-auto mb-4 opacity-20"/>
+                                <p className="font-black uppercase tracking-tighter">No se encontraron documentos bajo este filtro</p>
+                            </td>
+                        </tr>
+                   )}
                  </tbody>
                </table>
              </div>
 
              {historyFilter === 'PENDING' && (
-                <div className="p-6 bg-slate-900 text-white rounded-b-xl flex justify-between items-center">
-                    <div>
-                    <div className="text-gray-400 text-sm">Total a Procesar</div>
-                    <div className="text-3xl font-bold">${getBillingTotal().toLocaleString('es-AR')}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                        {selectedRemitoIds.length} remitos seleccionados
+                <div className="p-8 bg-slate-900 text-white rounded-b-[2.5rem] flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl">
+                    <div className="flex items-center gap-8">
+                        <div className="p-4 bg-white/10 rounded-3xl">
+                            <CheckSquare size={32} className="text-indigo-400"/>
+                        </div>
+                        <div>
+                            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Seleccionado para Cobro</p>
+                            <h4 className="text-4xl font-black tracking-tighter leading-none">${getBillingTotal().toLocaleString('es-AR')}</h4>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-2">{selectedRemitoIds.length} Documentos marcados</p>
+                        </div>
                     </div>
-                    </div>
-                    <div className="flex gap-3">
-                    <button 
-                        onClick={() => handleBillHistory('INTERNAL')}
-                        disabled={selectedRemitoIds.length === 0}
-                        className="px-6 py-3 rounded-lg border border-slate-600 hover:bg-slate-800 text-gray-300 transition-colors disabled:opacity-50">
-                        Ingreso Interno
-                    </button>
-                    <button 
-                        onClick={() => handleBillHistory('ARCA')}
-                        disabled={selectedRemitoIds.length === 0}
-                        className="px-6 py-3 rounded-lg bg-ferre-orange hover:bg-orange-600 text-white font-bold transition-colors disabled:opacity-50 flex items-center gap-2">
-                        <FileText size={18} /> Facturar con ARCA
-                    </button>
+                    <div className="flex gap-4 w-full md:w-auto">
+                        <button 
+                            onClick={() => handleBillHistory('INTERNAL')} 
+                            disabled={selectedRemitoIds.length === 0} 
+                            className="flex-1 md:flex-none bg-white/5 hover:bg-white/10 border-2 border-white/10 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-20 flex items-center justify-center gap-2">
+                            <Receipt size={16}/> INGRESO POR CAJA
+                        </button>
+                        <button 
+                            onClick={() => handleBillHistory('ARCA')} 
+                            disabled={selectedRemitoIds.length === 0} 
+                            className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-900/40 transition-all disabled:opacity-20 flex items-center justify-center gap-2">
+                            <FileText size={18} /> PASAR A FACTURA (ARCA)
+                        </button>
                     </div>
                 </div>
              )}
@@ -524,175 +507,79 @@ const Remitos: React.FC = () => {
         </div>
       )}
 
-      {/* --- MODAL: DIRECT BILLING FROM NEW REMITO --- */}
-      {isBillingModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-                  
-                  {billingStep === 'SELECTION' && (
-                      <>
-                        <div className="p-6 text-center border-b border-gray-100">
-                            <h3 className="text-xl font-bold text-gray-800">Transformar en Venta</h3>
-                            <p className="text-gray-500 mt-1">Total: <span className="font-bold text-ferre-orange text-lg">${getCartTotal().toLocaleString('es-AR')}</span></p>
-                            <p className="text-sm text-gray-400 mt-2">Seleccione el tipo de comprobante para facturar directamente estos ítems.</p>
-                        </div>
-                        <div className="p-8 space-y-4">
-                            <button 
-                                onClick={() => handleDirectBilling('FISCAL')}
-                                className="w-full flex items-center p-4 border-2 border-green-100 bg-green-50 hover:bg-green-100 hover:border-green-300 rounded-xl transition-all group">
-                                <div className="bg-green-500 text-white p-3 rounded-full mr-4 group-hover:scale-110 transition-transform">
-                                    <Globe size={24}/>
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-bold text-green-800 text-lg">Factura Fiscal (ARCA)</div>
-                                    <div className="text-green-600 text-sm">Se conecta al servidor y genera CAE.</div>
-                                </div>
-                            </button>
-
-                            <button 
-                                onClick={() => handleDirectBilling('INTERNAL')}
-                                className="w-full flex items-center p-4 border-2 border-gray-100 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 rounded-xl transition-all group">
-                                <div className="bg-gray-500 text-white p-3 rounded-full mr-4 group-hover:scale-110 transition-transform">
-                                    <FileText size={24}/>
-                                </div>
-                                <div className="text-left">
-                                    <div className="font-bold text-gray-800 text-lg">Ingreso Interno (Ticket X)</div>
-                                    <div className="text-gray-500 text-sm">Comprobante de uso interno. Sin CAE.</div>
-                                </div>
-                            </button>
-                        </div>
-                        <div className="p-4 bg-gray-50 text-center">
-                            <button onClick={() => setIsBillingModalOpen(false)} className="text-gray-500 hover:text-gray-800 text-sm underline">Cancelar</button>
-                        </div>
-                      </>
-                  )}
-
-                  {billingStep === 'PROCESSING' && (
-                      <div className="p-12 text-center">
-                          <div className="w-16 h-16 border-4 border-ferre-orange border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-                          <h3 className="text-lg font-bold text-gray-800">Procesando Facturación...</h3>
-                      </div>
-                  )}
-
-                  {billingStep === 'SUCCESS' && (
-                      <div className="p-8 text-center">
-                          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                              <CheckCircle size={40} />
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-800">¡Venta Generada!</h3>
-                          <p className="text-gray-500 mt-1">
-                              {billingType === 'FISCAL' ? 'Factura Autorizada por ARCA' : 'Comprobante Interno Generado'}
-                          </p>
-                          <div className="mt-6">
-                              <button onClick={() => setIsBillingModalOpen(false)} className="bg-slate-800 text-white py-2 px-6 rounded-lg font-bold hover:bg-slate-900">Cerrar</button>
-                          </div>
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {/* Mock Print Modal */}
+      {/* MODAL: PREVIEW IMPRESIÓN REMITO */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
-           <div className="bg-white w-[500px] h-[700px] shadow-2xl rounded-sm p-8 flex flex-col relative">
-              <button onClick={() => setShowPrintModal(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X /></button>
-              
-              <div className="text-center border-b-2 border-black pb-4 mb-4">
-                 <h1 className="text-2xl font-bold uppercase tracking-widest">Remito X</h1>
-                 <p className="text-sm">Documento no válido como factura</p>
-                 <p className="text-xs mt-2">Fecha: {showPrintModal.date} | Nro: {showPrintModal.id}</p>
+        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-md p-4 animate-fade-in">
+           <div className="bg-white w-full max-w-2xl shadow-2xl rounded-[3rem] overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50">
+                 <h3 className="font-black text-gray-800 uppercase tracking-tighter flex items-center gap-2">
+                    <Printer size={20} className="text-indigo-600"/> Vista Previa de Remito
+                 </h3>
+                 <button onClick={() => setShowPrintModal(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={24}/></button>
               </div>
 
-              <div className="mb-6">
-                <p className="font-bold">Cliente: <span className="font-normal">{showPrintModal.clientName}</span></p>
-              </div>
-
-              <table className="w-full text-left mb-auto">
-                <thead className="border-b border-black">
-                  <tr>
-                    <th className="py-1">Cant.</th>
-                    <th className="py-1">Descripción</th>
-                    {/* Explicitly NO PRICE COLUMN */}
-                  </tr>
-                </thead>
-                <tbody>
-                  {showPrintModal.items.map((item, i) => (
-                    <tr key={i} className="border-b border-gray-100">
-                      <td className="py-2 font-bold w-16">{item.quantity}</td>
-                      <td className="py-2">{item.product.name}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="mt-8 pt-8 border-t border-black">
-                 <div className="flex justify-between items-end">
-                    <div className="text-xs">
-                       <p>Recibí conforme:</p>
-                       <br/><br/>
-                       <p>__________________________</p>
-                       <p>Firma / Aclaración</p>
+              <div className="flex-1 p-12 overflow-y-auto custom-scrollbar">
+                 <div className="border border-gray-200 p-10 rounded-[2rem] shadow-sm">
+                    <div className="flex justify-between items-start mb-12">
+                        <div>
+                            <h1 className="text-3xl font-black text-indigo-600 uppercase tracking-tighter">FerreCloud</h1>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">ID Logística: {showPrintModal.id}</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="bg-slate-900 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest inline-block mb-2">Remito de Entrega</div>
+                            <p className="text-sm font-bold text-slate-800 uppercase">Fecha: {showPrintModal.date}</p>
+                        </div>
                     </div>
-                    <div className="text-right">
-                       <p className="font-bold text-xl">VALORIZADO: NO</p>
+
+                    <div className="mb-10 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Receptor de Mercadería</p>
+                        <p className="text-xl font-black text-slate-800 uppercase tracking-tight">{showPrintModal.clientName}</p>
+                    </div>
+
+                    <table className="w-full text-left mb-12">
+                        <thead className="bg-slate-50 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b">
+                            <tr>
+                                <th className="py-4 px-2 w-16">Cant</th>
+                                <th className="py-4">Descripción del Artículo</th>
+                                <th className="py-4 text-right">Ref. Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm divide-y divide-gray-50">
+                            {showPrintModal.items.map((item, i) => (
+                                <tr key={i}>
+                                    <td className="py-4 px-2 font-black text-indigo-600 text-lg">{item.quantity}</td>
+                                    <td className="py-4">
+                                        <p className="font-bold text-slate-800 uppercase">{item.product.name}</p>
+                                        <p className="text-[9px] text-gray-400 font-mono">SKU: {item.product.internalCode}</p>
+                                    </td>
+                                    <td className="py-4 text-right font-medium text-slate-500">${item.historicalPrice.toLocaleString('es-AR')}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="mt-20 flex flex-col md:flex-row justify-between items-end gap-8 border-t-2 border-dashed border-gray-100 pt-10">
+                        <div className="text-center w-full md:w-64">
+                            <div className="h-10 border-b border-slate-300"></div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase mt-4">Firma de Entrega (FerreCloud)</p>
+                        </div>
+                        <div className="text-center w-full md:w-64">
+                            <div className="h-10 border-b border-slate-300"></div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase mt-4">Conformidad de Recepción</p>
+                        </div>
                     </div>
                  </div>
               </div>
               
-              <div className="mt-6 flex gap-2 no-print">
-                 <button className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 flex items-center justify-center gap-2" onClick={() => alert('Enviando Whatsapp...')}>
-                    <Send size={16}/> WhatsApp
-                 </button>
-                 <button className="flex-1 bg-blue-500 text-white py-2 rounded hover:bg-blue-600 flex items-center justify-center gap-2" onClick={() => alert('Enviando Email...')}>
-                    <Mail size={16}/> Email
-                 </button>
-                 <button className="flex-1 bg-slate-800 text-white py-2 rounded hover:bg-slate-700 flex items-center justify-center gap-2" onClick={() => setShowPrintModal(null)}>
-                    <Printer size={16}/> Imprimir
+              <div className="p-8 border-t border-gray-100 bg-gray-50 flex gap-4">
+                 <button onClick={() => setShowPrintModal(null)} className="flex-1 py-4 bg-white border border-gray-300 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-colors">Cerrar</button>
+                 <button className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all">
+                    <Printer size={18} /> Imprimir Comprobante
                  </button>
               </div>
            </div>
         </div>
       )}
-
-      {/* --- MODAL: SHOW RELATIONS (INVOICES) --- */}
-      {relationsModalData && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-                  <div className="p-4 border-b border-gray-200 bg-indigo-600 text-white flex justify-between items-center">
-                      <h3 className="font-bold text-lg flex items-center gap-2">
-                          <Link size={18}/> Relaciones de Documento
-                      </h3>
-                      <button onClick={() => setRelationsModalData(null)}><X className="text-indigo-200 hover:text-white"/></button>
-                  </div>
-                  <div className="p-6">
-                      <div className="mb-4">
-                          <p className="text-xs text-gray-500 uppercase font-bold">Documento Actual</p>
-                          <p className="text-lg font-bold text-gray-800">Remito: {relationsModalData.id}</p>
-                      </div>
-                      
-                      <div className="border-t border-gray-200 pt-4">
-                          <p className="text-xs text-gray-500 uppercase font-bold mb-2">Facturado En</p>
-                          {relationsModalData.relatedInvoice ? (
-                              <div className="flex items-center gap-2 bg-green-50 p-3 rounded border border-green-200">
-                                  <FileText size={16} className="text-green-600"/>
-                                  <span className="font-mono font-medium text-gray-700">{relationsModalData.relatedInvoice}</span>
-                                  <CheckCircle size={16} className="text-green-500 ml-auto"/>
-                              </div>
-                          ) : (
-                              <div className="text-center p-4 bg-gray-50 rounded border border-gray-200 text-gray-400 text-sm">
-                                  Este remito aún no ha sido facturado.
-                              </div>
-                          )}
-                      </div>
-                  </div>
-                  <div className="p-4 bg-gray-50 border-t border-gray-200 text-right">
-                      <button onClick={() => setRelationsModalData(null)} className="px-4 py-2 bg-white border border-gray-300 rounded text-gray-700 font-medium hover:bg-gray-100">Cerrar</button>
-                  </div>
-              </div>
-          </div>
-      )}
-
     </div>
   );
 };
