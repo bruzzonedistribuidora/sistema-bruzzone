@@ -103,6 +103,21 @@ const Inventory: React.FC = () => {
         alert("El nombre y el código interno son obligatorios.");
         return;
     }
+
+    // Validación de unicidad compuesta: Código Interno + Proveedor + Código de Proveedor
+    const primaryProvCode = formData.providerCodes[0] || '';
+    const isDuplicate = products.some(p => 
+        p.id !== formData.id && 
+        p.internalCode.toUpperCase() === formData.internalCode.toUpperCase() &&
+        p.provider.toUpperCase() === formData.provider.toUpperCase() &&
+        (p.providerCodes[0] || '').toUpperCase() === primaryProvCode.toUpperCase()
+    );
+
+    if (isDuplicate) {
+        alert(`Error: Ya existe un artículo con el código interno "${formData.internalCode}" para el proveedor "${formData.provider}" con el mismo código de referencia. La combinación debe ser única.`);
+        return;
+    }
+
     const totalStock = formData.stockDetails.reduce((acc, curr) => acc + curr.quantity, 0);
     const finalProduct = { ...formData, stock: totalStock };
 
