@@ -6,9 +6,9 @@ import {
     ShoppingCart, AlertCircle, Info, Percent, Building2, 
     Store, Monitor, TrendingDown, ArrowUpRight, ListPlus, 
     Ruler, Hash, BookmarkPlus, ChevronRight, Settings2,
-    CheckCircle, PackagePlus
+    CheckCircle, PackagePlus, Zap
 } from 'lucide-react';
-import { Product, ProductStock } from '../types';
+import { Product, ProductStock, Provider } from '../types';
 
 const Inventory: React.FC = () => {
   const initialProduct: Product = {
@@ -36,14 +36,11 @@ const Inventory: React.FC = () => {
   const [formData, setFormData] = useState<Product>(initialProduct);
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'ECOMMERCE'>('GENERAL');
   
-  // Estados auxiliares para entradas múltiples
   const [newBarcode, setNewBarcode] = useState('');
   const [newProvCode, setNewProvCode] = useState('');
   
-  // Persistencia
   useEffect(() => { localStorage.setItem('ferrecloud_products', JSON.stringify(products)); }, [products]);
 
-  // Lógica de Precios
   useEffect(() => {
     let cost = Number(formData.listCost) || 0;
     formData.discounts.forEach(d => { if (d > 0) cost = cost * (1 - d / 100); });
@@ -58,7 +55,6 @@ const Inventory: React.FC = () => {
     }));
   }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate]);
 
-  // Handlers
   const handleOpenModal = () => {
     setFormData({...initialProduct, id: Date.now().toString()});
     setIsModalOpen(true);
@@ -82,6 +78,24 @@ const Inventory: React.FC = () => {
     } else {
         alert(`El artículo "${product.name}" ya se encuentra en la lista de pedidos pendientes.`);
     }
+  };
+
+  const handleSyncProviderDiscounts = (providerName: string) => {
+      if (!providerName) return;
+      const savedProviders = localStorage.getItem('ferrecloud_providers');
+      if (savedProviders) {
+          const providers: Provider[] = JSON.parse(savedProviders);
+          const found = providers.find(p => p.name.toLowerCase().trim() === providerName.toLowerCase().trim());
+          if (found && found.defaultDiscounts) {
+              const newDiscounts: [number, number, number, number] = [
+                  found.defaultDiscounts[0],
+                  found.defaultDiscounts[1],
+                  found.defaultDiscounts[2],
+                  0
+              ];
+              setFormData(prev => ({ ...prev, discounts: newDiscounts }));
+          }
+      }
   };
 
   const handleSaveProduct = () => {
@@ -120,7 +134,6 @@ const Inventory: React.FC = () => {
   return (
     <div className="p-8 h-full flex flex-col max-w-7xl mx-auto space-y-6">
       
-      {/* HEADER PRINCIPAL */}
       <div className="flex justify-between items-end">
           <div>
               <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Inventario Maestro</h2>
@@ -133,7 +146,6 @@ const Inventory: React.FC = () => {
           </button>
       </div>
 
-      {/* BUSCADOR */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 p-6 flex gap-4">
             <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={20} />
@@ -147,7 +159,6 @@ const Inventory: React.FC = () => {
             </div>
       </div>
 
-      {/* TABLA */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col animate-fade-in">
         <div className="flex-1 overflow-auto">
             <table className="w-full text-left">
@@ -210,12 +221,10 @@ const Inventory: React.FC = () => {
         </div>
       </div>
 
-      {/* --- MODAL DE CARGA (PRO-DESIGN) --- */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh] border border-white/10">
                   
-                  {/* Header del Modal */}
                   <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-5">
                           <div className="p-4 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-500/20">
@@ -231,7 +240,6 @@ const Inventory: React.FC = () => {
                       <button onClick={() => setIsModalOpen(false)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X size={32} /></button>
                   </div>
 
-                  {/* Solapas (Tabs) */}
                   <div className="flex bg-slate-100 p-2 gap-2 border-b border-gray-200 shrink-0">
                       {[
                           { id: 'GENERAL', label: 'Identidad y Proveedor', icon: Info },
@@ -249,14 +257,11 @@ const Inventory: React.FC = () => {
                       ))}
                   </div>
 
-                  {/* Cuerpo del Modal */}
                   <div className="flex-1 overflow-y-auto p-12 custom-scrollbar bg-slate-50/30">
                       
-                      {/* --- TAB: GENERAL --- */}
                       {modalTab === 'GENERAL' && (
                           <div className="space-y-10 animate-fade-in">
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                                  {/* Columna Identidad */}
                                   <div className="space-y-6">
                                       <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 border-b pb-3 border-indigo-100"><Tag size={16}/> Identidad del Producto</h4>
                                       <div className="space-y-4">
@@ -281,13 +286,32 @@ const Inventory: React.FC = () => {
                                       </div>
                                   </div>
 
-                                  {/* Columna Proveedor (CLAVE PARA ACTUALIZACIONES) */}
                                   <div className="space-y-6">
                                       <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest flex items-center gap-2 border-b pb-3 border-orange-100"><Truck size={16}/> Vínculo con el Proveedor</h4>
                                       <div className="bg-orange-50/50 p-8 rounded-[2.5rem] border border-orange-100 space-y-6">
                                           <div>
                                               <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Proveedor Principal</label>
-                                              <input className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-orange-500 shadow-sm outline-none font-black text-slate-800 transition-all uppercase" placeholder="BUSCAR O CREAR PROVEEDOR..." value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value.toUpperCase()})}/>
+                                              <div className="relative group">
+                                                <input 
+                                                    className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-orange-500 shadow-sm outline-none font-black text-slate-800 transition-all uppercase pr-12" 
+                                                    placeholder="BUSCAR PROVEEDOR..." 
+                                                    value={formData.provider} 
+                                                    onChange={e => {
+                                                        const val = e.target.value.toUpperCase();
+                                                        setFormData({...formData, provider: val});
+                                                        // Auto-sync discounts if provider name matches
+                                                        handleSyncProviderDiscounts(val);
+                                                    }}
+                                                />
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleSyncProviderDiscounts(formData.provider)}
+                                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-orange-400 hover:text-orange-600 transition-all"
+                                                    title="Sincronizar descuentos del proveedor"
+                                                >
+                                                    <Zap size={18} />
+                                                </button>
+                                              </div>
                                           </div>
 
                                           <div>
@@ -307,7 +331,6 @@ const Inventory: React.FC = () => {
                                           </div>
                                       </div>
 
-                                      {/* Barcodes */}
                                       <div className="space-y-4">
                                           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2 flex items-center gap-2"><Barcode size={14}/> Códigos de Barra (EAN/GTIN)</label>
                                           <div className="flex gap-2">
@@ -327,7 +350,6 @@ const Inventory: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: PRICING --- */}
                       {modalTab === 'PRICING' && (
                           <div className="space-y-10 animate-fade-in">
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -355,6 +377,7 @@ const Inventory: React.FC = () => {
                                                       </div>
                                                   ))}
                                               </div>
+                                              <p className="text-[9px] text-center text-gray-400 font-bold uppercase mt-3 italic">Heredados automáticamente del perfil del proveedor.</p>
                                           </div>
                                           <div className="pt-6 border-t border-dashed border-gray-300 flex justify-between items-center px-4">
                                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Costo Neto de Reposición</span>
@@ -394,7 +417,6 @@ const Inventory: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: STOCK --- */}
                       {modalTab === 'STOCK' && (
                           <div className="space-y-12 animate-fade-in">
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
@@ -474,7 +496,6 @@ const Inventory: React.FC = () => {
                           </div>
                       )}
 
-                      {/* --- TAB: ECOMMERCE --- */}
                       {modalTab === 'ECOMMERCE' && (
                           <div className="space-y-10 animate-fade-in">
                                <div className="bg-white p-12 rounded-[4rem] shadow-sm border border-gray-100 text-center max-w-4xl mx-auto">
@@ -505,7 +526,6 @@ const Inventory: React.FC = () => {
                       )}
                   </div>
 
-                  {/* Footer del Modal */}
                   <div className="p-8 border-t border-gray-100 bg-white flex justify-end gap-5 shrink-0">
                       <button onClick={() => setIsModalOpen(false)} className="px-10 py-4 text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-800 transition-all">Descartar Cambios</button>
                       <button onClick={handleSaveProduct} className="bg-slate-900 text-white px-16 py-4 rounded-[2rem] font-black uppercase text-sm tracking-widest shadow-2xl hover:bg-slate-800 transition-all active:scale-95 flex items-center gap-3">
