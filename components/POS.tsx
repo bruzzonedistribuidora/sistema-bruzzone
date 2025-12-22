@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
-import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
