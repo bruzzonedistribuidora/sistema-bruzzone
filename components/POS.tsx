@@ -4,27 +4,20 @@ import {
     ShoppingCart, User, CreditCard, Printer, Trash2, Search, CheckCircle, 
     Plus, Minus, Banknote, FileText, X, AlertCircle, RefreshCw, Barcode, 
     DollarSign, History, Filter, Eye, Package, UserPlus, Zap, Landmark, Smartphone,
-    PackagePlus
+    PackagePlus, Loader2, CloudLightning, Globe
 } from 'lucide-react';
 import { InvoiceItem, Product, TaxCondition, Client, PriceList } from '../types';
+import { searchVirtualInventory } from '../services/geminiService';
 
 const POS: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'SALES' | 'HISTORY'>('SALES');
     const searchRef = useRef<HTMLDivElement>(null);
     const clientRef = useRef<HTMLDivElement>(null);
 
-    // --- DATOS POR DEFECTO (Para asegurar que siempre haya algo que buscar) ---
-    const defaultProducts: Product[] = [
-        { id: '1', name: 'Tornillo T1 Autoperforante 2"', internalCode: 'TOR-001', brand: 'Fischer', category: 'Fijaciones', provider: 'Herramientas Global SA', stock: 1500, priceFinal: 150, listCost: 100, barcodes: ['7790001', 'TOR001'], providerCodes: [], vatRate: 21, profitMargin: 30, costAfterDiscounts: 100, priceNeto: 123.96, discounts: [0,0,0,0], measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS', minStock: 100, reorderPoint: 500, desiredStock: 2000, stockDetails: [], description: '', location: '', ecommerce: {} },
-        { id: '2', name: 'Taladro Percutor 750W GSB 13 RE', internalCode: 'TAL-022', brand: 'Bosch', category: 'Herramientas', provider: 'Robert Bosch', stock: 15, priceFinal: 95000, listCost: 60000, barcodes: ['3165140', 'TAL022'], providerCodes: [], vatRate: 21, profitMargin: 30, costAfterDiscounts: 60000, priceNeto: 78512.4, discounts: [0,0,0,0], measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS', minStock: 5, reorderPoint: 10, desiredStock: 30, stockDetails: [], description: '', location: '', ecommerce: {} },
-        { id: '3', name: 'Lija al Agua Grano 180', internalCode: 'LIJ-180', brand: 'Dob A', category: 'Pintureria', provider: 'Pinturas del Centro', stock: 500, priceFinal: 450, listCost: 200, barcodes: ['7791234', 'LIJ180'], providerCodes: [], vatRate: 21, profitMargin: 30, costAfterDiscounts: 200, priceNeto: 371.9, discounts: [0,0,0,0], measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS', minStock: 100, reorderPoint: 200, desiredStock: 1000, stockDetails: [], description: '', location: '', ecommerce: {} }
-    ];
-
-    // --- CARGA DE DATOS ---
+    // --- ESTADO INICIAL VACÍO (Desde Cero) ---
     const [products] = useState<Product[]>(() => {
         const saved = localStorage.getItem('ferrecloud_products');
-        const parsed = saved ? JSON.parse(saved) : [];
-        return parsed.length > 0 ? parsed : defaultProducts;
+        return saved ? JSON.parse(saved) : [];
     });
 
     const [clients] = useState<Client[]>(() => {
@@ -42,6 +35,10 @@ const POS: React.FC = () => {
     const [clientSearch, setClientSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
     const [showClientResults, setShowClientResults] = useState(false);
+    
+    // IA Cloud Search State
+    const [cloudResults, setCloudResults] = useState<Product[]>([]);
+    const [isCloudSearching, setIsCloudSearching] = useState(false);
 
     // --- LISTAS DE PRECIOS ---
     const [priceLists] = useState<PriceList[]>([
@@ -69,23 +66,45 @@ const POS: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // --- LÓGICA DE BÚSQUEDA FILTRADA ---
-    const filteredProducts = useMemo(() => {
+    // --- LÓGICA DE BÚSQUEDA HÍBRIDA (LOCAL + IA CLOUD) ---
+    const localResults = useMemo(() => {
         const term = productSearch.trim().toLowerCase();
         if (!term) return [];
-        
-        return products.filter(p => {
-            const name = (p.name || '').toLowerCase();
-            const code = (p.internalCode || '').toLowerCase();
-            const brand = (p.brand || '').toLowerCase();
-            const barcodes = p.barcodes || [];
-            
-            return name.includes(term) || 
-                   code.includes(term) || 
-                   brand.includes(term) || 
-                   barcodes.some(b => b.toLowerCase().includes(term));
-        }).slice(0, 10);
+        return products.filter(p => 
+            (p.name || '').toLowerCase().includes(term) || 
+            (p.internalCode || '').toLowerCase().includes(term) ||
+            (p.brand || '').toLowerCase().includes(term)
+        ).slice(0, 5);
     }, [productSearch, products]);
+
+    // Trigger IA Cloud Search only when local results are zero or user keeps typing
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            if (productSearch.trim().length > 2 && localResults.length === 0) {
+                setIsCloudSearching(true);
+                const results = await searchVirtualInventory(productSearch);
+                // Map IA result properties to full Product interface
+                const mappedResults = results.map(r => ({
+                    ...r,
+                    priceFinal: (r as any).price || 0,
+                    internalCode: (r as any).sku || 'CLOUD',
+                    brand: 'Catálogo Nube',
+                    stock: 0,
+                    provider: 'Proveedor Nube',
+                    vatRate: 21,
+                    discounts: [0,0,0,0],
+                    costAfterDiscounts: ((r as any).price || 0) * 0.7,
+                    listCost: ((r as any).price || 0) * 0.7,
+                    stockDetails: []
+                } as unknown as Product));
+                setCloudResults(mappedResults);
+                setIsCloudSearching(false);
+            } else {
+                setCloudResults([]);
+            }
+        }, 800); // Debounce to avoid excessive API calls
+        return () => clearTimeout(timer);
+    }, [productSearch, localResults]);
 
     const filteredClients = useMemo(() => {
         const term = clientSearch.trim().toLowerCase();
@@ -132,22 +151,18 @@ const POS: React.FC = () => {
 
     const removeFromCartLocal = (id: string) => setCart(prev => prev.filter(i => i.product.id !== id));
 
-    // --- NUEVO: PEDIR A PROVEEDOR ---
     const handleRequestToProvider = (e: React.MouseEvent, product: Product) => {
-        e.stopPropagation(); // Evitar agregar al carrito si se hace clic solo en el icono
+        e.stopPropagation();
         const savedManual = localStorage.getItem('ferrecloud_manual_shortages');
         const manualIds: string[] = savedManual ? JSON.parse(savedManual) : [];
-        
         if (!manualIds.includes(product.id)) {
-            const newManualIds = [...manualIds, product.id];
-            localStorage.setItem('ferrecloud_manual_shortages', JSON.stringify(newManualIds));
-            alert(`"${product.name}" agregado a la lista de Faltantes/Reposición para el comprador.`);
+            localStorage.setItem('ferrecloud_manual_shortages', JSON.stringify([...manualIds, product.id]));
+            alert(`"${product.name}" agregado a faltantes.`);
         } else {
-            alert(`"${product.name}" ya está marcado para pedido.`);
+            alert(`"${product.name}" ya estaba solicitado.`);
         }
     };
 
-    // --- CÁLCULO DE TOTALES ---
     const totals = useMemo(() => {
         const total = cart.reduce((acc, item) => acc + item.subtotal, 0);
         const subtotal = total / 1.21;
@@ -159,7 +174,6 @@ const POS: React.FC = () => {
         if (cart.length === 0) return;
         setCheckoutStatus('PROCESSING');
         setIsCheckoutOpen(true);
-        
         setTimeout(() => {
             const cae = Math.random().toString().slice(2, 16);
             const newSale = {
@@ -173,7 +187,6 @@ const POS: React.FC = () => {
             };
             const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify([newSale, ...history]));
-            
             setCheckoutStatus('SUCCESS');
         }, 1500);
     };
@@ -191,7 +204,6 @@ const POS: React.FC = () => {
 
     return (
         <div className="flex h-full bg-slate-100 overflow-hidden flex-col">
-            {/* TABS HEADER */}
             <div className="bg-white border-b border-gray-200 px-8 pt-4 flex justify-between items-end shrink-0">
                 <div className="flex gap-8">
                     <button onClick={() => setActiveTab('SALES')} className={`pb-4 px-2 font-black text-sm uppercase tracking-widest border-b-4 transition-all ${activeTab === 'SALES' ? 'border-ferre-orange text-ferre-orange' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
@@ -214,65 +226,92 @@ const POS: React.FC = () => {
 
             {activeTab === 'SALES' && (
                 <div className="flex flex-1 overflow-hidden p-6 gap-6">
-                    {/* COLUMNA IZQUIERDA: BÚSQUEDA Y CARRITO */}
                     <div className="flex-[3] flex flex-col gap-6 overflow-hidden">
                         
-                        {/* BUSCADORES */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
                             <div className="relative" ref={searchRef}>
                                 <div className="flex items-center bg-white border-2 border-transparent focus-within:border-ferre-orange rounded-3xl px-6 py-4 shadow-sm transition-all group">
                                     <Barcode className="text-gray-300 group-focus-within:text-ferre-orange mr-4" size={24} />
                                     <input 
                                         type="text" 
-                                        placeholder="Buscar Artículo (Nombre, Código, Marca)..." 
+                                        placeholder="Buscar entre 140,000 artículos..." 
                                         className="flex-1 bg-transparent outline-none text-lg font-bold text-gray-700" 
                                         value={productSearch}
                                         onFocus={() => setShowProductResults(true)}
                                         onChange={(e) => setProductSearch(e.target.value)}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && filteredProducts.length > 0) {
-                                                addToCart(filteredProducts[0]);
-                                            }
+                                            if (e.key === 'Enter' && localResults.length > 0) addToCart(localResults[0]);
                                         }}
                                     />
-                                    {productSearch && (
+                                    {isCloudSearching && <Loader2 className="animate-spin text-indigo-500" size={20}/>}
+                                    {productSearch && !isCloudSearching && (
                                         <button onClick={() => setProductSearch('')} className="p-1 hover:bg-gray-100 rounded-full text-gray-400"><X size={20}/></button>
                                     )}
                                 </div>
                                 
                                 {showProductResults && productSearch.trim().length > 0 && (
                                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-fade-in max-h-[400px] overflow-y-auto custom-scrollbar">
-                                        {filteredProducts.length > 0 ? (
-                                            filteredProducts.map(p => (
-                                                <div key={p.id} className="w-full text-left p-4 hover:bg-orange-50 border-b last:border-0 flex justify-between items-center group transition-colors">
-                                                    <div className="flex gap-4 flex-1 cursor-pointer" onClick={() => addToCart(p)}>
-                                                        <div className="p-2 bg-gray-50 rounded-xl text-gray-400 group-hover:bg-white group-hover:text-ferre-orange transition-colors"><Package size={20}/></div>
-                                                        <div>
-                                                            <p className="font-black text-slate-800 uppercase tracking-tight">{p.name}</p>
-                                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{p.internalCode} • {p.brand}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right flex items-center gap-4">
-                                                        <div className="hidden group-hover:flex">
-                                                            <button 
-                                                                onClick={(e) => handleRequestToProvider(e, p)}
-                                                                className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center gap-2 text-[10px] font-black uppercase"
-                                                                title="Pedir reposición a proveedor"
-                                                            >
-                                                                <PackagePlus size={16}/> PEDIR
-                                                            </button>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-black text-ferre-orange text-lg">${calculatePriceWithList(p, selectedPriceList).toLocaleString('es-AR')}</p>
-                                                            <p className={`text-[10px] font-black uppercase ${p.stock > 0 ? 'text-green-500' : 'text-red-500'}`}>Stock: {p.stock}</p>
-                                                        </div>
+                                        
+                                        {/* LOCAL RESULTS */}
+                                        {localResults.length > 0 && (
+                                            <div className="bg-slate-50 px-6 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">Stock Local</div>
+                                        )}
+                                        {localResults.map(p => (
+                                            <div key={p.id} className="w-full text-left p-4 hover:bg-orange-50 border-b last:border-0 flex justify-between items-center group transition-colors">
+                                                <div className="flex gap-4 flex-1 cursor-pointer" onClick={() => addToCart(p)}>
+                                                    <div className="p-2 bg-gray-50 rounded-xl text-gray-400 group-hover:bg-white group-hover:text-ferre-orange transition-colors"><Package size={20}/></div>
+                                                    <div>
+                                                        <p className="font-black text-slate-800 uppercase tracking-tight">{p.name}</p>
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{p.internalCode} • {p.brand}</p>
                                                     </div>
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
-                                                <Search size={32} className="opacity-20"/>
-                                                <p className="font-bold text-sm uppercase">No se encontraron artículos</p>
+                                                <div className="text-right flex items-center gap-4">
+                                                    <div>
+                                                        <p className="font-black text-ferre-orange text-lg">${calculatePriceWithList(p, selectedPriceList).toLocaleString('es-AR')}</p>
+                                                        <p className={`text-[10px] font-black uppercase ${p.stock > 0 ? 'text-green-500' : 'text-red-500'}`}>Stock: {p.stock}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {/* CLOUD SEARCH RESULTS (IA) */}
+                                        {cloudResults.length > 0 && (
+                                            <div className="bg-indigo-50 px-6 py-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b flex items-center gap-2">
+                                                <CloudLightning size={12}/> Catálogo Maestro Cloud (140k artículos)
+                                            </div>
+                                        )}
+                                        {cloudResults.map(p => (
+                                            <div key={p.id} className="w-full text-left p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center group transition-colors">
+                                                <div className="flex gap-4 flex-1">
+                                                    <div className="p-2 bg-white rounded-xl text-indigo-400 shadow-sm">
+                                                        {/* Fix: Use Globe icon imported from lucide-react */}
+                                                        <Globe size={20}/>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-slate-800 uppercase tracking-tight">{p.name}</p>
+                                                        <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{p.internalCode} • {p.category}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right flex items-center gap-4">
+                                                    <button 
+                                                        onClick={(e) => handleRequestToProvider(e, p)}
+                                                        className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md flex items-center gap-2 text-[10px] font-black uppercase"
+                                                    >
+                                                        <PackagePlus size={16}/> PEDIR A PROV.
+                                                    </button>
+                                                    <div className="text-right min-w-[80px]">
+                                                        <p className="font-black text-slate-400 text-lg leading-none">${p.priceFinal.toLocaleString('es-AR')}</p>
+                                                        <p className="text-[10px] text-red-500 font-black uppercase mt-1">Sin Stock</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {localResults.length === 0 && cloudResults.length === 0 && !isCloudSearching && (
+                                            <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
+                                                <Search size={48} className="opacity-10"/>
+                                                <p className="font-black text-sm uppercase">No se encontró "{productSearch}"</p>
+                                                <p className="text-xs max-w-[200px]">Prueba con otros términos o marca.</p>
                                             </div>
                                         )}
                                     </div>
@@ -284,7 +323,7 @@ const POS: React.FC = () => {
                                     <User className="text-gray-300 group-focus-within:text-blue-500 mr-4" size={24} />
                                     <input 
                                         type="text" 
-                                        placeholder="Asignar Cliente (Nombre o CUIT)..." 
+                                        placeholder="Cliente (Nombre o CUIT)..." 
                                         className="flex-1 bg-transparent outline-none text-lg font-bold text-gray-700" 
                                         value={selectedClient ? selectedClient.name : clientSearch}
                                         onFocus={() => setShowClientResults(true)}
@@ -296,30 +335,22 @@ const POS: React.FC = () => {
                                 </div>
                                 {showClientResults && clientSearch.trim().length > 0 && !selectedClient && (
                                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-fade-in max-h-[300px] overflow-y-auto custom-scrollbar">
-                                        {filteredClients.length > 0 ? (
-                                            filteredClients.map(c => (
-                                                <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); setShowClientResults(false); }} className="w-full text-left p-4 hover:bg-blue-50 border-b last:border-0 flex justify-between items-center group transition-colors">
-                                                    <div>
-                                                        <p className="font-black text-slate-800 uppercase tracking-tight">{c.name}</p>
-                                                        <p className="text-[10px] text-gray-400 font-bold uppercase">{c.cuit}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className={`text-[10px] font-black uppercase ${c.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>Saldo: ${c.balance.toLocaleString('es-AR')}</p>
-                                                    </div>
-                                                </button>
-                                            ))
-                                        ) : (
-                                            <div className="p-8 text-center text-gray-400 flex flex-col items-center gap-2">
-                                                <User size={32} className="opacity-20"/>
-                                                <p className="font-bold text-sm uppercase">Sin coincidencias de cliente</p>
-                                            </div>
-                                        )}
+                                        {filteredClients.map(c => (
+                                            <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); setShowClientResults(false); }} className="w-full text-left p-4 hover:bg-blue-50 border-b last:border-0 flex justify-between items-center group transition-colors">
+                                                <div>
+                                                    <p className="font-black text-slate-800 uppercase tracking-tight">{c.name}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{c.cuit}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`text-[10px] font-black uppercase ${c.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>Saldo: ${c.balance.toLocaleString('es-AR')}</p>
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* LISTADO DEL CARRITO */}
                         <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 <table className="w-full text-left">
@@ -353,11 +384,10 @@ const POS: React.FC = () => {
                                                         <button 
                                                             onClick={(e) => handleRequestToProvider(e, item.product)}
                                                             className="p-3 text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all"
-                                                            title="Añadir a faltantes para pedido"
                                                         >
                                                             <PackagePlus size={20}/>
                                                         </button>
-                                                        <button onClick={() => removeFromCartLocal(item.product.id)} className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all" title="Quitar del carrito"><Trash2 size={20}/></button>
+                                                        <button onClick={() => removeFromCartLocal(item.product.id)} className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 size={20}/></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -368,7 +398,7 @@ const POS: React.FC = () => {
                                                     <div className="flex flex-col items-center gap-4">
                                                         <ShoppingCart size={80} strokeWidth={1} className="opacity-20"/>
                                                         <p className="text-xl font-black uppercase tracking-tighter">El carrito está vacío</p>
-                                                        <p className="text-sm">Empieza a buscar artículos arriba o escanea un código</p>
+                                                        <p className="text-sm">Escanee un código o busque en el catálogo cloud</p>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -379,10 +409,7 @@ const POS: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* COLUMNA DERECHA: TOTALES Y CIERRE */}
                     <div className="w-[400px] flex flex-col gap-6 shrink-0">
-                        
-                        {/* PANEL DE PAGO */}
                         <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-200 space-y-8 flex-1">
                             <div>
                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
@@ -480,7 +507,6 @@ const POS: React.FC = () => {
                 </div>
             )}
 
-            {/* MODAL: PROCESANDO COBRO */}
             {isCheckoutOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col p-12 text-center">
