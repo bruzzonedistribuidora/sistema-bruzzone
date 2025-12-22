@@ -29,7 +29,26 @@ export enum ViewState {
   AFIP_CONFIG = 'AFIP_CONFIG',
   CUSTOMER_PORTAL = 'CUSTOMER_PORTAL',
   DAILY_MOVEMENTS = 'DAILY_MOVEMENTS',
-  EMPLOYEES = 'EMPLOYEES'
+  EMPLOYEES = 'EMPLOYEES',
+  STOCK_TRANSFERS = 'STOCK_TRANSFERS'
+}
+
+export interface StockTransferItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+}
+
+export interface StockTransfer {
+  id: string;
+  date: string;
+  sourceBranchId: string;
+  sourceBranchName: string;
+  destBranchId: string;
+  destBranchName: string;
+  items: StockTransferItem[];
+  notes?: string;
+  status: 'COMPLETED' | 'CANCELLED';
 }
 
 export interface Check {
@@ -221,6 +240,8 @@ export interface Provider {
   contact: string;
   balance: number;
   defaultDiscounts: [number, number, number];
+  address?: string;
+  authorizedPersonnel?: string[];
 }
 
 export interface ReplenishmentItem {
