@@ -8,7 +8,6 @@ import Inventory from './components/Inventory';
 import POS from './components/POS';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
-import Assistant from './components/Assistant';
 import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
@@ -188,7 +187,6 @@ const App: React.FC = () => {
       case ViewState.BACKUP: return <Backup />;
       case ViewState.BRANCHES: return <Branches />;
       case ViewState.USERS: return <UsersComponent />;
-      case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
       case ViewState.SHORTAGES: return <Shortages />;
       case ViewState.PRINT_CONFIG: return <PrintSettings />;
