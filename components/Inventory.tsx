@@ -6,7 +6,7 @@ import {
     ShoppingCart, AlertCircle, Info, Percent, Building2, 
     Store, Monitor, TrendingDown, ArrowUpRight, ListPlus, 
     Ruler, Hash, BookmarkPlus, ChevronRight, Settings2,
-    CheckCircle
+    CheckCircle, PackagePlus
 } from 'lucide-react';
 import { Product, ProductStock } from '../types';
 
@@ -69,6 +69,19 @@ const Inventory: React.FC = () => {
       setFormData({ ...product });
       setIsModalOpen(true);
       setModalTab('GENERAL');
+  };
+
+  const handleManualOrder = (product: Product) => {
+    const savedManual = localStorage.getItem('ferrecloud_manual_shortages');
+    const manualIds: string[] = savedManual ? JSON.parse(savedManual) : [];
+    
+    if (!manualIds.includes(product.id)) {
+        const newManualIds = [...manualIds, product.id];
+        localStorage.setItem('ferrecloud_manual_shortages', JSON.stringify(newManualIds));
+        alert(`Articulo "${product.name}" agregado a la lista de Faltantes para reposición.`);
+    } else {
+        alert(`El artículo "${product.name}" ya se encuentra en la lista de pedidos pendientes.`);
+    }
   };
 
   const handleSaveProduct = () => {
@@ -179,6 +192,13 @@ const Inventory: React.FC = () => {
                             <td className="px-8 py-6 text-right font-black text-slate-900 text-lg">${product.priceFinal.toLocaleString('es-AR')}</td>
                             <td className="px-8 py-6 text-center">
                                 <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={() => handleManualOrder(product)}
+                                        title="Pedir / Agregar a Faltantes"
+                                        className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all"
+                                    >
+                                        <PackagePlus size={18} />
+                                    </button>
                                     <button onClick={() => handleEditProduct(product)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Pen size={18} /></button>
                                     <button onClick={() => { if(confirm('¿Eliminar?')) setProducts(products.filter(p => p.id !== product.id)) }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18} /></button>
                                 </div>
@@ -204,7 +224,6 @@ const Inventory: React.FC = () => {
                           <div>
                               <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">Ficha Técnica de Artículo</h3>
                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
-                                  {/* Fixed: imported missing CheckCircle icon */}
                                   <CheckCircle size={12} className="text-green-400"/> Datos sincronizados para actualización masiva
                               </p>
                           </div>
@@ -267,12 +286,12 @@ const Inventory: React.FC = () => {
                                       <h4 className="text-xs font-black text-orange-600 uppercase tracking-widest flex items-center gap-2 border-b pb-3 border-orange-100"><Truck size={16}/> Vínculo con el Proveedor</h4>
                                       <div className="bg-orange-50/50 p-8 rounded-[2.5rem] border border-orange-100 space-y-6">
                                           <div>
-                                              <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 ml-2">Proveedor Principal</label>
+                                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Proveedor Principal</label>
                                               <input className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-orange-500 shadow-sm outline-none font-black text-slate-800 transition-all uppercase" placeholder="BUSCAR O CREAR PROVEEDOR..." value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value.toUpperCase()})}/>
                                           </div>
 
                                           <div>
-                                              <label className="block text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 ml-2">Códigos de Referencia (Proveedor)</label>
+                                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Códigos de Referencia (Proveedor)</label>
                                               <div className="flex gap-2 mb-3">
                                                   <input className="flex-1 p-4 bg-white border-2 border-transparent rounded-2xl focus:border-orange-500 shadow-sm outline-none font-mono text-sm uppercase" placeholder="Código de fábrica..." value={newProvCode} onChange={e => setNewProvCode(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && addProvCode()}/>
                                                   <button onClick={addProvCode} className="bg-slate-900 text-white p-4 rounded-2xl hover:bg-slate-800 transition-all shadow-lg"><BookmarkPlus size={20}/></button>
