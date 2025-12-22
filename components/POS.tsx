@@ -4,10 +4,20 @@ import {
     ShoppingCart, User, CreditCard, Printer, Trash2, Search, CheckCircle, 
     Plus, Minus, Banknote, FileText, X, AlertCircle, RefreshCw, Barcode, 
     DollarSign, History, Filter, Eye, Package, UserPlus, Zap, Landmark, Smartphone,
-    PackagePlus, Loader2, CloudLightning, Globe
+    PackagePlus, Loader2, CloudLightning, Globe, Percent, Tag
 } from 'lucide-react';
 import { InvoiceItem, Product, TaxCondition, Client, PriceList } from '../types';
 import { searchVirtualInventory } from '../services/geminiService';
+
+const DEFAULT_CLIENT: Client = {
+    id: 'cf-default',
+    name: 'Consumidor Final',
+    cuit: '00-00000000-0',
+    phone: '',
+    address: '',
+    balance: 0,
+    limit: 0
+};
 
 const POS: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'SALES' | 'HISTORY'>('SALES');
@@ -27,8 +37,9 @@ const POS: React.FC = () => {
 
     // --- ESTADO DEL CARRITO ---
     const [cart, setCart] = useState<InvoiceItem[]>([]);
-    const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+    const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
     const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CTACTE'>('EFECTIVO');
+    const [discountPerc, setDiscountPerc] = useState<number>(0);
     
     // --- BÚSQUEDA ---
     const [productSearch, setProductSearch] = useState('');
@@ -77,13 +88,11 @@ const POS: React.FC = () => {
         ).slice(0, 5);
     }, [productSearch, products]);
 
-    // Trigger IA Cloud Search only when local results are zero or user keeps typing
     useEffect(() => {
         const timer = setTimeout(async () => {
             if (productSearch.trim().length > 2 && localResults.length === 0) {
                 setIsCloudSearching(true);
                 const results = await searchVirtualInventory(productSearch);
-                // Map IA result properties to full Product interface
                 const mappedResults = results.map(r => ({
                     ...r,
                     priceFinal: (r as any).price || 0,
@@ -102,7 +111,7 @@ const POS: React.FC = () => {
             } else {
                 setCloudResults([]);
             }
-        }, 800); // Debounce to avoid excessive API calls
+        }, 800);
         return () => clearTimeout(timer);
     }, [productSearch, localResults]);
 
@@ -114,15 +123,6 @@ const POS: React.FC = () => {
             (c.cuit || '').includes(term)
         ).slice(0, 5);
     }, [clientSearch, clients]);
-
-    // --- LÓGICA DE PRECIOS ---
-    const calculatePriceWithList = (product: Product, list: PriceList) => {
-        if (list.type === 'BASE') return product.priceFinal;
-        const margin = (list.fixedMargin || 0) / 100;
-        const netPrice = (product.costAfterDiscounts || product.listCost) * (1 + margin);
-        const finalPrice = netPrice * (1 + (product.vatRate || 21) / 100);
-        return Math.round(finalPrice * 100) / 100;
-    };
 
     const addToCart = (product: Product) => {
         const price = calculatePriceWithList(product, selectedPriceList);
@@ -137,6 +137,14 @@ const POS: React.FC = () => {
         });
         setProductSearch('');
         setShowProductResults(false);
+    };
+
+    const calculatePriceWithList = (product: Product, list: PriceList) => {
+        if (list.type === 'BASE') return product.priceFinal;
+        const margin = (list.fixedMargin || 0) / 100;
+        const netPrice = (product.costAfterDiscounts || product.listCost) * (1 + margin);
+        const finalPrice = netPrice * (1 + (product.vatRate || 21) / 100);
+        return Math.round(finalPrice * 100) / 100;
     };
 
     const updateQty = (id: string, delta: number) => {
@@ -164,11 +172,13 @@ const POS: React.FC = () => {
     };
 
     const totals = useMemo(() => {
-        const total = cart.reduce((acc, item) => acc + item.subtotal, 0);
-        const subtotal = total / 1.21;
-        const iva = total - subtotal;
-        return { subtotal, iva, total };
-    }, [cart]);
+        const grossTotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
+        const discountAmount = grossTotal * (discountPerc / 100);
+        const finalTotal = grossTotal - discountAmount;
+        const subtotal = finalTotal / 1.21;
+        const iva = finalTotal - subtotal;
+        return { subtotal, iva, total: finalTotal, discountAmount, grossTotal };
+    }, [cart, discountPerc]);
 
     const handleCheckout = () => {
         if (cart.length === 0) return;
@@ -179,11 +189,12 @@ const POS: React.FC = () => {
             const newSale = {
                 id: `FC-${Date.now().toString().slice(-8)}`,
                 date: new Date().toLocaleString(),
-                client: selectedClient?.name || 'Consumidor Final',
+                client: selectedClient.name,
                 total: totals.total,
                 items: cart.length,
                 payment: paymentMethod,
-                cae
+                cae,
+                discount: discountPerc
             };
             const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify([newSale, ...history]));
@@ -193,9 +204,12 @@ const POS: React.FC = () => {
 
     const resetPOS = () => {
         setCart([]);
-        setSelectedClient(null);
+        setSelectedClient(DEFAULT_CLIENT);
+        setClientSearch('');
         setIsCheckoutOpen(false);
         setCheckoutStatus('IDLE');
+        setPaymentMethod('EFECTIVO');
+        setDiscountPerc(0);
     };
 
     const salesHistory = useMemo(() => {
@@ -251,8 +265,6 @@ const POS: React.FC = () => {
                                 
                                 {showProductResults && productSearch.trim().length > 0 && (
                                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-fade-in max-h-[400px] overflow-y-auto custom-scrollbar">
-                                        
-                                        {/* LOCAL RESULTS */}
                                         {localResults.length > 0 && (
                                             <div className="bg-slate-50 px-6 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">Stock Local</div>
                                         )}
@@ -274,7 +286,6 @@ const POS: React.FC = () => {
                                             </div>
                                         ))}
 
-                                        {/* CLOUD SEARCH RESULTS (IA) */}
                                         {cloudResults.length > 0 && (
                                             <div className="bg-indigo-50 px-6 py-2 text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b flex items-center gap-2">
                                                 <CloudLightning size={12}/> Catálogo Maestro Cloud (140k artículos)
@@ -283,10 +294,7 @@ const POS: React.FC = () => {
                                         {cloudResults.map(p => (
                                             <div key={p.id} className="w-full text-left p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center group transition-colors">
                                                 <div className="flex gap-4 flex-1">
-                                                    <div className="p-2 bg-white rounded-xl text-indigo-400 shadow-sm">
-                                                        {/* Fix: Use Globe icon imported from lucide-react */}
-                                                        <Globe size={20}/>
-                                                    </div>
+                                                    <div className="p-2 bg-white rounded-xl text-indigo-400 shadow-sm"><Globe size={20}/></div>
                                                     <div>
                                                         <p className="font-black text-slate-800 uppercase tracking-tight">{p.name}</p>
                                                         <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{p.internalCode} • {p.category}</p>
@@ -306,14 +314,6 @@ const POS: React.FC = () => {
                                                 </div>
                                             </div>
                                         ))}
-
-                                        {localResults.length === 0 && cloudResults.length === 0 && !isCloudSearching && (
-                                            <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
-                                                <Search size={48} className="opacity-10"/>
-                                                <p className="font-black text-sm uppercase">No se encontró "{productSearch}"</p>
-                                                <p className="text-xs max-w-[200px]">Prueba con otros términos o marca.</p>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                             </div>
@@ -325,16 +325,25 @@ const POS: React.FC = () => {
                                         type="text" 
                                         placeholder="Cliente (Nombre o CUIT)..." 
                                         className="flex-1 bg-transparent outline-none text-lg font-bold text-gray-700" 
-                                        value={selectedClient ? selectedClient.name : clientSearch}
-                                        onFocus={() => setShowClientResults(true)}
-                                        onChange={(e) => { setClientSearch(e.target.value); setSelectedClient(null); }}
+                                        value={selectedClient.id === 'cf-default' && !showClientResults ? 'Consumidor Final' : clientSearch}
+                                        onFocus={() => { setShowClientResults(true); if(selectedClient.id === 'cf-default') setClientSearch(''); }}
+                                        onChange={(e) => setClientSearch(e.target.value)}
                                     />
-                                    {selectedClient && (
-                                        <button onClick={() => setSelectedClient(null)} className="p-1 hover:bg-red-50 text-red-500 rounded-full"><X size={20}/></button>
+                                    {selectedClient.id !== 'cf-default' && (
+                                        <button onClick={() => setSelectedClient(DEFAULT_CLIENT)} className="p-1 hover:bg-red-50 text-red-500 rounded-full"><X size={20}/></button>
                                     )}
                                 </div>
-                                {showClientResults && clientSearch.trim().length > 0 && !selectedClient && (
+                                {showClientResults && (
                                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-gray-100 z-[100] overflow-hidden animate-fade-in max-h-[300px] overflow-y-auto custom-scrollbar">
+                                        <button 
+                                            onClick={() => { setSelectedClient(DEFAULT_CLIENT); setClientSearch(''); setShowClientResults(false); }}
+                                            className="w-full text-left p-4 hover:bg-blue-50 border-b flex justify-between items-center group transition-colors">
+                                            <div>
+                                                <p className="font-black text-blue-600 uppercase tracking-tight">Consumidor Final (Predeterminado)</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">Facturación General</p>
+                                            </div>
+                                            <CheckCircle size={18} className="text-blue-500"/>
+                                        </button>
                                         {filteredClients.map(c => (
                                             <button key={c.id} onClick={() => { setSelectedClient(c); setClientSearch(''); setShowClientResults(false); }} className="w-full text-left p-4 hover:bg-blue-50 border-b last:border-0 flex justify-between items-center group transition-colors">
                                                 <div>
@@ -381,12 +390,7 @@ const POS: React.FC = () => {
                                                 <td className="px-8 py-6 text-right font-black text-slate-900 text-lg">${item.subtotal.toLocaleString('es-AR')}</td>
                                                 <td className="px-8 py-6 text-center">
                                                     <div className="flex items-center justify-center gap-2">
-                                                        <button 
-                                                            onClick={(e) => handleRequestToProvider(e, item.product)}
-                                                            className="p-3 text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all"
-                                                        >
-                                                            <PackagePlus size={20}/>
-                                                        </button>
+                                                        <button onClick={(e) => handleRequestToProvider(e, item.product)} className="p-3 text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all"><PackagePlus size={20}/></button>
                                                         <button onClick={() => removeFromCartLocal(item.product.id)} className="p-3 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 size={20}/></button>
                                                     </div>
                                                 </td>
@@ -435,19 +439,45 @@ const POS: React.FC = () => {
                             </div>
 
                             <div className="space-y-4 pt-8 border-t border-dashed border-gray-200">
-                                <div className="flex justify-between items-center text-slate-500">
-                                    <span className="text-xs font-bold uppercase tracking-wider">Subtotal Neto</span>
-                                    <span className="font-mono font-bold">${totals.subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <Tag size={12} className="text-ferre-orange"/> Descuento Global
+                                    </label>
+                                    <div className="relative group">
+                                        <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-ferre-orange" size={16}/>
+                                        <input 
+                                            type="number" 
+                                            min="0"
+                                            max="100"
+                                            placeholder="Porcentaje de descuento..."
+                                            className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-transparent focus:border-ferre-orange rounded-2xl outline-none font-bold text-slate-700 transition-all"
+                                            value={discountPerc || ''}
+                                            onChange={(e) => setDiscountPerc(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                        />
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center text-slate-400">
-                                    <span className="text-xs font-bold uppercase tracking-wider">IVA (21%)</span>
-                                    <span className="font-mono font-bold">${totals.iva.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
-                                </div>
-                                <div className="flex justify-between items-end pt-4">
-                                    <span className="text-lg font-black text-slate-800 uppercase tracking-tighter">Total a Pagar</span>
-                                    <div className="text-right">
-                                        <p className="text-5xl font-black text-ferre-orange tracking-tighter leading-none">${totals.total.toLocaleString('es-AR')}</p>
-                                        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Pesos Argentinos</p>
+
+                                <div className="space-y-2 pt-4">
+                                    <div className="flex justify-between items-center text-slate-500">
+                                        <span className="text-xs font-bold uppercase tracking-wider">Subtotal Bruto</span>
+                                        <span className="font-mono font-bold">${totals.grossTotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    {totals.discountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-red-500">
+                                            <span className="text-xs font-bold uppercase tracking-wider italic">Descuento ({discountPerc}%)</span>
+                                            <span className="font-mono font-bold">-$ {totals.discountAmount.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center text-slate-400">
+                                        <span className="text-xs font-bold uppercase tracking-wider">IVA (21%)</span>
+                                        <span className="font-mono font-bold">${totals.iva.toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    <div className="flex justify-between items-end pt-4">
+                                        <span className="text-lg font-black text-slate-800 uppercase tracking-tighter">Total a Pagar</span>
+                                        <div className="text-right">
+                                            <p className="text-5xl font-black text-ferre-orange tracking-tighter leading-none">${totals.total.toLocaleString('es-AR')}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-2">Pesos Argentinos</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -482,7 +512,10 @@ const POS: React.FC = () => {
                                 {salesHistory.map((sale: any) => (
                                     <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-10 py-6">
-                                            <p className="font-black text-slate-800 text-sm">{sale.id}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-black text-slate-800 text-sm">{sale.id}</p>
+                                                {sale.discount > 0 && <span className="bg-red-50 text-red-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase">-{sale.discount}%</span>}
+                                            </div>
                                             <p className="text-[10px] text-gray-400 font-bold uppercase">{sale.date}</p>
                                         </td>
                                         <td className="px-10 py-6 font-bold text-gray-600">{sale.client}</td>
