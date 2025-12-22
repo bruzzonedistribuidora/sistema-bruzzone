@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Search, Plus, ShoppingCart, Trash2, Save, FileText, CheckCircle, Clock, Package, Truck, Minus, ArrowRight, ClipboardList, AlertCircle, X, Receipt } from 'lucide-react';
 import { InvoiceItem, Product, SalesOrder, SalesOrderStatus } from '../types';
@@ -28,7 +29,8 @@ const SalesOrders: React.FC = () => {
           date: '2023-10-27',
           priority: 'URGENTE',
           status: 'PENDING',
-          items: [{ product: createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante', 150, 5000, 'Fijaciones'), quantity: 500, subtotal: 75000 }],
+          // Fix: added missing appliedPrice property
+          items: [{ product: createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante', 150, 5000, 'Fijaciones'), quantity: 500, subtotal: 75000, appliedPrice: 150 }],
           notes: 'Entregar antes del mediodía',
           total: 75000
       },
@@ -38,7 +40,8 @@ const SalesOrders: React.FC = () => {
           date: '2023-10-26',
           priority: 'NORMAL',
           status: 'IN_PREPARATION',
-          items: [{ product: createMockProduct('4', 'PINT-20L', 'Látex Interior 20L', 45000, 8, 'Pinturería'), quantity: 2, subtotal: 90000 }],
+          // Fix: added missing appliedPrice property
+          items: [{ product: createMockProduct('4', 'PINT-20L', 'Látex Interior 20L', 45000, 8, 'Pinturería'), quantity: 2, subtotal: 90000, appliedPrice: 45000 }],
           notes: '',
           total: 90000
       },
@@ -48,7 +51,8 @@ const SalesOrders: React.FC = () => {
           date: '2023-10-25',
           priority: 'NORMAL',
           status: 'READY',
-          items: [{ product: createMockProduct('3', 'TAL-IND', 'Taladro Percutor', 85000, 5, 'Herramientas'), quantity: 1, subtotal: 85000 }],
+          // Fix: added missing appliedPrice property
+          items: [{ product: createMockProduct('3', 'TAL-IND', 'Taladro Percutor', 85000, 5, 'Herramientas'), quantity: 1, subtotal: 85000, appliedPrice: 85000 }],
           notes: 'Retira mañana',
           total: 85000
       }
@@ -75,11 +79,13 @@ const SalesOrders: React.FC = () => {
       if (existing) {
         return prev.map(item => 
           item.product.id === product.id 
-          ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.priceFinal }
+          // Fix: added missing appliedPrice property
+          ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.priceFinal, appliedPrice: item.product.priceFinal }
           : item
         );
       }
-      return [...prev, { product, quantity: 1, subtotal: product.priceFinal }];
+      // Fix: added missing appliedPrice property
+      return [...prev, { product, quantity: 1, subtotal: product.priceFinal, appliedPrice: product.priceFinal }];
     });
   };
 

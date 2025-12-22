@@ -1,17 +1,19 @@
 
 export enum ViewState {
+  LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
   INVENTORY = 'INVENTORY',
   POS = 'POS',
   REMITOS = 'REMITOS',
   PRESUPUESTOS = 'PRESUPUESTOS',
   CLIENTS = 'CLIENTS',
+  CLIENT_BALANCES = 'CLIENT_BALANCES',
   PURCHASES = 'PURCHASES',
   PROVIDERS = 'PROVIDERS',
   TREASURY = 'TREASURY',
   ACCOUNTING = 'ACCOUNTING',
   STATISTICS = 'STATISTICS',
-  REPORTS = 'REPORTS', // New View
+  REPORTS = 'REPORTS',
   BACKUP = 'BACKUP',
   BRANCHES = 'BRANCHES',
   AI_ASSISTANT = 'AI_ASSISTANT',
@@ -22,50 +24,122 @@ export enum ViewState {
   SALES_ORDERS = 'SALES_ORDERS',
   ONLINE_SALES = 'ONLINE_SALES',
   PRINT_CONFIG = 'PRINT_CONFIG',
-  LABEL_PRINTING = 'LABEL_PRINTING', // New Module
+  LABEL_PRINTING = 'LABEL_PRINTING',
   COMPANY_SETTINGS = 'COMPANY_SETTINGS',
   AFIP_CONFIG = 'AFIP_CONFIG',
-  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL'
+  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL',
+  DAILY_MOVEMENTS = 'DAILY_MOVEMENTS',
+  EMPLOYEES = 'EMPLOYEES'
+}
+
+export interface Check {
+  id: string;
+  type: 'FISICO' | 'ECHEQ';
+  bank: string;
+  number: string;
+  amount: number;
+  paymentDate: string; // Vencimiento
+  entryDate: string;   // Ingreso
+  status: 'CARTERA' | 'DEPOSITADO' | 'RECHAZADO' | 'ENTREGADO';
+  origin: string;      // Cliente que lo dio
+  destination?: string; // Proveedor a quien se le pagó
+  issuerCuit?: string;
+}
+
+export interface DailyExpense {
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    category: 'FIXED' | 'VARIABLE';
+    paymentMethod: string;
+    type: 'EXPENSE' | 'INCOME';
+}
+
+export interface Employee {
+    id: string;
+    name: string;
+    position: string;
+    baseSalary: number;
+    dni: string;
+    startDate: string;
+    active: boolean;
+    movements: EmployeeMovement[];
+}
+
+export interface EmployeeMovement {
+    id: string;
+    date: string;
+    type: 'SALARY' | 'ADVANCE' | 'BONUS' | 'DEDUCTION';
+    amount: number;
+    description: string;
+    month: string; // e.g., "2023-10"
+}
+
+export interface PaymentAccount {
+    id: string;
+    type: 'BANK' | 'VIRTUAL_WALLET';
+    bankName: string; 
+    alias: string;
+    cbu: string;
+    owner: string;
+    qrImage?: string | null;
+    active: boolean;
 }
 
 export interface CompanyConfig {
-    name: string; // Razón Social
-    fantasyName: string; // Nombre Fantasía
+    name: string;
+    fantasyName: string;
     cuit: string;
-    taxCondition: string; // Resp Inscripto, Monotributo, etc.
-    iibb: string; // Ingresos Brutos
-    startDate: string; // Inicio de Actividades
+    taxCondition: string;
+    iibb: string;
+    startDate: string;
     address: string;
     city: string;
     zipCode: string;
     phone: string;
     email: string;
     web: string;
-    logo: string | null; // Base64 string for preview
+    logo: string | null;
     slogan: string;
+    paymentAccounts: PaymentAccount[];
+    // SMTP Config
+    smtpHost?: string;
+    smtpPort?: string;
+    smtpUser?: string;
+    smtpPassword?: string;
+    smtpSSL?: boolean;
 }
 
-export interface Branch {
+export interface Client {
   id: string;
-  code: string;
   name: string;
-  address: string;
+  cuit: string;
   phone: string;
-  manager: string;
-  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
-  active: boolean;
+  address: string;
+  balance: number;
+  limit: number;
+  portalEnabled?: boolean;
+  portalHash?: string;
+  email?: string;
+}
+
+export interface CurrentAccountMovement {
+    id: string;
+    date: string;
+    voucherType: string;
+    description: string;
+    debit: number;
+    credit: number;
+    balance: number;
+    clientId?: string;
+    providerId?: string;
 }
 
 export interface ProductStock {
-  branchId: string;
-  branchName: string;
-  quantity: number;
-}
-
-export interface EcommerceConfig {
-  mercadoLibre: boolean;
-  tiendaNube: boolean;
-  webPropia: boolean;
+    branchId: string;
+    branchName: string;
+    quantity: number;
 }
 
 export interface Product {
@@ -96,16 +170,15 @@ export interface Product {
   desiredStock: number;
   reorderPoint: number;
   location: string;
-  ecommerce: EcommerceConfig;
+  ecommerce: any;
 }
 
-// --- NUEVO: Listas de Precios ---
-export interface PriceList {
-    id: string;
-    name: string;
-    type: 'BASE' | 'CUSTOM'; // BASE usa el margen del producto, CUSTOM usa fixedMargin
-    fixedMargin?: number; // Porcentaje de ganancia fijo sobre el costo
-    active: boolean;
+export interface InvoiceItem {
+  product: Product;
+  quantity: number;
+  subtotal: number;
+  appliedPrice: number;
+  priceListId?: string;
 }
 
 export enum TaxCondition {
@@ -115,22 +188,14 @@ export enum TaxCondition {
   EXENTO = 'Exento'
 }
 
-export interface InvoiceItem {
-  product: Product;
-  quantity: number;
-  subtotal: number;
-  appliedPrice: number; // Precio unitario final aplicado
-  priceListId?: string; // ID de la lista usada
-}
+export interface DashboardStats {}
 
-export interface Invoice {
-  customerName: string;
-  customerCuit: string;
-  taxCondition: TaxCondition;
-  items: InvoiceItem[];
-  total: number;
-  cae?: string;
-  date: string;
+export interface PriceList {
+  id: string;
+  name: string;
+  type: 'BASE' | 'CUSTOM';
+  fixedMargin?: number;
+  active: boolean;
 }
 
 export interface RemitoItem {
@@ -143,122 +208,10 @@ export interface Remito {
   id: string;
   clientId: string;
   clientName: string;
+  date: string;
+  status: 'PENDING' | 'BILLED';
   items: RemitoItem[];
-  date: string;
-  status: 'PENDING' | 'BILLED' | 'PAID_INTERNAL';
-}
-
-export interface Budget {
-  id: string;
-  clientName: string;
-  date: string;
-  validUntil: string;
-  items: InvoiceItem[];
-  total: number;
-  status: 'OPEN' | 'CONVERTED' | 'EXPIRED';
-}
-
-// --- NUEVO: Ordenes de Pedido (Clientes) ---
-export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
-
-export interface SalesOrder {
-    id: string;
-    clientName: string;
-    date: string;
-    priority: 'NORMAL' | 'URGENTE';
-    items: InvoiceItem[];
-    status: SalesOrderStatus;
-    notes: string;
-    total: number;
-}
-
-// --- NUEVO: Ventas Online ---
-export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WOOCOMMERCE';
-export type ShippingMethod = 'MERCADOENVIOS' | 'FLEX' | 'CORREO' | 'RETIRO_SUCURSAL';
-export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-
-export interface OnlineOrder {
-    id: string; // ID interno
-    platformId: string; // ID en la plataforma (ej: ML 20000...)
-    platform: OnlinePlatform;
-    date: string;
-    customer: {
-        name: string;
-        nickname?: string;
-        address: string;
-        city: string;
-        zipCode: string;
-        phone: string;
-        dni: string;
-    };
-    items: InvoiceItem[];
-    total: number;
-    shippingCost: number;
-    shippingMethod: ShippingMethod;
-    status: OnlineOrderStatus;
-    trackingCode?: string;
-    labelPrinted: boolean;
-    invoiced: boolean;
-}
-
-// --- NUEVO: Configuración de Impresión ---
-export type DocumentType = 'FACTURA' | 'TICKET_INTERNO' | 'REMITO' | 'PRESUPUESTO' | 'ORDEN_PEDIDO';
-export type PaperSize = 'A4' | 'TICKET_80MM' | 'A4_QUARTER' | 'CUSTOM';
-
-export interface Position {
-    x: number; // mm
-    y: number; // mm
-    visible: boolean;
-}
-
-export interface PrintTemplate {
-    id: DocumentType;
-    name: string;
-    paperSize: PaperSize;
-    customWidth?: number; // mm
-    customHeight?: number; // mm
-    
-    // Content
-    headerText: string; // Nombre Fantasía
-    subHeaderText: string; // Dirección / Tel
-    footerText: string; // Gracias por su compra / Condicines
-    showLogo: boolean;
-    showPrice: boolean;
-    showTotal: boolean;
-    fontSize: 'SMALL' | 'MEDIUM' | 'LARGE';
-
-    // Layout Positions (Coordinates in mm)
-    positions: {
-        logo: Position;
-        header: Position; // Company Info
-        docInfo: Position; // Date, Invoice Type, Number
-        client: Position; // Client Info
-        table: Position; // Items Table
-        totals: Position; // Totals Section
-        footer: Position; // Footer Text / Legal
-        qr: Position; // QR AFIP
-    }
-}
-
-export interface DashboardStats {
-  totalSales: number;
-  lowStockCount: number;
-  dailyRevenue: number;
-  pendingShipments: number;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  cuit: string;
-  phone: string;
-  address: string;
-  balance: number; // Saldo Cta Cte
-  limit: number; // Límite de crédito
-  // Portal Fields
-  portalEnabled?: boolean;
-  portalHash?: string;
-  email?: string;
+  relatedInvoice?: string;
 }
 
 export interface Provider {
@@ -266,111 +219,14 @@ export interface Provider {
   name: string;
   cuit: string;
   contact: string;
-  balance: number; // Deuda con el proveedor
-  defaultDiscounts: [number, number, number]; 
+  balance: number;
+  defaultDiscounts: [number, number, number];
 }
 
-// --- NUEVO: Detalle de Items de Compra ---
-export interface PurchaseItem {
-    id: string;
-    productCode: string;
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    subtotal: number;
-}
-
-export interface Purchase {
-  id: string;
-  providerId: string;
-  providerName: string;
-  date: string;
-  type: 'FACTURA_A' | 'FACTURA_B' | 'PRESUPUESTO_X';
-  items: number; // Cantidad de items resumen
-  details?: PurchaseItem[]; // Detalle real de productos
-  total: number;
-  status: 'PAID' | 'PENDING' | 'PARTIAL';
-}
-
-export interface CashRegister {
-  id: string;
-  name: string;
-  balance: number; // Saldo actual
-  isOpen: boolean;
-}
-
-export interface Check {
-  id: string;
-  bank: string;
-  number: string;
-  amount: number;
-  paymentDate: string; // Fecha pago
-  status: 'CARTERA' | 'DEPOSITADO' | 'ENTREGADO' | 'RECHAZADO';
-  origin: string; // De quien vino
-}
-
-export interface TreasuryMovement {
-  id: string;
-  date: string;
-  type: 'INCOME' | 'EXPENSE' | 'TRANSFER'; // Ingreso (Recibo), Egreso (Orden Pago), Transferencia
-  subtype: 'VENTA' | 'COBRO_CTACTE' | 'PAGO_PROVEEDOR' | 'GASTO_VARIO' | 'RETIRO_SOCIO';
-  paymentMethod: 'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CHEQUE' | 'ECHEQ' | 'TARJETA';
-  amount: number;
-  description: string;
-  cashRegisterId: string;
-}
-
-// --- NUEVO: Movimiento de Cuenta Corriente ---
-export interface CurrentAccountMovement {
-    id: string;
-    date: string;
-    voucherType: string; // Ej: FC-A 0001-0000001, REC-X 0001, ND, NC
-    debit: number; // Debe (Suma saldo deudor)
-    credit: number; // Haber (Resta saldo deudor)
-    balance: number; // Saldo acumulado
-    description: string;
-}
-
-// --- TIPOS CONTABILIDAD ---
-export interface AccountingAccount {
-  code: string;
-  name: string;
-  type: 'ACTIVO' | 'PASIVO' | 'PATRIMONIO' | 'RESULTADO_POS' | 'RESULTADO_NEG';
-  level: number;
-}
-
-export interface JournalEntry {
-  id: string;
-  date: string;
-  concept: string;
-  debit: number;
-  credit: number;
-  details: { account: string, debit: number, credit: number }[];
-}
-
-// --- USUARIOS Y ROLES DINAMICOS ---
-export interface Role {
-  id: string;
-  name: string;
-  color: string; // Tailwind color class e.g. 'bg-red-100 text-red-800'
-  permissions: string[]; // IDs of permissions enabled
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  roleId: string; // Reference to Role ID
-  active: boolean;
-  lastLogin?: string;
-  branchId?: string; // Sucursal asignada
-}
-
-// --- MODULO PEDIDOS (REPLENISHMENT) ---
 export interface ReplenishmentItem {
   product: Product;
   quantity: number;
-  selectedProviderId: string; // Allows changing from default provider
+  selectedProviderId: string;
   selectedProviderName: string;
 }
 
@@ -380,7 +236,168 @@ export interface ReplenishmentOrder {
   providerId: string;
   providerName: string;
   items: ReplenishmentItem[];
-  status: 'DRAFT' | 'SENT' | 'RECEIVED';
+  status: 'DRAFT' | 'SENT';
   totalItems: number;
   estimatedCost: number;
+}
+
+export interface PurchaseItem {
+  id: string;
+  productCode: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface Purchase {
+  id: string;
+  providerId: string;
+  providerName: string;
+  date: string;
+  type: 'FACTURA_A' | 'FACTURA_B' | 'FACTURA_C' | 'LIQUIDACION';
+  items: number;
+  total: number;
+  status: 'PAID' | 'PENDING';
+  details?: PurchaseItem[];
+}
+
+export interface Budget {
+  id: string;
+  clientName: string;
+  date: string;
+  validUntil: string;
+  items: InvoiceItem[];
+  total: number;
+  status: 'OPEN' | 'EXPIRED' | 'BILLED';
+}
+
+export interface CashRegister {
+  id: string;
+  name: string;
+  balance: number;
+  isOpen: boolean;
+}
+
+export interface TreasuryMovement {
+  id: string;
+  date: string;
+  type: 'INCOME' | 'EXPENSE';
+  subtype: 'VENTA' | 'COBRO_CTACTE' | 'PAGO_PROVEEDOR' | 'GASTO_VARIO' | 'RETIRO_SOCIO';
+  paymentMethod: 'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CHEQUE' | 'ECHEQ' | 'CTACTE';
+  amount: number;
+  description: string;
+  cashRegisterId: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  date: string;
+  concept: string;
+  debit: number;
+  credit: number;
+  details: any[];
+}
+
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone: string;
+  manager: string;
+  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
+  active: boolean;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  roleId: string;
+  active: boolean;
+  lastLogin: string;
+  branchId: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  permissions: string[];
+}
+
+export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
+
+export interface SalesOrder {
+  id: string;
+  clientName: string;
+  date: string;
+  priority: 'NORMAL' | 'URGENTE';
+  status: SalesOrderStatus;
+  items: InvoiceItem[];
+  notes: string;
+  total: number;
+}
+
+export type DocumentType = 'FACTURA' | 'TICKET_INTERNO' | 'REMITO' | 'PRESUPUESTO' | 'ORDEN_PEDIDO';
+export type PaperSize = 'A4' | 'TICKET_80MM' | 'A4_QUARTER' | 'CUSTOM';
+
+export interface Position {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
+export interface PrintTemplate {
+  id: string;
+  name: string;
+  paperSize: PaperSize;
+  customWidth?: number;
+  customHeight?: number;
+  showLogo: boolean;
+  headerText: string;
+  subHeaderText: string;
+  footerText: string;
+  showPrice: boolean;
+  showTotal: boolean;
+  fontSize: 'SMALL' | 'MEDIUM' | 'LARGE';
+  positions: {
+    logo: Position;
+    header: Position;
+    docInfo: Position;
+    client: Position;
+    table: Position;
+    footer: Position;
+    totals: Position;
+    qr: Position;
+  };
+}
+
+export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WOOCOMMERCE';
+export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+
+export interface OnlineOrder {
+  id: string;
+  platformId: string;
+  platform: OnlinePlatform;
+  date: string;
+  customer: {
+    name: string;
+    nickname?: string;
+    address: string;
+    city: string;
+    zipCode: string;
+    phone: string;
+    dni: string;
+  };
+  items: InvoiceItem[];
+  total: number;
+  shippingCost: number;
+  shippingMethod: 'MERCADOENVIOS' | 'CORREO' | 'RETIRO_SUCURSAL';
+  status: OnlineOrderStatus;
+  labelPrinted: boolean;
+  invoiced: boolean;
+  trackingCode?: string;
 }

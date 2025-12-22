@@ -1,16 +1,15 @@
-
 import React, { useState } from 'react';
 import { Search, Plus, Printer, CheckSquare, Square, RefreshCw, FileText, CreditCard, User, ClipboardList, AlertCircle, X, Send, Mail, Minus, Package, Trash2, History, Link, CheckCircle, Globe } from 'lucide-react';
 import { Product, Remito, RemitoItem } from '../types';
 
 // Helper to create valid Product objects compatible with the interface
-const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string): Product => ({
+const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string, brand: string = 'Genérico'): Product => ({
   id,
   internalCode,
   barcodes: [internalCode],
   providerCodes: [],
   name,
-  brand: 'Generico',
+  brand,
   provider: 'Proveedor Demo',
   description: '',
   category,
@@ -60,16 +59,17 @@ const Remitos: React.FC = () => {
 
   // Mock Data
   const sampleProducts: Product[] = [
-    createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante 2"', 150, 5000, 'Fijaciones'),
-    createMockProduct('2', 'MAR-055', 'Martillo Galponero', 12500, 45, 'Herramientas'),
-    createMockProduct('3', 'CEM-LOM', 'Cemento Loma Negra 50kg', 9500, 200, 'Construcción'),
-    createMockProduct('4', 'AMOL-700', 'Amoladora Angular 700W', 45000, 10, 'Herramientas'),
-    createMockProduct('5', 'DISC-COR', 'Disco Corte Metal 115mm', 850, 100, 'Abrasivos'),
+    createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante 2"', 150, 5000, 'Fijaciones', 'Fischer'),
+    createMockProduct('2', 'MAR-055', 'Martillo Galponero', 12500, 45, 'Herramientas', 'Stanley'),
+    createMockProduct('3', 'CEM-LOM', 'Cemento Loma Negra 50kg', 9500, 200, 'Construcción', 'Loma Negra'),
+    createMockProduct('4', 'AMOL-700', 'Amoladora Angular 700W', 45000, 10, 'Herramientas', 'Bosch'),
+    createMockProduct('5', 'DISC-COR', 'Disco Corte Metal 115mm', 850, 100, 'Abrasivos', 'Aliafor'),
   ];
   
   const filteredProducts = sampleProducts.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.internalCode.toLowerCase().includes(searchTerm.toLowerCase())
+    p.internalCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.brand.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const clients = ['Constructora del Norte', 'Juan Perez (Obras)', 'Estudio Arq. Lopez'];
@@ -251,12 +251,12 @@ const Remitos: React.FC = () => {
 
                 {/* Product Search */}
                 <div className="relative">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Agregar Producto</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Buscar y Filtrar Producto (Nombre, Marca, Código)</label>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Buscar por código, nombre o marca..." 
+                            placeholder="Ej: Stanley, Tornillo, FIS-001..." 
                             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-ferre-orange outline-none shadow-sm"
                             value={searchTerm}
                             onChange={e => {
@@ -278,7 +278,13 @@ const Remitos: React.FC = () => {
                                 >
                                     <div>
                                         <div className="font-bold text-gray-800 text-sm">{p.name}</div>
-                                        <div className="text-xs text-gray-500 font-mono">{p.internalCode} • {p.brand}</div>
+                                        <div className="text-xs text-gray-500 font-mono flex items-center gap-1.5">
+                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">{p.internalCode}</span>
+                                            <span>•</span>
+                                            <span className="font-bold text-ferre-orange uppercase">{p.brand}</span>
+                                            <span>•</span>
+                                            <span>{p.category}</span>
+                                        </div>
                                     </div>
                                     <div className="text-right">
                                         <div className={`text-xs font-bold ${p.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>Stock: {p.stock}</div>
@@ -286,7 +292,7 @@ const Remitos: React.FC = () => {
                                 </button>
                             ))}
                             {filteredProducts.length === 0 && (
-                                <div className="p-4 text-center text-gray-400 text-sm italic">No se encontraron productos.</div>
+                                <div className="p-4 text-center text-gray-400 text-sm italic">No se encontraron productos coincidentes.</div>
                             )}
                         </div>
                     )}
@@ -301,6 +307,7 @@ const Remitos: React.FC = () => {
                             <tr>
                                 <th className="px-4 py-3 w-32">Código</th>
                                 <th className="px-4 py-3">Descripción</th>
+                                <th className="px-4 py-3">Marca</th>
                                 <th className="px-4 py-3 text-center w-40">Cantidad</th>
                                 <th className="px-4 py-3 text-center w-20">Acción</th>
                             </tr>
@@ -312,6 +319,11 @@ const Remitos: React.FC = () => {
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-800 text-sm">{item.product.name}</div>
                                         <div className="text-xs text-gray-400">{item.product.category}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded uppercase tracking-tighter">
+                                            {item.product.brand}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center border border-gray-300 rounded-lg w-fit mx-auto bg-white">
@@ -336,11 +348,11 @@ const Remitos: React.FC = () => {
                             ))}
                             {cart.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="p-12 text-center">
+                                    <td colSpan={5} className="p-12 text-center">
                                         <div className="flex flex-col items-center justify-center text-gray-300">
                                             <ClipboardList size={48} className="mb-4 opacity-50"/>
                                             <p className="text-lg font-medium text-gray-400">Sin artículos cargados</p>
-                                            <p className="text-sm mt-1">Utiliza el buscador superior para agregar productos al remito.</p>
+                                            <p className="text-sm mt-1">Busca productos por nombre, código o marca arriba.</p>
                                         </div>
                                     </td>
                                 </tr>

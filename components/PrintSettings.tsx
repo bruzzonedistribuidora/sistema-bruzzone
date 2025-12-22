@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Printer, Save, Layout, FileText, Type, Image as ImageIcon, AlignLeft, GripVertical, CheckSquare, Square, LayoutGrid, Maximize, Ruler, Move, MousePointer2, RefreshCw } from 'lucide-react';
 import { PrintTemplate, DocumentType, PaperSize, Position } from '../types';
@@ -216,7 +217,8 @@ const PrintSettings: React.FC = () => {
                 <div className="border-t border-gray-200 pt-6">
                     <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <Move size={16}/> Propiedades del Elemento
-                        {activeElement ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase ml-auto">{activeElement}</span> : <span className="text-xs text-gray-400 font-normal ml-auto">Selecciona uno</span>}
+                        {/* Fix: Ensured activeElement is cast to string to avoid type error with ReactNode */}
+                        {activeElement ? <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded uppercase ml-auto">{String(activeElement)}</span> : <span className="text-xs text-gray-400 font-normal ml-auto">Selecciona uno</span>}
                     </h3>
                     
                     {activeElement ? (

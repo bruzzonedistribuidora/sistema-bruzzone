@@ -63,11 +63,13 @@ const Presupuestos: React.FC = () => {
       if (existing) {
         return prev.map(item => 
           item.product.id === product.id 
-          ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.priceFinal }
+          // Fix: added missing appliedPrice property
+          ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.priceFinal, appliedPrice: item.product.priceFinal }
           : item
         );
       }
-      return [...prev, { product, quantity: 1, subtotal: product.priceFinal }];
+      // Fix: added missing appliedPrice property
+      return [...prev, { product, quantity: 1, subtotal: product.priceFinal, appliedPrice: product.priceFinal }];
     });
     setSearchTerm('');
     setShowSearchResults(false);

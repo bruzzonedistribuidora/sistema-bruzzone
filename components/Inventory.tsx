@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Filter, Package, MoreVertical, X, Save, Globe, DollarSign, Archive, Barcode, ArrowRight, Layers, LayoutList, RefreshCcw, Truck, Edit3, Pen, Trash2, AlertTriangle, ShoppingBag, Store, Tag, Upload, FileSpreadsheet, Check, ChevronRight, Download, CheckCircle, ArrowRightLeft, MoveHorizontal } from 'lucide-react';
+import { Search, Plus, Filter, Package, MoreVertical, X, Save, Globe, DollarSign, Archive, Barcode, ArrowRight, Layers, LayoutList, RefreshCcw, Truck, Edit3, Pen, Trash2, AlertTriangle, ShoppingBag, Store, Tag, Upload, FileSpreadsheet, Check, ChevronRight, Download, CheckCircle, ArrowRightLeft, MoveHorizontal, PackagePlus, Settings2, Eye, EyeOff } from 'lucide-react';
 import { Product, ProductStock } from '../types';
 
 const Inventory: React.FC = () => {
@@ -20,9 +21,9 @@ const Inventory: React.FC = () => {
   };
 
   const defaultProducts: Product[] = [
-      { ...initialProduct, id: '1', name: 'Tornillo T1', internalCode: 'TOR-001', brand: 'Fischer', category: 'Fijaciones', provider: 'Herramientas Global SA', stock: 1500, priceFinal: 150, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 1000 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 500 }] },
-      { ...initialProduct, id: '2', name: 'Taladro Percutor', internalCode: 'TAL-022', brand: 'Bosch', category: 'Herramientas', provider: 'Robert Bosch', stock: 15, priceFinal: 95000, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 10 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 5 }] },
-      { ...initialProduct, id: '3', name: 'Lija al Agua 180', internalCode: 'LIJ-180', brand: 'Dob A', category: 'Pintureria', provider: 'Pinturas del Centro', stock: 500, priceFinal: 450, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 200 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 300 }] }
+      { ...initialProduct, id: '1', name: 'Tornillo T1', internalCode: 'TOR-001', brand: 'Fischer', category: 'Fijaciones', provider: 'Herramientas Global SA', stock: 1500, priceFinal: 150, listCost: 100, minStock: 100, reorderPoint: 500, desiredStock: 2000, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 1000 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 500 }] },
+      { ...initialProduct, id: '2', name: 'Taladro Percutor', internalCode: 'TAL-022', brand: 'Bosch', category: 'Herramientas', provider: 'Robert Bosch', stock: 15, priceFinal: 95000, listCost: 60000, minStock: 5, reorderPoint: 10, desiredStock: 30, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 10 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 5 }] },
+      { ...initialProduct, id: '3', name: 'Lija al Agua 180', internalCode: 'LIJ-180', brand: 'Dob A', category: 'Pintureria', provider: 'Pinturas del Centro', stock: 500, priceFinal: 450, listCost: 200, minStock: 100, reorderPoint: 200, desiredStock: 1000, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 200 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 300 }] }
   ];
 
   // --- STATE WITH PERSISTENCE ---
@@ -31,10 +32,29 @@ const Inventory: React.FC = () => {
       return saved ? JSON.parse(saved) : defaultProducts;
   });
 
-  // Save to LocalStorage whenever products change
+  // --- COLUMN VISIBILITY STATE ---
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+      const saved = localStorage.getItem('ferrecloud_inventory_columns');
+      return saved ? JSON.parse(saved) : {
+          brand: true,
+          category: true,
+          provider: false,
+          listCost: false,
+          priceNeto: false,
+          priceFinal: true,
+          stock: true
+      };
+  });
+
+  const [isColumnConfigOpen, setIsColumnConfigOpen] = useState(false);
+
   useEffect(() => {
       localStorage.setItem('ferrecloud_products', JSON.stringify(products));
   }, [products]);
+
+  useEffect(() => {
+      localStorage.setItem('ferrecloud_inventory_columns', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'LIST' | 'MASS_EDIT' | 'TRANSFERS' | 'DEPOSITS'>('LIST');
@@ -84,6 +104,19 @@ const Inventory: React.FC = () => {
       }
   };
 
+  const handleManualReorder = (product: Product) => {
+    const savedManual = localStorage.getItem('ferrecloud_manual_shortages');
+    const manualIds: string[] = savedManual ? JSON.parse(savedManual) : [];
+    
+    if (!manualIds.includes(product.id)) {
+        const newManualIds = [...manualIds, product.id];
+        localStorage.setItem('ferrecloud_manual_shortages', JSON.stringify(newManualIds));
+        alert(`"${product.name}" agregado a la lista de faltantes/reposición.`);
+    } else {
+        alert(`"${product.name}" ya se encuentra en la lista de reposición.`);
+    }
+  };
+
   const handleSaveProduct = () => {
     if (!formData.name || !formData.internalCode) {
         alert("El nombre y el código interno son obligatorios.");
@@ -105,18 +138,10 @@ const Inventory: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const updateDiscount = (index: number, value: number) => {
-      const newDiscounts = [...formData.discounts] as [number, number, number, number];
-      newDiscounts[index] = value;
-      setFormData({...formData, discounts: newDiscounts});
+  const toggleColumn = (col: string) => {
+      setVisibleColumns((prev: any) => ({ ...prev, [col]: !prev[col] }));
   };
 
-  const updateStockDetail = (branchId: string, quantity: number) => {
-      const newDetails = formData.stockDetails.map(d => d.branchId === branchId ? {...d, quantity} : d);
-      setFormData({...formData, stockDetails: newDetails});
-  };
-
-  // --- TRANSFER ACTIONS ---
   const handleExecuteTransfer = () => {
       if (!transferProduct || !transferFromId || !transferToId || transferQty <= 0) {
           alert("Complete todos los campos de transferencia.");
@@ -140,7 +165,6 @@ const Inventory: React.FC = () => {
                   if (s.branchId === transferToId) return { ...s, quantity: s.quantity + transferQty };
                   return s;
               });
-              // Recalculamos stock total para mantener consistencia
               const newTotal = newDetails.reduce((acc, curr) => acc + curr.quantity, 0);
               return { ...p, stockDetails: newDetails, stock: newTotal };
           }
@@ -168,6 +192,46 @@ const Inventory: React.FC = () => {
                 </div>
             </div>
             <div className="flex gap-2">
+                {/* Column Config Popover */}
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsColumnConfigOpen(!isColumnConfigOpen)}
+                        className={`bg-white border ${isColumnConfigOpen ? 'border-ferre-orange ring-1 ring-orange-100' : 'border-gray-300'} text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-all shadow-sm text-sm font-medium`}>
+                        <Settings2 size={16} className={isColumnConfigOpen ? 'text-ferre-orange' : ''} /> Vista
+                    </button>
+                    
+                    {isColumnConfigOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 z-[60] overflow-hidden animate-fade-in">
+                            <div className="p-4 bg-slate-50 border-b border-gray-200">
+                                <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider">Configurar Columnas</h4>
+                            </div>
+                            <div className="p-2 space-y-1">
+                                {[
+                                    { id: 'brand', label: 'Marca' },
+                                    { id: 'category', label: 'Categoría' },
+                                    { id: 'provider', label: 'Proveedor' },
+                                    { id: 'listCost', label: 'Costo Lista' },
+                                    { id: 'priceNeto', label: 'Precio Neto' },
+                                    { id: 'priceFinal', label: 'Precio Final' },
+                                    { id: 'stock', label: 'Stock' },
+                                ].map(col => (
+                                    <button 
+                                        key={col.id}
+                                        onClick={() => toggleColumn(col.id)}
+                                        className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                                    >
+                                        <span className={visibleColumns[col.id] ? 'font-bold text-gray-800' : 'text-gray-400'}>{col.label}</span>
+                                        {visibleColumns[col.id] ? <Eye size={14} className="text-blue-600"/> : <EyeOff size={14} className="text-gray-300"/>}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+                                <button onClick={() => setIsColumnConfigOpen(false)} className="text-xs font-bold text-blue-600 hover:underline">Cerrar</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 <button className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium">
                     <FileSpreadsheet size={16} /> Importar Excel
                 </button>
@@ -212,9 +276,13 @@ const Inventory: React.FC = () => {
                     <tr>
                         <th className="px-6 py-4 border-b border-gray-200">Cód. Interno</th>
                         <th className="px-6 py-4 border-b border-gray-200">Producto</th>
-                        <th className="px-6 py-4 border-b border-gray-200">Marca</th>
-                        <th className="px-6 py-4 border-b border-gray-200 text-right">Precio Final</th>
-                        <th className="px-6 py-4 border-b border-gray-200 text-right">Stock</th>
+                        {visibleColumns.brand && <th className="px-6 py-4 border-b border-gray-200">Marca</th>}
+                        {visibleColumns.category && <th className="px-6 py-4 border-b border-gray-200">Categoría</th>}
+                        {visibleColumns.provider && <th className="px-6 py-4 border-b border-gray-200">Proveedor</th>}
+                        {visibleColumns.listCost && <th className="px-6 py-4 border-b border-gray-200 text-right">Costo Lista</th>}
+                        {visibleColumns.priceNeto && <th className="px-6 py-4 border-b border-gray-200 text-right">P. Neto</th>}
+                        {visibleColumns.priceFinal && <th className="px-6 py-4 border-b border-gray-200 text-right">P. Final</th>}
+                        {visibleColumns.stock && <th className="px-6 py-4 border-b border-gray-200 text-right">Stock</th>}
                         <th className="px-6 py-4 border-b border-gray-200 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -222,20 +290,31 @@ const Inventory: React.FC = () => {
                     {products
                         .filter(p => 
                             p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            p.internalCode.toLowerCase().includes(searchTerm.toLowerCase())
+                            p.internalCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.brand.toLowerCase().includes(searchTerm.toLowerCase())
                         )
                         .map((product) => (
                         <tr key={product.id} className="hover:bg-slate-50/50 transition-colors group">
                             <td className="px-6 py-4 text-sm font-mono text-gray-500">{product.internalCode}</td>
                             <td className="px-6 py-4">
                                 <div className="text-sm font-bold text-gray-800 cursor-pointer hover:text-ferre-orange" onClick={() => handleEditProduct(product)}>{product.name}</div>
-                                <div className="text-xs text-gray-400">{product.category}</div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{product.brand}</td>
-                            <td className="px-6 py-4 text-sm text-right font-bold text-slate-900">${product.priceFinal.toLocaleString('es-AR')}</td>
-                            <td className={`px-6 py-4 text-sm text-right font-bold ${product.stock <= product.minStock ? 'text-red-600' : 'text-green-700'}`}>{product.stock}</td>
+                            {visibleColumns.brand && <td className="px-6 py-4 text-sm text-gray-600">{product.brand}</td>}
+                            {visibleColumns.category && <td className="px-6 py-4 text-sm text-gray-500">{product.category}</td>}
+                            {visibleColumns.provider && <td className="px-6 py-4 text-sm text-gray-500">{product.provider}</td>}
+                            {visibleColumns.listCost && <td className="px-6 py-4 text-sm text-right font-medium text-red-500">${product.listCost.toLocaleString('es-AR')}</td>}
+                            {visibleColumns.priceNeto && <td className="px-6 py-4 text-sm text-right font-medium text-gray-700">${product.priceNeto.toLocaleString('es-AR')}</td>}
+                            {visibleColumns.priceFinal && <td className="px-6 py-4 text-sm text-right font-bold text-slate-900">${product.priceFinal.toLocaleString('es-AR')}</td>}
+                            {visibleColumns.stock && <td className={`px-6 py-4 text-sm text-right font-bold ${product.stock <= product.minStock ? 'text-red-600' : 'text-green-700'}`}>{product.stock}</td>}
                             <td className="px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
+                                    <button 
+                                        onClick={() => handleManualReorder(product)}
+                                        className="text-gray-400 hover:text-indigo-600 p-2 rounded-full hover:bg-indigo-50 transition-colors"
+                                        title="Hacer Pedido"
+                                    >
+                                        <PackagePlus size={16} />
+                                    </button>
                                     <button onClick={() => handleEditProduct(product)} className="text-gray-400 hover:text-blue-600 p-2 rounded-full hover:bg-blue-50 transition-colors"><Pen size={16} /></button>
                                     <button onClick={() => handleDeleteProduct(product.id)} className="text-gray-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 size={16} /></button>
                                 </div>
@@ -330,10 +409,9 @@ const Inventory: React.FC = () => {
            </div>
       )}
 
-      {/* --- ADD/EDIT MODAL OMITTED FOR BREVITY --- */}
+      {/* --- ADD/EDIT MODAL --- */}
       {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              {/* Contenido del modal similar al anterior pero con los hooks de persistencia */}
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6">
                   <div className="flex justify-between items-center mb-6">
                       <h3 className="text-xl font-bold">Carga de Producto</h3>

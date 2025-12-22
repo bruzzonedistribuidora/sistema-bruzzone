@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Database, Cloud, HardDrive, RotateCcw, Download, CheckCircle, AlertTriangle, RefreshCw, Trash2, AlertOctagon } from 'lucide-react';
+import { Database, Cloud, HardDrive, RotateCcw, Download, CheckCircle, AlertTriangle, RefreshCw, Trash2, AlertOctagon, FileJson, Save } from 'lucide-react';
 
 const Backup: React.FC = () => {
   const [lastBackup, setLastBackup] = useState('26/10/2023 20:00');
@@ -10,13 +11,67 @@ const Backup: React.FC = () => {
       { id: 3, date: '24/10/2023 20:00', size: '43 MB', type: 'Automático', location: 'Nube' },
   ]);
 
+  // Function to trigger physical file download
+  const triggerFileDownload = () => {
+      // 1. Collect all app-related data from localStorage
+      const appData: Record<string, any> = {};
+      const keysToExport = [
+          'ferrecloud_products',
+          'ferrecloud_clients',
+          'ferrecloud_sales_history',
+          'ferrecloud_providers',
+          'ferrecloud_purchases',
+          'ferrecloud_employees',
+          'ferrecloud_price_templates',
+          'company_config',
+          'daily_movements',
+          'afip_backend_url',
+          'afip_sales_point',
+          'afip_environment'
+      ];
+
+      keysToExport.forEach(key => {
+          const value = localStorage.getItem(key);
+          if (value) {
+              try {
+                  appData[key] = JSON.parse(value);
+              } catch (e) {
+                  appData[key] = value;
+              }
+          }
+      });
+
+      // 2. Create a Blob with JSON data
+      const jsonString = JSON.stringify(appData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // 3. Create a temporary link and trigger browser "Save As"
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().split('T')[0];
+      
+      link.href = url;
+      link.download = `backup_ferrebruzzone_${timestamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  };
+
   const handleBackup = () => {
       setIsBackingUp(true);
+      // Simulating processing time for 140,000+ items
       setTimeout(() => {
           setIsBackingUp(false);
           setLastBackup(new Date().toLocaleString());
-          alert('Copia de seguridad realizada con éxito.');
-      }, 3000);
+          
+          // Trigger the actual browser download dialog
+          triggerFileDownload();
+          
+          alert('Copia de seguridad preparada. El navegador solicitará ahora la ubicación de guardado.');
+      }, 2500);
   };
 
   const handleFactoryReset = () => {
@@ -24,66 +79,76 @@ const Backup: React.FC = () => {
       if (confirm1) {
           const confirm2 = window.confirm("Esta acción es IRREVERSIBLE. Se eliminarán clientes, productos, ventas y configuraciones. ¿Confirmar reinicio de fábrica?");
           if (confirm2) {
-              alert("El sistema se está reiniciando y borrando datos...");
-              window.location.reload(); // Simulates a reset
+              localStorage.clear();
+              alert("El sistema se ha reiniciado y borrado datos...");
+              window.location.reload(); 
           }
       }
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
-                  <Database size={40} />
+    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full overflow-y-auto animate-fade-in">
+      {/* MAIN BACKUP CARD */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+          <div className="absolute -top-10 -left-10 p-20 opacity-5 text-blue-600 pointer-events-none">
+              <Cloud size={240}/>
+          </div>
+          <div className="flex items-center gap-8 relative z-10">
+              <div className="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center text-blue-600 shadow-inner">
+                  <Database size={48} />
               </div>
               <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Estado del Sistema</h2>
-                  <p className="text-gray-500 mt-1">Última copia exitosa: <span className="font-bold text-gray-700">{lastBackup}</span></p>
-                  <div className="flex items-center gap-2 mt-2 text-green-600 font-medium text-sm bg-green-50 w-fit px-2 py-1 rounded">
-                      <CheckCircle size={14} /> Sistema sincronizado con la nube
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Estado de la Base de Datos</h2>
+                  <p className="text-gray-500 mt-1 font-medium italic text-lg">Última descarga local: <span className="font-black text-slate-900 not-italic">{lastBackup}</span></p>
+                  <div className="flex items-center gap-2 mt-4 text-green-600 font-black text-xs bg-green-50 w-fit px-3 py-1.5 rounded-full uppercase tracking-widest border border-green-100">
+                      <CheckCircle size={14} /> Sincronización en la nube activa
                   </div>
               </div>
           </div>
           <button 
             onClick={handleBackup}
             disabled={isBackingUp}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-colors shadow-lg shadow-blue-900/20">
+            className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-3xl font-black text-xl flex items-center gap-4 transition-all shadow-2xl shadow-blue-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100">
               {isBackingUp ? (
-                  <><RefreshCw className="animate-spin" /> Generando...</>
+                  <><RefreshCw className="animate-spin" size={28} /> Generando...</>
               ) : (
-                  <><Cloud size={24} /> Generar Copia Ahora</>
+                  <><Cloud size={28} /> Generar y Descargar</>
               )}
           </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <HardDrive size={20} className="text-gray-400"/> Historial de Copias
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* HISTORY */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
+              <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-3 uppercase tracking-tighter">
+                  <HardDrive size={20} className="text-slate-400"/> Historial de Descargas Recientes
               </h3>
-              <div className="overflow-hidden rounded-lg border border-gray-100">
+              <div className="overflow-hidden rounded-2xl border border-gray-100">
                   <table className="w-full text-left">
-                      <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                      <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-widest">
                           <tr>
-                              <th className="px-4 py-3">Fecha</th>
-                              <th className="px-4 py-3">Tipo</th>
-                              <th className="px-4 py-3">Tamaño</th>
-                              <th className="px-4 py-3"></th>
+                              <th className="px-6 py-4">Fecha y Hora</th>
+                              <th className="px-6 py-4">Origen</th>
+                              <th className="px-6 py-4">Peso</th>
+                              <th className="px-6 py-4"></th>
                           </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 text-sm">
                           {backups.map(b => (
-                              <tr key={b.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 text-gray-700 font-medium">{b.date}</td>
-                                  <td className="px-4 py-3">
-                                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${b.type === 'Automático' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                              <tr key={b.id} className="hover:bg-blue-50/30 transition-colors">
+                                  <td className="px-6 py-4 text-slate-700 font-bold">{b.date}</td>
+                                  <td className="px-6 py-4">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${b.type === 'Automático' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
                                           {b.type}
                                       </span>
                                   </td>
-                                  <td className="px-4 py-3 text-gray-500">{b.size}</td>
-                                  <td className="px-4 py-3 text-right">
-                                      <button className="text-blue-600 hover:underline text-xs font-bold">Descargar</button>
+                                  <td className="px-6 py-4 text-slate-400 font-mono text-xs">{b.size}</td>
+                                  <td className="px-6 py-4 text-right">
+                                      <button 
+                                        onClick={triggerFileDownload}
+                                        className="text-blue-600 hover:bg-blue-100 p-2 rounded-xl transition-all" title="Descargar nuevamente">
+                                          <Download size={20}/>
+                                      </button>
                                   </td>
                               </tr>
                           ))}
@@ -92,25 +157,35 @@ const Backup: React.FC = () => {
               </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <RotateCcw size={20} className="text-gray-400"/> Restauración
+          {/* RESTORE SECTION */}
+          <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8 flex flex-col">
+              <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-3 uppercase tracking-tighter">
+                  <RotateCcw size={20} className="text-slate-400"/> Restauración de Respaldo
               </h3>
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6">
-                  <div className="flex items-start gap-3">
-                      <AlertTriangle className="text-blue-500 shrink-0" size={20} />
+              <div className="bg-orange-50 border border-orange-100 rounded-2xl p-6 mb-8">
+                  <div className="flex items-start gap-4">
+                      <div className="p-3 bg-white rounded-xl text-orange-500 shadow-sm shrink-0">
+                        <AlertTriangle size={24} />
+                      </div>
                       <div>
-                          <h4 className="font-bold text-blue-800 text-sm">Recuperación de Datos</h4>
-                          <p className="text-xs text-blue-600 mt-1">Restaurar una copia reemplazará todos los datos actuales por los de la copia seleccionada.</p>
+                          <h4 className="font-black text-orange-800 text-base uppercase tracking-tight">Sobrescribir Datos</h4>
+                          <p className="text-sm text-orange-700 mt-1 leading-relaxed">
+                            Al cargar un archivo de respaldo, <strong>se borrará la información actual</strong> del sistema para reemplazarla por la del archivo. Asegúrate de que el archivo sea un <code>.json</code> generado por FerreCloud.
+                          </p>
                       </div>
                   </div>
               </div>
-              <div className="space-y-3">
-                   <label className="block text-sm font-bold text-gray-700">Seleccionar archivo de respaldo</label>
-                   <div className="flex gap-2">
-                       <input type="file" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
-                       <button className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-sm">
-                           Restaurar
+              <div className="space-y-4 mt-auto">
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Seleccionar archivo (.json)</label>
+                   <div className="flex gap-3">
+                       <div className="flex-1 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex items-center justify-center relative group hover:border-blue-400 transition-colors">
+                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-10" accept=".json"/>
+                            <div className="flex items-center gap-3 text-slate-400 font-bold text-sm group-hover:text-blue-500">
+                                <FileJson size={20}/> Arrastra o selecciona archivo
+                            </div>
+                       </div>
+                       <button className="bg-slate-900 hover:bg-slate-800 text-white px-8 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95 uppercase tracking-tighter">
+                           RESTAURAR
                        </button>
                    </div>
               </div>
@@ -118,23 +193,22 @@ const Backup: React.FC = () => {
       </div>
 
       {/* DANGER ZONE - FACTORY RESET */}
-      <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-          <div className="flex items-start gap-4">
-              <div className="p-3 bg-red-100 rounded-full text-red-600">
-                  <AlertOctagon size={32} />
+      <div className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-10 flex flex-col md:flex-row items-center justify-between gap-10 shadow-sm mt-10">
+          <div className="flex items-start gap-6">
+              <div className="p-5 bg-white rounded-[1.5rem] text-red-600 shadow-lg shadow-red-100">
+                  <AlertOctagon size={48} />
               </div>
               <div>
-                  <h3 className="text-xl font-bold text-red-800">Borrar Datos / Reinicio de Fábrica</h3>
-                  <p className="text-red-700 text-sm mt-1 max-w-xl">
-                      Esta acción eliminará permanentemente todos los clientes, productos, ventas, configuraciones y usuarios del sistema. 
-                      Utilice esta opción solo si desea comenzar desde cero.
+                  <h3 className="text-2xl font-black text-red-800 uppercase tracking-tighter">Zona de Peligro: Reseteo Total</h3>
+                  <p className="text-red-700/70 text-sm mt-2 max-w-xl font-medium leading-relaxed">
+                      Esta acción eliminará de forma <strong>permanente e irreversible</strong> todos los datos de tu ferretería del dispositivo actual: clientes, los 140.000 artículos, ventas, configuraciones fiscales y usuarios. 
                   </p>
               </div>
           </div>
           <button 
             onClick={handleFactoryReset}
-            className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-red-900/20 border border-red-800">
-              <Trash2 size={20} /> BORRAR TODO
+            className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white px-10 py-5 rounded-[2rem] font-black text-lg flex items-center gap-3 shadow-2xl shadow-red-200 transition-all hover:scale-105 active:scale-95 border border-red-200">
+              <Trash2 size={24} /> LIMPIAR SISTEMA
           </button>
       </div>
     </div>
