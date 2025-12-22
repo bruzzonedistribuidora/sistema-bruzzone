@@ -20,16 +20,10 @@ const Inventory: React.FC = () => {
     ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
   };
 
-  const defaultProducts: Product[] = [
-      { ...initialProduct, id: '1', name: 'Tornillo T1', internalCode: 'TOR-001', brand: 'Fischer', category: 'Fijaciones', provider: 'Herramientas Global SA', stock: 1500, priceFinal: 150, listCost: 100, minStock: 100, reorderPoint: 500, desiredStock: 2000, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 1000 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 500 }] },
-      { ...initialProduct, id: '2', name: 'Taladro Percutor', internalCode: 'TAL-022', brand: 'Bosch', category: 'Herramientas', provider: 'Robert Bosch', stock: 15, priceFinal: 95000, listCost: 60000, minStock: 5, reorderPoint: 10, desiredStock: 30, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 10 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 5 }] },
-      { ...initialProduct, id: '3', name: 'Lija al Agua 180', internalCode: 'LIJ-180', brand: 'Dob A', category: 'Pintureria', provider: 'Pinturas del Centro', stock: 500, priceFinal: 450, listCost: 200, minStock: 100, reorderPoint: 200, desiredStock: 1000, stockDetails: [{ branchId: '1', branchName: 'Casa Central', quantity: 200 }, { branchId: '2', branchName: 'Depósito Norte', quantity: 300 }] }
-  ];
-
-  // --- STATE WITH PERSISTENCE ---
+  // --- STATE WITH PERSISTENCE (System starts at ZERO) ---
   const [products, setProducts] = useState<Product[]>(() => {
       const saved = localStorage.getItem('ferrecloud_products');
-      return saved ? JSON.parse(saved) : defaultProducts;
+      return saved ? JSON.parse(saved) : []; // Default empty for "System from Zero"
   });
 
   // --- COLUMN VISIBILITY STATE ---
@@ -323,6 +317,13 @@ const Inventory: React.FC = () => {
                     ))}
                 </tbody>
             </table>
+            {products.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-32 text-gray-300">
+                    <Package size={80} strokeWidth={1} className="opacity-20 mb-4"/>
+                    <p className="text-xl font-black uppercase tracking-tighter">Sin artículos en stock local</p>
+                    <p className="text-sm">Agrega artículos manualmente o impórtalos desde Excel.</p>
+                </div>
+            )}
         </div>
       </div>
       )}
