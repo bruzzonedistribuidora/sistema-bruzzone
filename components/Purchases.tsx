@@ -6,9 +6,10 @@ import {
     Wallet, CheckCircle, DollarSign, Printer, Download, Eye, Upload, 
     FileSpreadsheet, RefreshCw, Globe, Trash2, ShoppingCart, Package, 
     AlertTriangle, Edit, Box, Tag, Layers, Calculator, Landmark, 
-    History, ArrowDownLeft, CheckSquare, Square, ArrowRight, Info, Scroll, Smartphone
+    History, ArrowDownLeft, CheckSquare, Square, ArrowRight, Info, Scroll, Smartphone, Loader2, Zap, ShieldCheck, UserCheck
 } from 'lucide-react';
 import { Purchase, Provider, CurrentAccountMovement, Check } from '../types';
+import { fetchCompanyByCuit } from '../services/geminiService';
 
 interface PurchasesProps {
     defaultTab?: 'PURCHASES' | 'PROVIDERS';
@@ -25,6 +26,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [viewingVoucher, setViewingVoucher] = useState<CurrentAccountMovement | null>(null);
 
+  // Estados Modal Proveedor
+  const [isSearchingCuit, setIsSearchingCuit] = useState(false);
+  const [providerModalTab, setProviderModalTab] = useState<'DATA' | 'AUTH'>('DATA');
+  const [newAuthPerson, setNewAuthPerson] = useState('');
+
   // --- PERSISTENCIA: CHEQUES (Global desde Clientes) ---
   const [checks, setChecks] = useState<Check[]>(() => {
       const saved = localStorage.getItem('ferrecloud_checks');
@@ -37,9 +43,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
   const [providers, setProviders] = useState<Provider[]>(() => {
     const saved = localStorage.getItem('ferrecloud_providers');
     return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Herramientas Global SA', cuit: '30-11223344-5', contact: 'Roberto', balance: 150000, defaultDiscounts: [10, 5, 0] },
-      { id: '2', name: 'Pinturas del Centro', cuit: '30-55667788-9', contact: 'Maria', balance: 0, defaultDiscounts: [25, 0, 0] },
-      { id: '3', name: 'Bulonera Industrial', cuit: '30-99887766-1', contact: 'Carlos', balance: 50000, defaultDiscounts: [0, 0, 0] },
+      { id: '1', name: 'Herramientas Global SA', cuit: '30-11223344-5', contact: 'Roberto', balance: 150000, defaultDiscounts: [10, 5, 0], address: 'Av. Corrientes 4500', authorizedPersonnel: ['Carlos Ruiz (Ventas)', 'Marta Lopez (Logística)'] },
+      { id: '2', name: 'Pinturas del Centro', cuit: '30-55667788-9', contact: 'Maria', balance: 0, defaultDiscounts: [25, 0, 0], address: 'Calle 10 #554', authorizedPersonnel: [] },
+      { id: '3', name: 'Bulonera Industrial', cuit: '30-99887766-1', contact: 'Carlos', balance: 50000, defaultDiscounts: [0, 0, 0], address: 'Ruta 8 km 22', authorizedPersonnel: [] },
     ];
   });
 
@@ -65,7 +71,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
 
   // --- FORMULARIOS ---
   const [providerFormData, setProviderFormData] = useState<Partial<Provider>>({
-      name: '', cuit: '', contact: '', balance: 0, defaultDiscounts: [0, 0, 0]
+      name: '', cuit: '', contact: '', balance: 0, defaultDiscounts: [0, 0, 0], address: '', authorizedPersonnel: []
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -88,17 +94,61 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
 
   // --- HANDLERS ---
 
+  const handleSearchProviderCuit = async () => {
+    if (!providerFormData.cuit || providerFormData.cuit.length < 8) {
+        alert("Ingrese un CUIT válido.");
+        return;
+    }
+    setIsSearchingCuit(true);
+    try {
+        const data = await fetchCompanyByCuit(providerFormData.cuit);
+        if (data && data.name) {
+            setProviderFormData(prev => ({
+                ...prev,
+                name: data.name,
+                address: data.address || '',
+                contact: data.contact || ''
+            }));
+        } else {
+            alert("No se obtuvieron datos para este CUIT. Ingrese los datos manualmente.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al buscar CUIT.");
+    } finally {
+        setIsSearchingCuit(false);
+    }
+  };
+
   const handleSaveProvider = () => {
       if (!providerFormData.name || !providerFormData.cuit) return;
       const newProvider: Provider = {
           ...providerFormData as Provider,
           id: Date.now().toString(),
           balance: 0,
-          defaultDiscounts: [0, 0, 0]
+          defaultDiscounts: providerFormData.defaultDiscounts || [0, 0, 0],
+          authorizedPersonnel: providerFormData.authorizedPersonnel || []
       };
       setProviders([newProvider, ...providers]);
       setIsProviderModalOpen(false);
-      setProviderFormData({ name: '', cuit: '', contact: '', balance: 0, defaultDiscounts: [0, 0, 0] });
+      setProviderFormData({ name: '', cuit: '', contact: '', balance: 0, defaultDiscounts: [0, 0, 0], address: '', authorizedPersonnel: [] });
+      setProviderModalTab('DATA');
+  };
+
+  const addAuthorizedPerson = () => {
+      if (!newAuthPerson.trim()) return;
+      setProviderFormData(prev => ({
+          ...prev,
+          authorizedPersonnel: [...(prev.authorizedPersonnel || []), newAuthPerson.trim()]
+      }));
+      setNewAuthPerson('');
+  };
+
+  const removeAuthorizedPerson = (index: number) => {
+      setProviderFormData(prev => ({
+          ...prev,
+          authorizedPersonnel: (prev.authorizedPersonnel || []).filter((_, i) => i !== index)
+      }));
   };
 
   const toggleCheckSelection = (check: Check) => {
@@ -251,7 +301,8 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
                         <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-widest border-b border-gray-100">
                             <tr>
                                 <th className="px-8 py-5">Razón Social / CUIT</th>
-                                <th className="px-8 py-5">Contacto</th>
+                                <th className="px-8 py-5">Contacto Principal</th>
+                                <th className="px-8 py-5">Personal Autorizado</th>
                                 <th className="px-8 py-5 text-right">Saldo de Cuenta</th>
                                 <th className="px-8 py-5 text-center">Acciones</th>
                             </tr>
@@ -264,6 +315,23 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
                                         <div className="text-xs text-gray-400 font-mono font-bold italic">{provider.cuit}</div>
                                     </td>
                                     <td className="px-8 py-5 text-sm font-medium text-slate-500 uppercase">{provider.contact || '-'}</td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex -space-x-2">
+                                            {(provider.authorizedPersonnel || []).slice(0, 3).map((person, i) => (
+                                                <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 uppercase" title={person}>
+                                                    {person.charAt(0)}
+                                                </div>
+                                            ))}
+                                            {(provider.authorizedPersonnel || []).length > 3 && (
+                                                <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-900 flex items-center justify-center text-[10px] font-black text-white">
+                                                    +{(provider.authorizedPersonnel || []).length - 3}
+                                                </div>
+                                            )}
+                                            {(!provider.authorizedPersonnel || provider.authorizedPersonnel.length === 0) && (
+                                                <span className="text-[10px] text-gray-300 font-bold italic">Sin registros</span>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td className={`px-8 py-5 text-right font-black text-lg tracking-tighter ${provider.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                         ${provider.balance.toLocaleString('es-AR')}
                                     </td>
@@ -285,38 +353,118 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
           </div>
       )}
 
-      {/* --- MODAL: ALTA PROVEEDOR --- */}
+      {/* --- MODAL: ALTA PROVEEDOR (MEJORADO CON PESTAÑAS Y CUIT IA) --- */}
       {isProviderModalOpen && (
           <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col">
                   <div className="p-8 border-b border-gray-100 bg-slate-900 text-white flex justify-between items-center">
                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-indigo-500 text-white rounded-2xl">
+                          <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-lg shadow-indigo-900/40">
                               <UserPlus size={24}/>
                           </div>
                           <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Alta Proveedor</h3>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Registro en el Sistema</p>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Gestión Proveedor</h3>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Vínculo Comercial</p>
                           </div>
                       </div>
                       <button onClick={() => setIsProviderModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
                   </div>
-                  <div className="p-8 space-y-4">
-                      <div>
-                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Razón Social</label>
-                          <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700" value={providerFormData.name || ''} onChange={e => setProviderFormData({...providerFormData, name: e.target.value})} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">CUIT</label>
-                            <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-mono text-gray-700 font-bold" value={providerFormData.cuit || ''} onChange={e => setProviderFormData({...providerFormData, cuit: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Persona de Contacto</label>
-                            <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700" value={providerFormData.contact || ''} onChange={e => setProviderFormData({...providerFormData, contact: e.target.value})} />
-                        </div>
-                      </div>
-                      <button onClick={handleSaveProvider} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-slate-800 transition-all mt-4 active:scale-95">Guardar Proveedor</button>
+                  
+                  <div className="flex bg-slate-100 p-1 mx-8 mt-6 rounded-2xl">
+                      <button 
+                        onClick={() => setProviderModalTab('DATA')}
+                        className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${providerModalTab === 'DATA' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                        Datos Fiscales
+                      </button>
+                      <button 
+                        onClick={() => setProviderModalTab('AUTH')}
+                        className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${providerModalTab === 'AUTH' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                        Autorizados
+                      </button>
+                  </div>
+
+                  <div className="p-8 space-y-6">
+                      {providerModalTab === 'DATA' ? (
+                          <div className="space-y-4 animate-fade-in">
+                                <div className="relative">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">CUIT / Identificación Fiscal</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            className="flex-1 p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-mono text-gray-700 font-bold" 
+                                            placeholder="30-xxxxxxxx-x"
+                                            value={providerFormData.cuit || ''} 
+                                            onChange={e => setProviderFormData({...providerFormData, cuit: e.target.value})} 
+                                        />
+                                        <button 
+                                            onClick={handleSearchProviderCuit}
+                                            disabled={isSearchingCuit}
+                                            className="bg-indigo-600 text-white px-4 rounded-2xl hover:bg-indigo-700 transition-all flex items-center justify-center disabled:opacity-50 min-w-[56px] shadow-lg shadow-indigo-200">
+                                            {isSearchingCuit ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] text-indigo-500 font-bold mt-1 uppercase tracking-tighter flex items-center gap-1 ml-2">
+                                        <Zap size={10}/> Buscar datos fiscales con IA
+                                    </p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">Razón Social</label>
+                                    <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700 uppercase" value={providerFormData.name || ''} onChange={e => setProviderFormData({...providerFormData, name: e.target.value})} />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">Dirección Comercial</label>
+                                    <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700 uppercase" value={providerFormData.address || ''} onChange={e => setProviderFormData({...providerFormData, address: e.target.value})} />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">Persona de Contacto (Titular)</label>
+                                    <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700" value={providerFormData.contact || ''} onChange={e => setProviderFormData({...providerFormData, contact: e.target.value})} />
+                                </div>
+                          </div>
+                      ) : (
+                          <div className="space-y-6 animate-fade-in">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest ml-2">Añadir Persona Autorizada</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            className="flex-1 p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-gray-700" 
+                                            placeholder="Nombre completo y función..."
+                                            value={newAuthPerson}
+                                            onChange={e => setNewAuthPerson(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && addAuthorizedPerson()}
+                                        />
+                                        <button onClick={addAuthorizedPerson} className="bg-indigo-50 text-indigo-600 px-4 rounded-2xl hover:bg-indigo-100 transition-all font-black text-xs uppercase tracking-widest border border-indigo-100">AÑADIR</button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 rounded-[2rem] border border-slate-100 p-6 min-h-[150px] max-h-[300px] overflow-y-auto space-y-2">
+                                    {(providerFormData.authorizedPersonnel || []).map((person, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center group shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><UserCheck size={16}/></div>
+                                                <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{person}</span>
+                                            </div>
+                                            <button onClick={() => removeAuthorizedPerson(idx)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1">
+                                                <Trash2 size={16}/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(providerFormData.authorizedPersonnel || []).length === 0 && (
+                                        <div className="h-full flex flex-col items-center justify-center text-gray-300 py-10">
+                                            <ShieldCheck size={32} className="opacity-20 mb-2"/>
+                                            <p className="text-xs font-bold uppercase tracking-widest">Sin personal registrado</p>
+                                        </div>
+                                    )}
+                                </div>
+                          </div>
+                      )}
+                      
+                      <button onClick={handleSaveProvider} className="w-full bg-slate-900 text-white py-4 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2">
+                          <Save size={18}/> Guardar Proveedor
+                      </button>
                   </div>
               </div>
           </div>
