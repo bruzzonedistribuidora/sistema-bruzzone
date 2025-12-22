@@ -5,7 +5,7 @@ import {
     ChevronRight, ChevronDown, Users, ClipboardList, FileSpreadsheet, 
     Truck, Wallet, Calculator, PieChart, Database, Store, FileUp, ShieldCheck, 
     ShoppingCart, ListOrdered, Printer, Globe, CloudCog, AlertTriangle, 
-    FileBarChart2, Tag, CalendarDays, Landmark, Shield
+    FileBarChart2, Tag, CalendarDays, Landmark, Shield, ArrowLeftRight
 } from 'lucide-react';
 import { ViewState, User, Role } from '../types';
 
@@ -25,20 +25,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
     config: false
   });
 
-  // Función de verificación de permisos interna para el sidebar
   const hasPermission = (permission: string): boolean => {
     if (!user) return false;
-    
-    // Admin maestro siempre tiene todo
     if (user.id === '1' || user.roleId === 'admin') return true;
-
     const savedRoles = localStorage.getItem('ferrecloud_roles');
     if (!savedRoles) return false;
-    
     const roles: Role[] = JSON.parse(savedRoles);
     const userRole = roles.find(r => r.id === user.roleId);
     if (!userRole) return false;
-    
     return userRole.permissions.includes('ALL') || userRole.permissions.includes(permission);
   };
 
@@ -47,9 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
   };
 
   const NavItem = ({ view, label, icon: Icon, perm }: { view: ViewState, label: string, icon: any, perm?: string }) => {
-    // Si se requiere un permiso y el usuario no lo tiene, no renderizar nada
     if (perm && !hasPermission(perm)) return null;
-
     return (
       <button
           onClick={() => onNavigate(view)}
@@ -70,7 +62,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
 
   const SectionHeader = ({ id, label, color, perm }: { id: string, label: string, color: string, perm?: string }) => {
     if (perm && !hasPermission(perm)) return null;
-    
     return (
       <button 
           onClick={() => toggleSection(id)}
@@ -103,9 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
       </div>
 
       <div className="p-4 space-y-2 pb-20">
-        {/* DASHBOARD AHORA TIENE PERMISO DASHBOARD_VIEW */}
         <NavItem view={ViewState.DASHBOARD} label="Tablero Principal" icon={LayoutDashboard} perm="DASHBOARD_VIEW" />
-        
         <NavItem view={ViewState.REPORTS} label="Informes y Reportes" icon={FileBarChart2} perm="ACCOUNTING_VIEW" />
 
         <SectionHeader id="ventas" label="Ventas" color="bg-green-500" />
@@ -136,6 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
         {openSections.inventario && (
             <nav className="animate-fade-in space-y-1">
                 <NavItem view={ViewState.INVENTORY} label="Gestión Artículos" icon={PackageSearch} perm="STOCK_VIEW" />
+                <NavItem view={ViewState.STOCK_TRANSFERS} label="Movimientos Stock" icon={ArrowLeftRight} perm="STOCK_EDIT" />
                 <NavItem view={ViewState.LABEL_PRINTING} label="Imprimir Etiquetas" icon={Tag} perm="STOCK_VIEW" />
                 <NavItem view={ViewState.AI_ASSISTANT} label="Asistente IA" icon={Bot} />
             </nav>
@@ -172,7 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
             </div>
             <div className="overflow-hidden">
                 <p className="text-xs font-black text-white truncate uppercase tracking-tighter leading-none">{user?.name || 'Usuario'}</p>
-                <p className={`text-[9px] font-black truncate uppercase tracking-widest mt-1 ${user?.roleId === 'admin' ? 'text-purple-400' : 'text-slate-500'}`}>{getRoleLabel()}</p>
+                <p className={`text-[9px] font-black truncate uppercase tracking-widest mt-1 ${user?.roleId === 'admin' ? 'text-purple-400' : 'text-slate-50'}`}>{getRoleLabel()}</p>
             </div>
         </div>
         <button 
