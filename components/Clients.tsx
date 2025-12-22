@@ -172,113 +172,34 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       setClientForm({ id: '', name: '', cuit: '', phone: '', balance: 0, limit: 100000, address: '' });
   };
 
-  const handleAddReceipt = () => {
-      if (!selectedClient || !receiptForm.amount) return;
-
-      const amount = parseFloat(receiptForm.amount);
-      const newBalance = selectedClient.balance - amount;
-      const receiptId = `REC-${Date.now().toString().slice(-6)}`;
-      
-      const isAdvance = receiptForm.selectedVouchers.length === 0;
-      const descPrefix = isAdvance ? 'ADELANTO A CUENTA' : `PAGO CANCELACIÓN (${receiptForm.selectedVouchers.join(', ')})`;
-
-      let methodLabel = receiptForm.method;
-      const customAccount = companyConfig.paymentAccounts.find(a => a.id === receiptForm.method);
-      if (customAccount) {
-          methodLabel = `${customAccount.bankName} (${customAccount.alias})`;
-      }
-
-      if (receiptForm.method === 'CHEQUE' || receiptForm.method === 'ECHEQ') {
-          if (!checkData.bank || !checkData.number) {
-              alert("Por favor complete los datos del cheque.");
-              return;
-          }
-          const newCheck: Check = {
-              id: `CH-${Date.now()}`,
-              type: receiptForm.method === 'CHEQUE' ? 'FISICO' : 'ECHEQ',
-              bank: checkData.bank,
-              number: checkData.number,
-              amount: amount,
-              paymentDate: checkData.paymentDate,
-              entryDate: new Date().toISOString().split('T')[0],
-              status: 'CARTERA',
-              origin: selectedClient.name,
-              issuerCuit: checkData.issuerCuit
-          };
-          setChecks([newCheck, ...checks]);
-      }
-
-      const newMovement: CurrentAccountMovement = {
-          id: receiptId,
-          date: new Date().toISOString().split('T')[0],
-          voucherType: 'RECIBO',
-          description: `${descPrefix} - ${methodLabel}${receiptForm.note ? ': ' + receiptForm.note : ''}`,
-          debit: 0,
-          credit: amount,
-          balance: newBalance,
-          clientId: selectedClient.id
-      };
-      setMovements([newMovement, ...movements]);
-
-      const tMovementsRaw = localStorage.getItem('ferrecloud_treasury_movements');
-      const tMovements: TreasuryMovement[] = tMovementsRaw ? JSON.parse(tMovementsRaw) : [];
-      
-      let treasuryMethod: TreasuryMovement['paymentMethod'] = 'TRANSFERENCIA';
-      if (receiptForm.method === 'EFECTIVO') treasuryMethod = 'EFECTIVO';
-      else if (receiptForm.method === 'CHEQUE') treasuryMethod = 'CHEQUE';
-      else if (receiptForm.method === 'ECHEQ') treasuryMethod = 'ECHEQ';
-      else if (customAccount?.type === 'VIRTUAL_WALLET') treasuryMethod = 'MERCADO_PAGO';
-
-      const newTMovement: TreasuryMovement = {
-          id: `T-${receiptId}`,
-          date: new Date().toLocaleString(),
-          type: 'INCOME',
-          subtype: 'COBRO_CTACTE',
-          paymentMethod: treasuryMethod,
-          amount: amount,
-          description: `Cobranza Cliente: ${selectedClient.name} (${receiptId}) - Vía ${methodLabel}`,
-          cashRegisterId: '1' 
-      };
-      localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify([newTMovement, ...tMovements]));
-
-      if (receiptForm.method === 'EFECTIVO') {
-          const registersRaw = localStorage.getItem('ferrecloud_registers');
-          if (registersRaw) {
-              const regs = JSON.parse(registersRaw);
-              const updatedRegs = regs.map((r: any) => r.id === '1' ? { ...r, balance: r.balance + amount } : r);
-              localStorage.setItem('ferrecloud_registers', JSON.stringify(updatedRegs));
-          }
-      }
-
-      const updatedClient = { ...selectedClient, balance: newBalance };
-      setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-      setSelectedClient(updatedClient);
-      
-      setIsReceiptModalOpen(false);
-      setReceiptForm({ amount: '', method: 'EFECTIVO', note: '', selectedVouchers: [] });
-      setCheckData({ bank: '', number: '', paymentDate: new Date().toISOString().split('T')[0], issuerCuit: '' });
-  };
-
   const handleTogglePortal = (clientId: string) => {
       setClients(prev => prev.map(c => {
           if (c.id === clientId) {
               const isEnabling = !c.portalEnabled;
+              const hash = c.portalHash || `portal-${Math.random().toString(36).substring(7)}`;
               return { 
                   ...c, 
                   portalEnabled: isEnabling,
-                  portalHash: isEnabling ? (c.portalHash || `portal-${Math.random().toString(36).substring(7)}`) : c.portalHash
+                  portalHash: hash
               };
           }
           return c;
       }));
+      
+      // Actualizar el cliente seleccionado si es el mismo
       if (selectedClient?.id === clientId) {
-          const updated = clients.find(c => c.id === clientId);
-          if (updated) setSelectedClient({
-                ...updated,
-                portalEnabled: !updated.portalEnabled,
-                portalHash: !updated.portalEnabled ? (updated.portalHash || `portal-${Math.random().toString(36).substring(7)}`) : updated.portalHash
-          });
+          setSelectedClient(prev => prev ? ({
+              ...prev,
+              portalEnabled: !prev.portalEnabled,
+              portalHash: prev.portalHash || `portal-${Math.random().toString(36).substring(7)}`
+          }) : null);
       }
+  };
+
+  const copyPortalLink = (hash: string) => {
+      const url = `${window.location.origin}/portal/${hash}`;
+      navigator.clipboard.writeText(url);
+      alert("Enlace del portal copiado al portapapeles.");
   };
 
   return (
@@ -364,6 +285,73 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                 </tbody>
             </table>
         </div>
+
+        {/* MODAL: CONFIGURACIÓN PORTAL CLIENTE */}
+        {isPortalModalOpen && selectedClient && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                    <div className="p-8 border-b border-gray-100 bg-slate-900 text-white flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-lg">
+                                <Globe size={24}/>
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Portal de Cliente</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Acceso Externo</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsPortalModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                    </div>
+                    
+                    <div className="p-8 space-y-6">
+                        <div className="flex items-center justify-between p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+                            <div>
+                                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">Habilitar Portal</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase">Permitir que el cliente vea su saldo</p>
+                            </div>
+                            <div 
+                                onClick={() => handleTogglePortal(selectedClient.id)}
+                                className={`w-14 h-8 rounded-full relative transition-all cursor-pointer ${selectedClient.portalEnabled ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${selectedClient.portalEnabled ? 'right-1' : 'left-1'}`}></div>
+                            </div>
+                        </div>
+
+                        {selectedClient.portalEnabled && (
+                            <div className="space-y-4 animate-fade-in">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Enlace de acceso único</label>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 p-3 bg-gray-50 border-2 border-gray-100 rounded-2xl font-mono text-[10px] text-slate-500 truncate flex items-center">
+                                            {window.location.origin}/portal/{selectedClient.portalHash}
+                                        </div>
+                                        <button 
+                                            onClick={() => copyPortalLink(selectedClient.portalHash || '')}
+                                            className="bg-white border-2 border-gray-100 p-3 rounded-2xl hover:bg-slate-50 text-indigo-600 transition-all">
+                                            <Copy size={18}/>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={() => onOpenPortal?.(selectedClient)}
+                                    className="w-full bg-indigo-600 text-white py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2">
+                                    <ExternalLink size={16}/> Acceder al Portal (Vista Previa)
+                                </button>
+                            </div>
+                        )}
+
+                        {!selectedClient.portalEnabled && (
+                            <div className="py-10 text-center space-y-3">
+                                <ShieldCheck size={48} className="mx-auto text-gray-200" />
+                                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+                                    El portal está desactivado.<br/>Actívalo para generar el enlace de acceso.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* MODAL: ALTA/EDICIÓN CLIENTE */}
         {isNewClientModalOpen && (
