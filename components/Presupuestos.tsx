@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Search, Plus, Printer, Trash2, Save, Clock, FileText, ArrowRight, X, Calendar, Minus, Calculator } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Printer, Trash2, Save, Clock, FileText, ArrowRight, X, Calendar, Minus, Calculator, Pencil } from 'lucide-react';
 import { InvoiceItem, Product, Budget } from '../types';
 
 const Presupuestos: React.FC = () => {
@@ -11,27 +11,25 @@ const Presupuestos: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   
-  // Historial Mock
-  const [budgets, setBudgets] = useState<Budget[]>([
-    {
-        id: 'P-0042',
-        clientName: 'Obra Edificio Central',
-        date: '2023-10-25',
-        validUntil: '2023-11-10',
-        items: [],
-        total: 154000,
-        status: 'OPEN'
-    },
-    {
-        id: 'P-0041',
-        clientName: 'Juan Perez',
-        date: '2023-10-20',
-        validUntil: '2023-11-04',
-        items: [],
-        total: 25000,
-        status: 'EXPIRED'
-    }
-  ]);
+  // Historial con persistencia
+  const [budgets, setBudgets] = useState<Budget[]>(() => {
+    const saved = localStorage.getItem('ferrecloud_budgets');
+    return saved ? JSON.parse(saved) : [
+        {
+            id: 'P-0042',
+            clientName: 'Obra Edificio Central',
+            date: '2023-10-25',
+            validUntil: '2023-11-10',
+            items: [],
+            total: 154000,
+            status: 'OPEN'
+        }
+      ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ferrecloud_budgets', JSON.stringify(budgets));
+  }, [budgets]);
 
   const [showPrintModal, setShowPrintModal] = useState<Budget | null>(null);
 
@@ -63,12 +61,10 @@ const Presupuestos: React.FC = () => {
       if (existing) {
         return prev.map(item => 
           item.product.id === product.id 
-          // Fix: added missing appliedPrice property
           ? { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.product.priceFinal, appliedPrice: item.product.priceFinal }
           : item
         );
       }
-      // Fix: added missing appliedPrice property
       return [...prev, { product, quantity: 1, subtotal: product.priceFinal, appliedPrice: product.priceFinal }];
     });
     setSearchTerm('');
@@ -112,6 +108,19 @@ const Presupuestos: React.FC = () => {
     setCart([]);
     setClientName('');
     setShowPrintModal(newBudget);
+  };
+
+  const handleDeleteBudget = (id: string) => {
+    if (window.confirm('¿Desea eliminar este presupuesto definitivamente?')) {
+        setBudgets(prev => prev.filter(b => b.id !== id));
+    }
+  };
+
+  const handleEditBudget = (budget: Budget) => {
+    setClientName(budget.clientName);
+    setCart(budget.items);
+    setActiveTab('NEW');
+    setBudgets(prev => prev.filter(b => b.id !== budget.id));
   };
 
   return (
@@ -176,7 +185,6 @@ const Presupuestos: React.FC = () => {
                             onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
                         />
                     </div>
-                    {/* Results Dropdown */}
                     {showSearchResults && searchTerm && (
                         <div className="absolute top-full left-0 w-full bg-white border border-gray-200 rounded-xl shadow-2xl mt-1 max-h-60 overflow-y-auto z-50">
                             {filteredProducts.map(p => (
@@ -297,7 +305,7 @@ const Presupuestos: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {budgets.map(budget => (
-                            <tr key={budget.id} className="hover:bg-gray-50">
+                            <tr key={budget.id} className="hover:bg-gray-50 group">
                                 <td className="px-6 py-4 font-mono text-sm text-gray-600">{budget.id}</td>
                                 <td className="px-6 py-4 font-medium text-gray-900">{budget.clientName}</td>
                                 <td className="px-6 py-4 text-sm text-gray-500">{budget.date}</td>
@@ -314,15 +322,13 @@ const Presupuestos: React.FC = () => {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right font-bold text-gray-900">${budget.total.toLocaleString('es-AR')}</td>
-                                <td className="px-6 py-4 text-center flex justify-center gap-2">
-                                    <button 
-                                        onClick={() => setShowPrintModal(budget)}
-                                        className="p-2 text-gray-500 hover:text-ferre-orange hover:bg-orange-50 rounded-lg" title="Ver / Imprimir">
-                                        <Printer size={18} />
-                                    </button>
-                                    <button className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Convertir a Venta">
-                                        <ArrowRight size={18} />
-                                    </button>
+                                <td className="px-6 py-4 text-center">
+                                    <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleEditBudget(budget)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar"><Pencil size={18} /></button>
+                                        <button onClick={() => setShowPrintModal(budget)} className="p-2 text-gray-500 hover:text-ferre-orange hover:bg-orange-50 rounded-lg" title="Ver / Imprimir"><Printer size={18} /></button>
+                                        <button onClick={() => handleDeleteBudget(budget.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Eliminar"><Trash2 size={18} /></button>
+                                        <button className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Convertir a Venta"><ArrowRight size={18} /></button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -332,7 +338,7 @@ const Presupuestos: React.FC = () => {
         </div>
       )}
 
-      {/* Print Modal (Unchanged essentially, but included for completeness of file) */}
+      {/* Print Modal */}
       {showPrintModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm p-4">
            <div className="bg-white w-full max-w-lg shadow-2xl rounded-xl overflow-hidden flex flex-col h-[80vh]">
