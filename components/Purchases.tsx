@@ -19,19 +19,16 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
   const [activeTab, setActiveTab] = useState<'PURCHASES' | 'PROVIDERS'>(defaultTab);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Estados para Cuenta Corriente de Proveedor
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [viewingVoucher, setViewingVoucher] = useState<CurrentAccountMovement | null>(null);
 
-  // Estados Modal Proveedor
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   const [providerModalTab, setProviderModalTab] = useState<'DATA' | 'AUTH'>('DATA');
   const [newAuthPerson, setNewAuthPerson] = useState('');
 
-  // --- PERSISTENCIA: CHEQUES (Global desde Clientes) ---
   const [checks, setChecks] = useState<Check[]>(() => {
       const saved = localStorage.getItem('ferrecloud_checks');
       return saved ? JSON.parse(saved) : [];
@@ -39,7 +36,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
 
   const availableChecks = useMemo(() => checks.filter(c => c.status === 'CARTERA'), [checks]);
 
-  // --- PERSISTENCIA: PROVEEDORES ---
   const [providers, setProviders] = useState<Provider[]>(() => {
     const saved = localStorage.getItem('ferrecloud_providers');
     return saved ? JSON.parse(saved) : [
@@ -69,7 +65,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
     localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
   }, [providers, providerMovements, checks, purchases]);
 
-  // --- FORMULARIOS ---
   const [providerFormData, setProviderFormData] = useState<Partial<Provider>>({
       name: '', cuit: '', contact: '', balance: 0, defaultDiscounts: [0, 0, 0], address: '', authorizedPersonnel: []
   });
@@ -91,8 +86,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
   const pendingPurchases = useMemo(() => {
       return currentMovements.filter(m => m.credit > 0);
   }, [currentMovements]);
-
-  // --- HANDLERS ---
 
   const handleSearchProviderCuit = async () => {
     if (!providerFormData.cuit || providerFormData.cuit.length < 8) {
@@ -175,7 +168,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
       const isAdvance = paymentForm.selectedPurchases.length === 0;
       const descPrefix = isAdvance ? 'PAGO A CUENTA (ADELANTO)' : `PAGO FACTURAS (${paymentForm.selectedPurchases.join(', ')})`;
 
-      // ACTUALIZACIÓN DE ESTADO DE CHEQUES (ENDOSO)
       if (paymentForm.method === 'CHEQUE_TERCERO') {
           setChecks(prev => prev.map(c => 
               paymentForm.selectedCheckIds.includes(c.id) 
@@ -353,7 +345,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
           </div>
       )}
 
-      {/* --- MODAL: ALTA PROVEEDOR (MEJORADO CON PESTAÑAS Y CUIT IA) --- */}
       {isProviderModalOpen && (
           <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col">
@@ -374,7 +365,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
                       <button 
                         onClick={() => setProviderModalTab('DATA')}
                         className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${providerModalTab === 'DATA' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                        Datos Fiscales
+                        Datos Fiscales y Compras
                       </button>
                       <button 
                         onClick={() => setProviderModalTab('AUTH')}
@@ -385,7 +376,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
 
                   <div className="p-8 space-y-6">
                       {providerModalTab === 'DATA' ? (
-                          <div className="space-y-4 animate-fade-in">
+                          <div className="space-y-4 animate-fade-in overflow-y-auto max-h-[50vh] pr-2 custom-scrollbar">
                                 <div className="relative">
                                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">CUIT / Identificación Fiscal</label>
                                     <div className="flex gap-2">
@@ -416,6 +407,31 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest ml-2">Dirección Comercial</label>
                                     <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-slate-800 outline-none font-bold text-gray-700 uppercase" value={providerFormData.address || ''} onChange={e => setProviderFormData({...providerFormData, address: e.target.value})} />
+                                </div>
+
+                                <div className="p-4 bg-indigo-50/50 rounded-3xl border border-indigo-100 space-y-4">
+                                    <label className="block text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-2 flex items-center gap-2">
+                                        <Percent size={14}/> Descuentos Base (%)
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {[0, 1, 2].map(idx => (
+                                            <div key={idx} className="relative group">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder={`Dto ${idx + 1}`}
+                                                    className="w-full p-3 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-black text-center text-indigo-700" 
+                                                    value={providerFormData.defaultDiscounts?.[idx] || 0} 
+                                                    onChange={e => {
+                                                        const dCopy = [...(providerFormData.defaultDiscounts || [0, 0, 0])] as [number, number, number];
+                                                        dCopy[idx] = parseFloat(e.target.value) || 0;
+                                                        setProviderFormData({...providerFormData, defaultDiscounts: dCopy});
+                                                    }} 
+                                                />
+                                                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-200 group-focus-within:text-indigo-600" size={10}/>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest italic ml-2">Estos descuentos se aplicarán automáticamente a sus productos.</p>
                                 </div>
 
                                 <div>
@@ -470,7 +486,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
           </div>
       )}
 
-      {/* --- MODAL: CUENTA CORRIENTE --- */}
       {isHistoryOpen && selectedProvider && (
             <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm">
                 <div className="bg-white h-full w-full max-w-5xl shadow-2xl flex flex-col animate-slide-in-right">
@@ -562,7 +577,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES' }) => {
             </div>
         )}
 
-        {/* --- MODAL: REGISTRAR PAGO (IMPUTACIÓN Y VALORES) --- */}
         {isPaymentModalOpen && selectedProvider && (
             <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in overflow-y-auto">
                 <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
