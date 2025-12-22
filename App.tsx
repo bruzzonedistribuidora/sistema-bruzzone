@@ -8,6 +8,7 @@ import Inventory from './components/Inventory';
 import POS from './components/POS';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
+import Assistant from './components/Assistant';
 import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
@@ -31,6 +32,7 @@ import DailyMovements from './components/DailyMovements';
 import Employees from './components/Employees';
 import Login from './components/Login';
 import CustomerPortal from './components/CustomerPortal';
+import StockTransfers from './components/StockTransfers';
 import { ViewState, User, Role, Client } from './types';
 
 const App: React.FC = () => {
@@ -38,11 +40,9 @@ const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [activeBranchName, setActiveBranchName] = useState('Sucursal Central');
   
-  // Estado para navegación profunda entre módulos
   const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
 
-  // Cargar roles maestros con blindaje
   const getRoles = (): Role[] => {
     const saved = localStorage.getItem('ferrecloud_roles');
     if (saved) {
@@ -91,7 +91,6 @@ const App: React.FC = () => {
       else setActiveBranchName('Sucursal Central');
   };
 
-  // Mapeo de vistas a permisos requeridos
   const viewPermissions: Partial<Record<ViewState, string>> = {
     [ViewState.DASHBOARD]: 'DASHBOARD_VIEW',
     [ViewState.INVENTORY]: 'STOCK_VIEW',
@@ -119,12 +118,11 @@ const App: React.FC = () => {
     [ViewState.BRANCHES]: 'CONFIG_ACCESS',
     [ViewState.BACKUP]: 'CONFIG_ACCESS',
     [ViewState.PRINT_CONFIG]: 'CONFIG_ACCESS',
+    [ViewState.STOCK_TRANSFERS]: 'STOCK_EDIT',
   };
 
   const renderView = () => {
     if (!loggedInUser) return <Login onLogin={handleLogin} />;
-
-    // Caso especial: Vista del Portal (Simulación admin)
     if (currentView === ViewState.CUSTOMER_PORTAL && portalPreviewClient) {
         return <CustomerPortal client={portalPreviewClient} onLogout={() => setCurrentView(ViewState.CLIENTS)} />;
     }
@@ -155,6 +153,7 @@ const App: React.FC = () => {
     switch (currentView) {
       case ViewState.DASHBOARD: return <Dashboard />;
       case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       case ViewState.POS: return <POS />;
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.ONLINE_SALES: return <OnlineSales />;
@@ -187,6 +186,7 @@ const App: React.FC = () => {
       case ViewState.BACKUP: return <Backup />;
       case ViewState.BRANCHES: return <Branches />;
       case ViewState.USERS: return <UsersComponent />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
       case ViewState.SHORTAGES: return <Shortages />;
       case ViewState.PRINT_CONFIG: return <PrintSettings />;
@@ -208,7 +208,7 @@ const App: React.FC = () => {
       <Sidebar 
         currentView={currentView} 
         onNavigate={(view) => {
-            setTargetClientId(undefined); // Limpiar navegación profunda al cambiar manual
+            setTargetClientId(undefined); 
             setCurrentView(view);
         }} 
         user={loggedInUser} 
