@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Lock } from 'lucide-react';
-import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import POS from './components/POS';
 import Remitos from './components/Remitos';
