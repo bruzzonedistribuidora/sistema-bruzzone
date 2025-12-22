@@ -96,23 +96,29 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   }, [clientMovements]);
 
   const handleSearchCuit = async () => {
-      if (!clientForm.cuit || clientForm.cuit.length < 10) {
-          alert("Por favor ingrese un CUIT válido.");
+      if (!clientForm.cuit || clientForm.cuit.length < 8) {
+          alert("Por favor ingrese un CUIT o DNI válido.");
           return;
       }
       setIsSearchingCuit(true);
-      const data = await fetchCompanyByCuit(clientForm.cuit);
-      if (data) {
-          setClientForm(prev => ({
-              ...prev,
-              name: data.name,
-              address: data.address,
-              phone: data.phone
-          }));
-      } else {
-          alert("No se pudieron obtener datos para este CUIT.");
+      try {
+          const data = await fetchCompanyByCuit(clientForm.cuit);
+          if (data && data.name) {
+              setClientForm(prev => ({
+                  ...prev,
+                  name: data.name,
+                  address: data.address || '',
+                  phone: data.phone || ''
+              }));
+          } else {
+              alert("La IA no pudo autocompletar este CUIT. Por favor, ingrese los datos manualmente.");
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Error de conexión al buscar el CUIT.");
+      } finally {
+          setIsSearchingCuit(false);
       }
-      setIsSearchingCuit(false);
   };
 
   const handleOpenAddModal = () => {
@@ -389,7 +395,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 <button 
                                     onClick={handleSearchCuit}
                                     disabled={isSearchingCuit}
-                                    className="bg-indigo-600 text-white px-4 rounded-2xl hover:bg-indigo-700 transition-all flex items-center justify-center disabled:opacity-50">
+                                    className="bg-indigo-600 text-white px-4 rounded-2xl hover:bg-indigo-700 transition-all flex items-center justify-center disabled:opacity-50 min-w-[56px]">
                                     {isSearchingCuit ? <Loader2 size={20} className="animate-spin" /> : <Zap size={20} />}
                                 </button>
                             </div>
@@ -414,7 +420,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 <input type="text" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-ferre-orange outline-none font-bold text-gray-700" value={clientForm.phone || ''} onChange={e => setClientForm({...clientForm, phone: e.target.value})} />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Límite de Crédito ($)</label>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 tracking-widest">Límite de Crédito ($)</label>
                                 <input type="number" className="w-full p-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-ferre-orange outline-none font-bold text-gray-700" value={clientForm.limit || 100000} onChange={e => setClientForm({...clientForm, limit: parseFloat(e.target.value) || 0})} />
                             </div>
                         </div>
@@ -427,7 +433,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
         )}
 
-        {/* MODAL: CUENTA CORRIENTE (History View) - Sin cambios, incluido para integridad */}
+        {/* MODAL: CUENTA CORRIENTE (History View) */}
         {isHistoryOpen && selectedClient && (
             <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-sm">
                 <div className="bg-white h-full w-full max-w-5xl shadow-2xl flex flex-col animate-slide-in-right">
@@ -522,9 +528,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                 </div>
             </div>
         )}
-
-        {/* OTROS MODALES (Receipt, Portal, etc.) - Sin cambios técnicos requeridos para esta actualización */}
-        {/* ... (Se asume que los modales de Cobro y Portal siguen funcionando igual) ... */}
     </div>
   );
 };
