@@ -107,123 +107,41 @@ const App: React.FC = () => {
   };
 
   const handleConvertToSale = (items: InvoiceItem[]) => {
-      setItemsToBill(items);
-      handleNavigate(ViewState.POS);
-  };
+  // ... (tus interfaces y tipos anteriores deben seguir igual arriba)
 
-  const renderViewContent = (view: ViewState) => {
-    switch (view) {
-      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
-      case ViewState.INVENTORY: return <Inventory />;
-      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
-      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
-      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
-      case ViewState.SALES_ORDERS: return <SalesOrders />;
-      case ViewState.ONLINE_SALES: return <OnlineSales />;
-      case ViewState.REMITOS: return <Remitos onBillRemitos={handleConvertToSale} />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={handleConvertToSale} />;
-      case ViewState.TREASURY: return <Treasury />;
-      case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
-      case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
-      case ViewState.PRICE_UPDATES: return <PriceUpdates />;
-      case ViewState.PRICE_AUDIT: return <PriceAudit />;
-      case ViewState.CREDIT_NOTES: return <CreditNotes />;
-      case ViewState.CURRENCIES: return <Currencies />;
-      case ViewState.MARKETING: return <Marketing />;
-      case ViewState.CLIENTS: return (
-        <Clients 
-            initialClientId={targetClientId} 
-            onOpenPortal={(client) => {
-                setPortalPreviewClient(client);
-                handleNavigate(ViewState.CUSTOMER_PORTAL);
-            }}
-        />
-      );
-      case ViewState.CLIENT_BALANCES: return (
-        <ClientBalances 
-            onNavigateToHistory={(client) => {
-                setTargetClientId(client.id);
-                handleNavigate(ViewState.CLIENTS);
-            }} 
-        />
-      );
-      case ViewState.ACCOUNTING: return <Accounting />;
-      case ViewState.STATISTICS: return <Statistics />;
-      case ViewState.REPORTS: return <Reports />;
-      case ViewState.BACKUP: return <Backup />;
-      case ViewState.BRANCHES: return <Branches />;
-      case ViewState.USERS: return <UsersComponent />;
-      case ViewState.AI_ASSISTANT: return <Assistant />;
-      case ViewState.REPLENISHMENT: return <Replenishment />;
-      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { /* handle */ }} />;
-      case ViewState.PRINT_CONFIG: return <PrintSettings />;
-      case ViewState.LABEL_PRINTING: return <LabelPrinting />;
-      case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
-      case ViewState.AFIP_CONFIG: return <AfipConfig />;
-      case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
-      case ViewState.EMPLOYEES: return <Employees />;
-      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
-      case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
-      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
-      default: return null;
-    }
-  };
+export enum ViewState {
+  LOGIN = 'LOGIN',
+  DASHBOARD = 'DASHBOARD',
+  INVENTORY = 'INVENTORY',
+  POS = 'POS',
+  REMITOS = 'REMITOS',
+  PRESUPUESTOS = 'PRESUPUESTOS',
+  TREASURY = 'TREASURY',
+  PURCHASES = 'PURCHASES',
+  PROVIDERS = 'PROVIDERS',
+  CLIENTS = 'CLIENTS',
+  CLIENT_BALANCES = 'CLIENT_BALANCES',
+  ACCOUNTING = 'ACCOUNTING',
+  STATISTICS = 'STATISTICS',
+  REPORTS = 'REPORTS',
+  BACKUP = 'BACKUP',
+  BRANCHES = 'BRANCHES',
+  USERS = 'USERS',
+  REPLENISHMENT = 'REPLENISHMENT',
+  SHORTAGES = 'SHORTAGES',
+  PRINT_CONFIG = 'PRINT_CONFIG',
+  LABEL_PRINTING = 'LABEL_PRINTING',
+  COMPANY_SETTINGS = 'COMPANY_SETTINGS',
+  AFIP_CONFIG = 'AFIP_CONFIG',
+  DAILY_MOVEMENTS = 'DAILY_MOVEMENTS',
+  EMPLOYEES = 'EMPLOYEES',
+  SALES_ORDERS = 'SALES_ORDERS',
+  ONLINE_SALES = 'ONLINE_SALES',
+  PRICE_UPDATES = 'PRICE_UPDATES',
+  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL'
+}
 
-  // Si estamos en modo público, no requerimos login de empleado
-  if (isPublicMode) {
-      return <PublicPortal />;
-  }
-
-  if (!loggedInUser) {
-      return <Login onLogin={handleLogin} />;
-  }
-
-  return (
-    <div className="flex flex-col h-screen bg-slate-950 font-sans overflow-hidden">
-      <Sidebar 
-        currentView={activeView} 
-        onNavigate={handleNavigate} 
-        user={loggedInUser} 
-        onLogout={handleLogout} 
-      />
-
-      <main className="flex-1 relative bg-slate-100 overflow-hidden">
-        {openViews.map((view) => (
-          <div 
-            key={view}
-            className={`absolute inset-0 transition-opacity duration-300 ${activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
-          >
-            {renderViewContent(view)}
-          </div>
-        ))}
-      </main>
-
-      <footer className="h-14 bg-slate-900 border-t border-slate-800 flex items-center px-4 gap-2 z-50 overflow-x-auto shrink-0 no-scrollbar">
-        {openViews.map((view) => (
-          <button
-            key={view}
-            onClick={() => setActiveView(view)}
-            className={`flex items-center gap-3 px-4 h-10 rounded-xl transition-all border ${
-              activeView === view 
-                ? 'bg-ferre-orange text-white border-orange-400 shadow-lg shadow-orange-900/20' 
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
-            }`}
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
-              {view === ViewState.DASHBOARD ? 'Escritorio' : view.replace(/_/g, ' ')}
-            </span>
-            {view !== ViewState.DASHBOARD && (
-              <X 
-                size={14} 
-                className="hover:text-white" 
-                onClick={(e) => closeView(view, e)} 
-              />
-            )}
-          </button>
-        ))}
-      </footer>
-    </div>
-  );
+// BORRÁ CUALQUIER COSA QUE DIGA "const renderViewContent" O TENGA <DASHBOARD /> AQUÍ ABAJO.
 };
 
 export default App;
