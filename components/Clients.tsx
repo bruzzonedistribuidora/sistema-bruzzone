@@ -7,8 +7,7 @@ import {
     CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
     ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
     Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil, ArrowLeft,
-    // Fix: Added missing icon imports
-    UserCheck, Phone, QrCode
+    UserCheck, Phone, QrCode, Banknote, FileCheck
 } from 'lucide-react';
 import { Client, CurrentAccountMovement, CompanyConfig } from '../types';
 import { fetchCompanyByCuit } from '../services/geminiService';
@@ -22,6 +21,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,16 +36,25 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
 
   const companyConfig: CompanyConfig = useMemo(() => {
     const saved = localStorage.getItem('company_config');
-    return saved ? JSON.parse(saved) : { loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 } };
+    return saved ? JSON.parse(saved) : { 
+        loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 },
+        paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA']
+    };
   }, []);
 
-  const [movements] = useState<CurrentAccountMovement[]>(() => {
+  const [movements, setMovements] = useState<CurrentAccountMovement[]>(() => {
       const saved = localStorage.getItem('ferrecloud_movements');
       return saved ? JSON.parse(saved) : [];
   });
 
   const [clientForm, setClientForm] = useState<Partial<Client>>({
       id: '', name: '', cuit: '', phone: '', balance: 0, limit: 100000, points: 0, address: '', email: '', portalEnabled: true
+  });
+
+  const [receiptForm, setReceiptForm] = useState({
+      amount: 0,
+      method: companyConfig.paymentMethods?.[0] || 'EFECTIVO',
+      notes: ''
   });
 
   useEffect(() => {
@@ -58,7 +67,13 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       }
   }, [initialClientId, clients]);
 
-  useEffect(() => { localStorage.setItem('ferrecloud_clients', JSON.stringify(clients)); }, [clients]);
+  useEffect(() => { 
+      localStorage.setItem('ferrecloud_clients', JSON.stringify(clients)); 
+  }, [clients]);
+
+  useEffect(() => {
+      localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
+  }, [movements]);
 
   const handleSearchCuit = async () => {
       if (!clientForm.cuit || clientForm.cuit.length < 8) return;
@@ -82,6 +97,32 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
           }
       });
       setIsNewClientModalOpen(false);
+  };
+
+  const handleRegisterReceipt = () => {
+    if (!selectedClient || receiptForm.amount <= 0) {
+        alert("Ingrese un monto válido para el recibo.");
+        return;
+    }
+
+    const newBalance = selectedClient.balance - receiptForm.amount;
+    const newMovement: CurrentAccountMovement = {
+        id: `REC-${Date.now().toString().slice(-6)}`,
+        clientId: selectedClient.id,
+        date: new Date().toLocaleDateString(),
+        voucherType: 'RECIBO DE PAGO',
+        description: `Cobranza vía ${receiptForm.method}. ${receiptForm.notes}`,
+        debit: 0,
+        credit: receiptForm.amount,
+        balance: newBalance
+    };
+
+    setMovements([newMovement, ...movements]);
+    setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, balance: newBalance } : c));
+    setSelectedClient({ ...selectedClient, balance: newBalance });
+    setIsReceiptModalOpen(false);
+    setReceiptForm({ amount: 0, method: companyConfig.paymentMethods?.[0] || 'EFECTIVO', notes: '' });
+    alert("Recibo registrado con éxito. El saldo del cliente ha sido actualizado.");
   };
 
   const filteredClients = useMemo(() => {
@@ -201,6 +242,15 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
+                        <div className="mb-6 flex justify-end">
+                            <button 
+                                onClick={() => setIsReceiptModalOpen(true)}
+                                className="bg-green-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-3 shadow-lg shadow-green-900/20 hover:bg-green-700 transition-all active:scale-95"
+                            >
+                                <Receipt size={18}/> Registrar Cobro (Recibo)
+                            </button>
+                        </div>
+
                         <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b">
@@ -237,13 +287,79 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
         )}
 
-        {/* MODAL: EDITAR / ALTA FICHA (REDISEÑADO ESPACIOS) */}
+        {/* MODAL: REGISTRAR RECIBO (PAGO) */}
+        {isReceiptModalOpen && selectedClient && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+                <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                    <div className="p-8 bg-green-600 text-white flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white/20 rounded-2xl"><Banknote size={24}/></div>
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Nuevo Recibo</h3>
+                                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">Imputación a Cuenta Corriente</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsReceiptModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                    </div>
+                    <div className="p-10 space-y-8 bg-slate-50/50">
+                        <div className="text-center mb-4">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cliente</p>
+                            <h4 className="text-xl font-black text-slate-800 uppercase">{selectedClient.name}</h4>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe a Cobrar ($)</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-green-600 outline-none font-black text-4xl text-center text-green-700 shadow-sm" 
+                                    value={receiptForm.amount || ''} 
+                                    onChange={e => setReceiptForm({...receiptForm, amount: parseFloat(e.target.value) || 0})}
+                                    placeholder="0.00"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Modalidad de Pago</label>
+                                    <select 
+                                        className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-green-500"
+                                        value={receiptForm.method}
+                                        onChange={e => setReceiptForm({...receiptForm, method: e.target.value})}
+                                    >
+                                        {companyConfig.paymentMethods?.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Observaciones</label>
+                                    <textarea 
+                                        className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-green-500 h-24 resize-none uppercase text-xs"
+                                        placeholder="Ej: Pago parcial factura Octubre..."
+                                        value={receiptForm.notes}
+                                        onChange={e => setReceiptForm({...receiptForm, notes: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={handleRegisterReceipt}
+                            className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                        >
+                            <FileCheck size={24}/> Confirmar Cobranza
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* MODAL: EDITAR / ALTA FICHA */}
         {isNewClientModalOpen && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                 <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
                     <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-4">
-                            {/* Fix: Added missing import for UserCheck */}
                             <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20"><UserCheck size={24}/></div>
                             <div>
                                 <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{isEditing ? 'Editar Ficha Cliente' : 'Alta de Nuevo Cliente'}</h3>
@@ -308,7 +424,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Teléfono de Contacto</label>
                                         <div className="relative group">
-                                            {/* Fix: Added missing import for Phone */}
                                             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18}/>
                                             <input 
                                                 type="text" 
@@ -362,7 +477,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                             <p className="text-[8px] text-slate-400 font-bold uppercase">Autogestión por DNI</p>
                                         </div>
                                     </div>
-                                    {/* Fix: Added missing import for QrCode */}
                                     <QrCode size={24} className="text-slate-200"/>
                                 </div>
                             </div>
