@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import App from './App';
 import './firebase'; // <--- AGREGÁ ESTA LÍNEA (Es el cable que enciende el motor)
 import App from './App';
 
