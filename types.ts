@@ -109,6 +109,8 @@ const App: React.FC = () => {
   const handleConvertToSale = (items: InvoiceItem[]) => {
   // ... (tus interfaces y tipos anteriores deben seguir igual arriba)
 
+} // <--- ESTA LLAVE ES LA QUE CIERRA LA INTERFAZ ANTERIOR
+
 export enum ViewState {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
@@ -140,8 +142,3 @@ export enum ViewState {
   PRICE_UPDATES = 'PRICE_UPDATES',
   CUSTOMER_PORTAL = 'CUSTOMER_PORTAL'
 }
-
-// BORRÁ CUALQUIER COSA QUE DIGA "const renderViewContent" O TENGA <DASHBOARD /> AQUÍ ABAJO.
-};
-
-
