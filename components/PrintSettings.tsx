@@ -7,7 +7,7 @@ import {
     ArrowUp, ArrowDown, EyeOff, Eye, Hash, Calendar, Table as TableIcon,
     Scissors, QrCode as QrIcon, AlignCenter, TextCursorInput, MonitorSmartphone,
     RotateCcw, Maximize2, Settings2, Trash2, Eye as EyeIcon, 
-    ToggleLeft, ToggleRight, DollarSign, List
+    ToggleLeft, ToggleRight, DollarSign, List, PencilLine
 } from 'lucide-react';
 import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig, TableColumnConfig } from '../types';
 
@@ -40,7 +40,7 @@ const PrintSettings: React.FC = () => {
   }, []);
 
   const [templates, setTemplates] = useState<Record<string, any>>(() => {
-      const saved = localStorage.getItem('ferrecloud_print_templates_v5');
+      const saved = localStorage.getItem('ferrecloud_print_templates_v6');
       if (saved) return JSON.parse(saved);
 
       const initial: Record<string, any> = {};
@@ -53,16 +53,14 @@ const PrintSettings: React.FC = () => {
               titleText: report.type,
               docLetterText: report.type === 'FACTURA' ? 'A' : 'R',
               docCodeText: 'Cod. 01',
-              headerText: companyConfig.fantasyName || 'FERRETERIA BRUZZONE',
-              subHeaderText: `Dr. Carlos Rocha 128 (2686)\nALEJANDRO ROCA - CORDOBA\nResponsable Inscripto`,
-              footerText: 'Impreso por LIDER GESTION - FERRECLOUD SYSTEM',
-              totalsLabel: 'TOTAL COMPROBANTE',
-              // Nuevos campos de voucher info
-              voucherPointOfSale: '00004',
-              voucherNumber: '00001900',
-              voucherCuitEmisor: companyConfig.cuit || '20-30800287-0',
-              voucherIIBBEmisor: companyConfig.iibb || '0284537947',
-              // Configuración de tabla
+              headerText: companyConfig.fantasyName || 'NOMBRE DE EMPRESA',
+              subHeaderText: `Dirección de la Empresa\nCiudad - Provincia\nResponsable Inscripto`,
+              footerText: 'Comprobante generado por FerreCloud System',
+              totalsLabel: 'TOTAL A PAGAR',
+              voucherPointOfSale: '00001',
+              voucherNumber: '00000001',
+              voucherCuitEmisor: companyConfig.cuit || '00-00000000-0',
+              voucherIIBBEmisor: companyConfig.iibb || '000000000',
               showPrices: true,
               showSkus: true,
               showBrands: true,
@@ -85,7 +83,7 @@ const PrintSettings: React.FC = () => {
   });
 
   useEffect(() => {
-      localStorage.setItem('ferrecloud_print_templates_v5', JSON.stringify(templates));
+      localStorage.setItem('ferrecloud_print_templates_v6', JSON.stringify(templates));
   }, [templates]);
 
   const currentTemplate = templates[selectedType] || templates['FACTURA'];
@@ -128,12 +126,81 @@ const PrintSettings: React.FC = () => {
       updatePosition(activeElement, newX, newY);
   };
 
+  // Renderizador dinámico de campos para el sidebar según el elemento activo
+  const renderElementEditor = () => {
+      if (!activeElement) return null;
+
+      switch (activeElement) {
+          case 'header':
+              return (
+                  <div className="space-y-3 animate-fade-in">
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400">Nombre de Empresa</label>
+                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold" value={currentTemplate.headerText} onChange={e => updateTemplate({headerText: e.target.value})} />
+                      </div>
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400">Sub-cabecera (Dirección/Fiscal)</label>
+                          <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-20 resize-none" value={currentTemplate.subHeaderText} onChange={e => updateTemplate({subHeaderText: e.target.value})} />
+                      </div>
+                  </div>
+              );
+          case 'voucherInfo':
+              return (
+                  <div className="space-y-3 animate-fade-in">
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400">Título del Documento</label>
+                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold" value={currentTemplate.titleText} onChange={e => updateTemplate({titleText: e.target.value})} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[8px] font-black uppercase text-slate-400">Pto. Venta</label>
+                            <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs" value={currentTemplate.voucherPointOfSale} onChange={e => updateTemplate({voucherPointOfSale: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black uppercase text-slate-400">Nº Inicial</label>
+                            <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs" value={currentTemplate.voucherNumber} onChange={e => updateTemplate({voucherNumber: e.target.value})} />
+                          </div>
+                      </div>
+                  </div>
+              );
+          case 'docLetter':
+              return (
+                  <div className="grid grid-cols-2 gap-2 animate-fade-in">
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400">Letra (A, B, R, P)</label>
+                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-center text-lg font-black" value={currentTemplate.docLetterText} maxLength={1} onChange={e => updateTemplate({docLetterText: e.target.value.toUpperCase()})} />
+                      </div>
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400">Etiqueta Cod.</label>
+                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs" value={currentTemplate.docCodeText} onChange={e => updateTemplate({docCodeText: e.target.value})} />
+                      </div>
+                  </div>
+              );
+          case 'totals':
+              return (
+                  <div className="space-y-3 animate-fade-in">
+                      <label className="text-[8px] font-black uppercase text-slate-400">Etiqueta de Total</label>
+                      <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold" value={currentTemplate.totalsLabel} onChange={e => updateTemplate({totalsLabel: e.target.value})} />
+                  </div>
+              );
+          case 'footer':
+              return (
+                  <div className="space-y-3 animate-fade-in">
+                      <label className="text-[8px] font-black uppercase text-slate-400">Texto de Pie de Página</label>
+                      <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-24 resize-none" value={currentTemplate.footerText} onChange={e => updateTemplate({footerText: e.target.value})} />
+                  </div>
+              );
+          default:
+              return <p className="text-[10px] text-slate-400 italic">Este elemento no posee campos editables adicionales.</p>;
+      }
+  };
+
   return (
     <div className="flex h-full bg-slate-100 overflow-hidden" onMouseUp={() => setIsDragging(false)} onMouseMove={handleMouseMove}>
         
         {/* PANEL DE CONTROL IZQUIERDO */}
         <div className="w-80 md:w-96 bg-white border-r border-slate-200 flex flex-col shadow-2xl z-30">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
                 <div>
                     <h2 className="text-xl font-black flex items-center gap-2 uppercase tracking-tighter leading-none">
                         <Printer className="text-indigo-400" size={20}/> Diseño Imprenta
@@ -145,10 +212,10 @@ const PrintSettings: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar pb-20">
                 {/* SELECTOR TIPO */}
-                <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1 tracking-widest">Comprobante a editar</label>
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Documento a editar</label>
                     <select 
-                        className="w-full p-3 bg-slate-50 border rounded-xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
+                        className="w-full p-2.5 bg-white border rounded-xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                         value={selectedType}
                         onChange={(e) => setSelectedType(e.target.value as DocumentType)}
                     >
@@ -156,21 +223,50 @@ const PrintSettings: React.FC = () => {
                     </select>
                 </div>
 
-                {/* VISIBILIDAD DE CAPAS */}
-                <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-200 space-y-4 shadow-sm">
-                    <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={14}/> Elementos del Lienzo</h3>
-                    <div className="grid grid-cols-1 gap-1.5">
+                {/* PROPIEDADES DEL ELEMENTO SELECCIONADO */}
+                <div className={`p-5 rounded-[2rem] transition-all border ${activeElement ? 'bg-indigo-50 border-indigo-200 shadow-lg' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
+                    <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-4">
+                        <PencilLine size={14}/> {activeElement ? `Editando: ${activeElement.toUpperCase()}` : 'Seleccione un elemento'}
+                    </h3>
+                    {renderElementEditor()}
+                </div>
+
+                {/* TABLA: CONFIGURACIÓN DE COLUMNAS */}
+                <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white space-y-4 shadow-xl">
+                    <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><TableIcon size={14}/> Columnas de Tabla</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                        <button onClick={() => updateTemplate({showPrices: !currentTemplate.showPrices})} className="flex items-center justify-between p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                            <span className="text-[9px] font-black uppercase">Precios y Totales</span>
+                            {currentTemplate.showPrices ? <ToggleRight className="text-green-400" size={20}/> : <ToggleLeft className="text-slate-600" size={20}/>}
+                        </button>
+                        <button onClick={() => updateTemplate({showSkus: !currentTemplate.showSkus})} className="flex items-center justify-between p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                            <span className="text-[9px] font-black uppercase">Código SKU</span>
+                            {currentTemplate.showSkus ? <ToggleRight className="text-green-400" size={20}/> : <ToggleLeft className="text-slate-600" size={20}/>}
+                        </button>
+                        <button onClick={() => updateTemplate({showBrands: !currentTemplate.showBrands})} className="flex items-center justify-between p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                            <span className="text-[9px] font-black uppercase">Marca de Producto</span>
+                            {currentTemplate.showBrands ? <ToggleRight className="text-green-400" size={20}/> : <ToggleLeft className="text-slate-600" size={20}/>}
+                        </button>
+                        <button onClick={() => updateTemplate({showIvaColumn: !currentTemplate.showIvaColumn})} className="flex items-center justify-between p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                            <span className="text-[9px] font-black uppercase">Alícuota IVA %</span>
+                            {currentTemplate.showIvaColumn ? <ToggleRight className="text-green-400" size={20}/> : <ToggleLeft className="text-slate-600" size={20}/>}
+                        </button>
+                    </div>
+                </div>
+
+                {/* GESTIÓN DE CAPAS (VISIBILIDAD) */}
+                <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={14}/> Capas del Lienzo</h3>
+                    <div className="grid grid-cols-1 gap-1">
                         {Object.keys(currentTemplate.positions).map(key => (
-                            <div key={key} className={`flex items-center justify-between p-2 rounded-xl transition-all ${activeElement === key ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-white'}`}>
+                            <div key={key} className={`flex items-center justify-between p-2 rounded-xl ${activeElement === key ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-50'}`}>
                                 <button onClick={() => setActiveElement(key)} className="flex items-center gap-3 flex-1 text-left">
-                                    <div className={`p-1.5 rounded-lg ${currentTemplate.positions[key].visible ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-300'}`}>
-                                        <GripVertical size={12}/>
-                                    </div>
-                                    <span className={`text-[10px] font-black uppercase tracking-tight ${currentTemplate.positions[key].visible ? 'text-slate-700' : 'text-slate-300 line-through'}`}>{key.replace(/([A-Z])/g, ' $1')}</span>
+                                    <GripVertical size={12} className="text-slate-300"/>
+                                    <span className={`text-[10px] font-black uppercase tracking-tight ${currentTemplate.positions[key].visible ? 'text-slate-700' : 'text-slate-300 line-through'}`}>{key}</span>
                                 </button>
                                 <button 
                                     onClick={() => toggleVisibility(key)}
-                                    className={`p-2 rounded-lg transition-all ${currentTemplate.positions[key].visible ? 'text-indigo-600 hover:bg-indigo-100' : 'text-slate-300 hover:bg-slate-100'}`}>
+                                    className={`p-1.5 rounded-lg ${currentTemplate.positions[key].visible ? 'text-indigo-600' : 'text-slate-300'}`}>
                                     {currentTemplate.positions[key].visible ? <EyeIcon size={16}/> : <EyeOff size={16}/>}
                                 </button>
                             </div>
@@ -178,102 +274,34 @@ const PrintSettings: React.FC = () => {
                     </div>
                 </div>
 
-                {/* EDICIÓN DE VOUCHER INFO */}
-                <div className="bg-slate-900 p-6 rounded-[2rem] text-white space-y-5 shadow-xl">
-                    <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><Hash size={14}/> Info de Comprobante (Derecha)</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-[8px] font-black text-slate-500 uppercase mb-1">Pto. Venta</label>
-                            <input className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black outline-none focus:border-indigo-500" value={currentTemplate.voucherPointOfSale} onChange={e => updateTemplate({voucherPointOfSale: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-black text-slate-500 uppercase mb-1">Nº Comprobante</label>
-                            <input className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black outline-none focus:border-indigo-500" value={currentTemplate.voucherNumber} onChange={e => updateTemplate({voucherNumber: e.target.value})} />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-[8px] font-black text-slate-500 uppercase mb-1">CUIT Emisor</label>
-                        <input className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black outline-none focus:border-indigo-500" value={currentTemplate.voucherCuitEmisor} onChange={e => updateTemplate({voucherCuitEmisor: e.target.value})} />
-                    </div>
-                    <div>
-                        <label className="block text-[8px] font-black text-slate-500 uppercase mb-1">IIBB Emisor</label>
-                        <input className="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black outline-none focus:border-indigo-500" value={currentTemplate.voucherIIBBEmisor} onChange={e => updateTemplate({voucherIIBBEmisor: e.target.value})} />
-                    </div>
-                </div>
-
-                {/* CONFIGURACIÓN DE TABLA */}
-                <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 space-y-4">
-                    <h3 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><TableIcon size={14}/> Columnas de Artículos</h3>
-                    <div className="space-y-3">
-                        <button onClick={() => updateTemplate({showPrices: !currentTemplate.showPrices})} className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
-                            <span className="text-[10px] font-black text-slate-700 uppercase">Mostrar Precios</span>
-                            {currentTemplate.showPrices ? <ToggleRight className="text-indigo-600" size={20}/> : <ToggleLeft className="text-slate-300" size={20}/>}
-                        </button>
-                        <button onClick={() => updateTemplate({showSkus: !currentTemplate.showSkus})} className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
-                            <span className="text-[10px] font-black text-slate-700 uppercase">Mostrar SKUs</span>
-                            {currentTemplate.showSkus ? <ToggleRight className="text-indigo-600" size={20}/> : <ToggleLeft className="text-slate-300" size={20}/>}
-                        </button>
-                        <button onClick={() => updateTemplate({showBrands: !currentTemplate.showBrands})} className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
-                            <span className="text-[10px] font-black text-slate-700 uppercase">Mostrar Marcas</span>
-                            {currentTemplate.showBrands ? <ToggleRight className="text-indigo-600" size={20}/> : <ToggleLeft className="text-slate-300" size={20}/>}
-                        </button>
-                        <button onClick={() => updateTemplate({showIvaColumn: !currentTemplate.showIvaColumn})} className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
-                            <span className="text-[10px] font-black text-slate-700 uppercase">Columna IVA %</span>
-                            {currentTemplate.showIvaColumn ? <ToggleRight className="text-indigo-600" size={20}/> : <ToggleLeft className="text-slate-300" size={20}/>}
-                        </button>
-                    </div>
-                </div>
-
-                {/* TEXTOS EDITORIALES */}
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 space-y-5">
-                    <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><TextCursorInput size={14}/> Textos Fijos</h3>
-                    
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Título</label>
-                                <input className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-black uppercase outline-none focus:border-indigo-500" value={currentTemplate.titleText} onChange={e => updateTemplate({titleText: e.target.value})} />
-                            </div>
-                            <div>
-                                <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Letra Caja</label>
-                                <input className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-black uppercase outline-none focus:border-indigo-500" value={currentTemplate.docLetterText} maxLength={1} onChange={e => updateTemplate({docLetterText: e.target.value})} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Sub-Título Emisor</label>
-                            <textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold outline-none h-16 resize-none uppercase" value={currentTemplate.subHeaderText} onChange={e => updateTemplate({subHeaderText: e.target.value})} />
-                        </div>
-                    </div>
-                </div>
-
                 {/* FORMATO HOJA */}
-                <div className="bg-white p-6 rounded-[2rem] border border-slate-200 space-y-4">
-                    <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> Hoja y Orientación</h3>
+                <div className="bg-slate-100 p-6 rounded-[2.5rem] space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> Hoja y Papel</h3>
                     <div className="grid grid-cols-2 gap-2">
                         {Object.keys(PAPER_DIMENSIONS).filter(k => k !== 'CUSTOM').map(size => (
                             <button 
                                 key={size}
                                 onClick={() => updateTemplate({paperSize: size})}
-                                className={`py-2 rounded-xl text-[9px] font-black border transition-all ${currentTemplate.paperSize === size ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'}`}>
+                                className={`py-2 rounded-xl text-[9px] font-black border transition-all ${currentTemplate.paperSize === size ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200'}`}>
                                 {size.replace('_', ' ')}
                             </button>
                         ))}
-                        <button onClick={() => updateTemplate({orientation: currentTemplate.orientation === 'VERTICAL' ? 'HORIZONTAL' : 'VERTICAL'})} className="col-span-2 mt-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 border border-indigo-100">
-                            <RotateCcw size={14}/> Cambiar a {currentTemplate.orientation === 'VERTICAL' ? 'Apaisado' : 'Vertical'}
-                        </button>
                     </div>
+                    <button onClick={() => updateTemplate({orientation: currentTemplate.orientation === 'VERTICAL' ? 'HORIZONTAL' : 'VERTICAL'})} className="w-full mt-2 py-3 bg-white text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest border border-indigo-100 shadow-sm flex items-center justify-center gap-2">
+                        <RotateCcw size={14}/> Cambiar Orientación
+                    </button>
                 </div>
             </div>
         </div>
 
         {/* ÁREA DE TRABAJO (LIENZO) */}
         <div className="flex-1 bg-slate-200 flex flex-col items-center p-12 overflow-auto relative scroll-smooth custom-scrollbar">
-            <div className="mb-6 bg-slate-800 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 shadow-xl">
-                <span>{selectedType}</span>
+            <div className="mb-6 bg-slate-800 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 shadow-xl shrink-0">
+                <span className="text-indigo-400">{selectedType}</span>
                 <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
                 <span>{dims.w}mm x {dims.h}mm</span>
                 <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                <span className="text-indigo-400">{currentTemplate.orientation}</span>
+                <span>{currentTemplate.orientation}</span>
             </div>
             
             <div 
@@ -281,24 +309,25 @@ const PrintSettings: React.FC = () => {
                 className="bg-white shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] relative flex-shrink-0 border border-slate-300 transition-all duration-500 overflow-hidden"
                 style={{ width: `${dims.w}mm`, height: `${dims.h}mm` }}
             >
-                {/* LÍNEAS DE CORTE ESTILO BRUZZONE */}
-                <div className="absolute top-[32mm] left-0 w-full h-px bg-slate-200"></div>
-                <div className="absolute top-0 left-1/2 w-px h-[32mm] bg-slate-200 -translate-x-1/2"></div>
+                {/* GUÍAS DE CORTE VISUALES */}
+                <div className="absolute top-[32mm] left-0 w-full h-px bg-slate-100"></div>
+                <div className="absolute top-0 left-1/2 w-px h-[32mm] bg-slate-100 -translate-x-1/2"></div>
 
-                {/* LOGO */}
+                {/* LOGO DE EMPRESA (Configuración de Mi Empresa) */}
                 {currentTemplate.positions.logo.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'logo')}
-                        className={`absolute cursor-move transition-shadow ${activeElement === 'logo' ? 'ring-2 ring-indigo-500 bg-indigo-50/20' : ''}`}
-                        style={{ left: `${currentTemplate.positions.logo.x}mm`, top: `${currentTemplate.positions.logo.y}mm` }}
+                        className={`absolute cursor-move transition-all flex items-center justify-center ${activeElement === 'logo' ? 'ring-2 ring-indigo-500 bg-indigo-50/20' : ''}`}
+                        style={{ left: `${currentTemplate.positions.logo.x}mm`, top: `${currentTemplate.positions.logo.y}mm`, width: '40mm', height: '25mm' }}
                     >
-                        <div className="flex items-center gap-2">
-                            <div className="w-14 h-14 bg-slate-900 text-white flex items-center justify-center font-black text-2xl rounded-lg shadow-lg uppercase">{currentTemplate.headerText.substring(0,2)}</div>
-                            <div>
-                                <h1 className="font-black text-base tracking-tighter leading-none">{currentTemplate.headerText.split(' ')[0]}</h1>
-                                <h1 className="font-black text-base tracking-tighter leading-none">{currentTemplate.headerText.split(' ').slice(1).join(' ')}</h1>
+                        {companyConfig.logo ? (
+                            <img src={companyConfig.logo} alt="Logo" className="max-w-full max-h-full object-contain" />
+                        ) : (
+                            <div className="w-full h-full bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-4">
+                                <ImageIcon size={24} className="text-slate-300 mb-1"/>
+                                <span className="text-[7px] font-black uppercase text-slate-400">Sin Logo Configurador</span>
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
 
@@ -314,32 +343,32 @@ const PrintSettings: React.FC = () => {
                     </div>
                 )}
 
-                {/* DATOS CABECERA DERECHA (VOUCHER INFO EDITADO) */}
+                {/* DATOS CABECERA DERECHA (VOUCHER INFO) */}
                 {currentTemplate.positions.voucherInfo.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'voucherInfo')}
                         className={`absolute cursor-move w-[65mm] ${activeElement === 'voucherInfo' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.voucherInfo.x}mm`, top: `${currentTemplate.positions.voucherInfo.y}mm` }}
                     >
-                        <h2 className="text-2xl font-black text-slate-800 uppercase text-center mb-3 tracking-[0.2em]">{currentTemplate.titleText}</h2>
+                        <h2 className="text-xl font-black text-slate-800 uppercase text-center mb-3 tracking-[0.2em]">{currentTemplate.titleText}</h2>
                         <div className="space-y-1.5 text-[9px] font-bold text-slate-600">
                             <p>Nº {currentTemplate.voucherPointOfSale} - {currentTemplate.voucherNumber}</p>
-                            <p>Fecha: {new Date().toLocaleDateString()}</p>
+                            <p>Fecha de Emisión: {new Date().toLocaleDateString()}</p>
                             <p>C.U.I.T.: {currentTemplate.voucherCuitEmisor}</p>
                             <p>Ingresos Brutos: {currentTemplate.voucherIIBBEmisor}</p>
                         </div>
                     </div>
                 )}
 
-                {/* SUB CABECERA */}
+                {/* CABECERA IZQUIERDA (IDENTIDAD) */}
                 {currentTemplate.positions.header.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'header')}
                         className={`absolute cursor-move max-w-[85mm] ${activeElement === 'header' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.header.x}mm`, top: `${currentTemplate.positions.header.y}mm` }}
                     >
-                        <p className="text-[10px] font-black uppercase leading-none text-slate-800">{currentTemplate.headerText}</p>
-                        <div className="text-[8px] font-bold text-slate-400 uppercase mt-2 whitespace-pre-line leading-relaxed italic">
+                        <p className="text-xs font-black uppercase leading-none text-slate-800 tracking-tighter mb-2">{currentTemplate.headerText}</p>
+                        <div className="text-[8px] font-bold text-slate-400 uppercase italic whitespace-pre-line leading-relaxed">
                             {currentTemplate.subHeaderText}
                         </div>
                     </div>
@@ -353,80 +382,67 @@ const PrintSettings: React.FC = () => {
                         style={{ left: `${currentTemplate.positions.client.x}mm`, top: `${currentTemplate.positions.client.y}mm` }}
                     >
                         <div className="text-[9px] space-y-1.5 font-medium">
-                            <p><strong>Razón Social:</strong> CLIENTE EJEMPLO S.A.</p>
-                            <p><strong>Domicilio:</strong> CALLE FALSA 123 - CIUDAD</p>
-                            <p><strong>Sit. Tributaria:</strong> Responsable Inscripto</p>
+                            <p><strong>Sr/es:</strong> CLIENTE DE PRUEBA S.R.L.</p>
+                            <p><strong>Dirección:</strong> CALLE EJEMPLO 456 - CORDOBA</p>
+                            <p><strong>IVA:</strong> Responsable Inscripto</p>
                         </div>
                         <div className="text-[9px] space-y-1.5 font-medium">
-                            <p><strong>Nro Cliente:</strong> 109</p>
-                            <p><strong>C.U.I.T.:</strong> 20-00000000-0</p>
-                            <p className="pt-2"><strong>Forma de Pago:</strong> Cuenta Corriente</p>
+                            <p><strong>CUIT:</strong> 30-00000000-0</p>
+                            <p><strong>Cond. Venta:</strong> Cuenta Corriente</p>
                         </div>
                     </div>
                 )}
 
-                {/* TABLA DE ITEMS DINÁMICA */}
+                {/* TABLA DE ITEMS */}
                 {currentTemplate.positions.table.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'table')}
                         className={`absolute cursor-move w-[190mm] ${activeElement === 'table' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.table.x}mm`, top: `${currentTemplate.positions.table.y}mm` }}
                     >
-                        <table className="w-full text-left border-t border-b border-slate-900">
+                        <table className="w-full text-left border-t border-b border-slate-800">
                             <thead className="text-[9px] font-black uppercase border-b border-slate-300 bg-slate-50">
                                 <tr>
-                                    {currentTemplate.showSkus && <th className="py-2 px-2">Codigo</th>}
-                                    <th className="py-2">Descripcion</th>
+                                    {currentTemplate.showSkus && <th className="py-2 px-2">Código</th>}
+                                    <th className="py-2">Descripción del Artículo</th>
+                                    <th className="py-2 text-center">Cant.</th>
+                                    {currentTemplate.showIvaColumn && <th className="py-2 text-center">IVA</th>}
                                     {currentTemplate.showPrices && <th className="py-2 text-right">Unitario</th>}
-                                    <th className="py-2 text-center">Cant</th>
-                                    {currentTemplate.showIvaColumn && <th className="py-2 text-center">IVA %</th>}
-                                    {currentTemplate.showPrices && <th className="py-2 text-right pr-2">Total</th>}
+                                    {currentTemplate.showPrices && <th className="py-2 text-right pr-2">Subtotal</th>}
                                 </tr>
                             </thead>
                             <tbody className="text-[9px] font-medium text-slate-700">
                                 <tr className="border-b border-slate-100">
-                                    {currentTemplate.showSkus && <td className="py-2 px-2 font-mono">241706</td>}
+                                    {currentTemplate.showSkus && <td className="py-2 px-2 font-mono">SKU-9902</td>}
                                     <td className="py-2 uppercase font-bold">
-                                        MANGUERA COMB C/T 8 mm 150LB
-                                        {currentTemplate.showBrands && <span className="block text-[7px] text-indigo-400">MARCA: CAM</span>}
+                                        PINZA UNIVERSAL 8 AISLADA PRO
+                                        {currentTemplate.showBrands && <span className="block text-[7px] text-indigo-400">MARCA: STANLEY</span>}
                                     </td>
-                                    {currentTemplate.showPrices && <td className="py-2 text-right">$7.101,00</td>}
-                                    <td className="py-2 text-center">5,00</td>
+                                    <td className="py-2 text-center">2,00</td>
                                     {currentTemplate.showIvaColumn && <td className="py-2 text-center">21,0</td>}
-                                    {currentTemplate.showPrices && <td className="py-2 text-right font-black pr-2">$35.505,00</td>}
+                                    {currentTemplate.showPrices && <td className="py-2 text-right">$4.500,00</td>}
+                                    {currentTemplate.showPrices && <td className="py-2 text-right font-black pr-2">$9.000,00</td>}
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 )}
 
-                {/* TOTALES (Ocultos si showPrices es false) */}
+                {/* TOTALES */}
                 {currentTemplate.positions.totals.visible && currentTemplate.showPrices && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'totals')}
                         className={`absolute cursor-move w-[65mm] border border-slate-900 shadow-sm ${activeElement === 'totals' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.totals.x}mm`, top: `${currentTemplate.positions.totals.y}mm` }}
                     >
-                        <div className="p-3 space-y-1 text-[9px] font-bold text-slate-700">
-                            <div className="flex justify-between"><span>Subtotal</span><span>$39.660,39</span></div>
-                            <div className="flex justify-between"><span>IVA %21,0</span><span>$8.328,68</span></div>
-                            <div className="flex justify-between text-base font-black bg-slate-900 text-white p-1.5 mt-2">
-                                <span className="text-[8px] uppercase tracking-widest">{currentTemplate.totalsLabel}</span>
-                                <span>$47.989,07</span>
+                        <div className="p-3 space-y-1 text-[9px] font-bold text-slate-700 bg-white">
+                            <div className="flex justify-between"><span>Gravado</span><span>$7.438,01</span></div>
+                            <div className="flex justify-between"><span>IVA 21%</span><span>$1.561,99</span></div>
+                            <div className="flex justify-between text-base font-black bg-slate-900 text-white p-2 mt-2">
+                                <span className="text-[8px] uppercase tracking-widest leading-none pt-1">{currentTemplate.totalsLabel}</span>
+                                <span>$9.000,00</span>
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {/* CAE INFO */}
-                {currentTemplate.positions.caeInfo.visible && (
-                    <div 
-                        onMouseDown={(e) => handleMouseDown(e, 'caeInfo')}
-                        className={`absolute cursor-move text-[9px] font-black uppercase text-right leading-relaxed ${activeElement === 'caeInfo' ? 'ring-2 ring-indigo-500' : ''}`}
-                        style={{ left: `${currentTemplate.positions.caeInfo.x}mm`, top: `${currentTemplate.positions.caeInfo.y}mm` }}
-                    >
-                        <p>C.A.E.: 75520332507227</p>
-                        <p className="text-slate-400">Vencimiento C.A.E.: 05/01/2026</p>
                     </div>
                 )}
 
@@ -441,12 +457,12 @@ const PrintSettings: React.FC = () => {
                             <QrIcon size="100%" className="opacity-40"/>
                         </div>
                         <div className="max-w-[100mm]">
-                            <p className="text-[7px] font-bold italic text-slate-400 leading-tight uppercase tracking-widest">Comprobante autorizado por ARCA.<br/>Validación mediante Código QR obligatoria.</p>
+                            <p className="text-[7px] font-bold italic text-slate-400 leading-tight uppercase tracking-widest">Autorización ARCA - Validez Fiscal Digital mediante QR.</p>
                         </div>
                     </div>
                 )}
 
-                {/* PIE DE PAGINA */}
+                {/* PIE DE PAGINA (FOOTER) */}
                 {currentTemplate.positions.footer.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'footer')}
