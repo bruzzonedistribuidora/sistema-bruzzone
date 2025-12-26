@@ -354,7 +354,8 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
           desiredStock: 0,
           reorderPoint: 0,
           location: '',
-          ecommerce: {}
+          ecommerce: {},
+          lastProviders: []
       };
 
       const updatedMaster = [newProd, ...products];
@@ -386,9 +387,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
           alert("Debe seleccionar un proveedor e ingresar al menos un producto.");
           return;
       }
-
-      const provider = providers.find(p => p.id === invoiceMetadata.providerId);
-      const quote = currencies.find(c => c.id === provider?.currencyQuoteId);
 
       const newPurchase: Purchase = {
           id: invoiceMetadata.numeroFactura || `FC-MAN-${Date.now()}`,
@@ -422,12 +420,14 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
               const updatedLastProviders = [historyEntry, ...(p.lastProviders || [])].slice(0, 2);
 
               if (shouldUpdateCosts) {
+                const priceNeto = unitCostFinal * (1 + (p.profitMargin / 100));
+                const priceFinal = priceNeto * (1 + (p.vatRate / 100));
                 return { 
                     ...p, 
                     listCost: match.costoUnitarioNeto, 
                     costAfterDiscounts: unitCostFinal,
-                    priceNeto: unitCostFinal * (1 + (p.profitMargin / 100)),
-                    priceFinal: (unitCostFinal * (1 + (p.profitMargin / 100))) * (1 + (p.vatRate / 100)),
+                    priceNeto: parseFloat(priceNeto.toFixed(2)),
+                    priceFinal: parseFloat(priceFinal.toFixed(2)),
                     lastProviders: updatedLastProviders
                 };
               } else {
@@ -464,17 +464,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
           p.internalCodes.some(c => c.toLowerCase().includes(manualSearch.toLowerCase()))
       ).slice(0, 5);
   }, [manualSearch, products]);
-
-  const combinedHistory = useMemo(() => {
-      if (!selectedProviderForHistory) return [];
-      const providerPurchases = purchases.filter(p => p.providerId === selectedProviderForHistory.id).map(p => ({
-          id: p.id, date: p.date, concept: `${p.type} ${p.id}`, debit: p.total, credit: 0, type: 'INVOICE'
-      }));
-      const providerPayments = payments.filter(p => p.providerId === selectedProviderForHistory.id).map(p => ({
-          id: p.id, date: p.date, concept: `ORDEN DE PAGO ${p.id} (${p.method})`, debit: 0, credit: p.amount, type: 'PAYMENT'
-      }));
-      return [...providerPurchases, ...providerPayments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [selectedProviderForHistory, purchases, payments]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden">
