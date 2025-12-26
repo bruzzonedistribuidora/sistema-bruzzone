@@ -83,11 +83,8 @@ const Inventory: React.FC = () => {
   const [formData, setFormData] = useState<Product>(initialProduct);
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'COMBO' | 'STOCK'>('GENERAL');
   
-  // Estados para Altas Rápidas (+)
   const [isQuickAddOpen, setIsQuickAddOpen] = useState<'BRAND' | 'CATEGORY' | 'PROVIDER' | null>(null);
   const [quickAddValue, setQuickAddValue] = useState('');
-
-  // Estado para búsqueda de componentes en Combos
   const [comboSearch, setComboSearch] = useState('');
 
   useEffect(() => {
@@ -97,7 +94,6 @@ const Inventory: React.FC = () => {
     localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
   }, [products, brands, categories, providers]);
 
-  // Recálculo automático de precios y costos
   useEffect(() => {
     let cost = 0;
     if (formData.isCombo && formData.comboItems && formData.comboItems.length > 0) {
@@ -560,7 +556,7 @@ const Inventory: React.FC = () => {
                                                   </div>
                                                   <input 
                                                       type="number" 
-                                                      className="w-24 p-2 bg-white border border-slate-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-500" 
+                                                      className="w-24 p-2 bg-white border border-gray-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-500" 
                                                       value={sd.quantity} 
                                                       onChange={e => {
                                                           const newDetails = [...formData.stockDetails];
@@ -587,7 +583,6 @@ const Inventory: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL PEQUEÑO PARA ALTA RÁPIDA (+) */}
       {isQuickAddOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6">
