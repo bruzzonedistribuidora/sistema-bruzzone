@@ -5,24 +5,9 @@ import {
     User, ClipboardList, AlertCircle, X, 
     Minus, Package, Trash2, History, CheckCircle, 
     ChevronRight, DollarSign, UserSearch, Filter,
-    TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart
+    TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem } from '../types';
-
-interface RemitosProps {
-    initialItems?: InvoiceItem[];
-    onItemsConsumed?: () => void;
-    onBillRemitos?: (items: InvoiceItem[]) => void;
-}
-
-const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string, brand: string = 'Genérico'): Product => ({
-  id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [],
-  name, brand, provider: 'Proveedor Demo', description: '',
-  category, measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
-  vatRate: 21.0, listCost: priceFinal * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 30,
-  priceNeto: priceFinal / 1.21, priceFinal: priceFinal, stock, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
-});
 
 const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBillRemitos }) => {
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');
@@ -31,9 +16,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   
-  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-  const [manualForm, setManualForm] = useState({ name: '', price: 0 });
-
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
   const [selectedRemitoIds, setSelectedRemitoIds] = useState<string[]>([]);
   const [showPrintModal, setShowPrintModal] = useState<Remito | null>(null);
@@ -42,7 +24,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [allClients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
   const [existingRemitos, setExistingRemitos] = useState<Remito[]>(() => JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]'));
 
-  // Manejar ítems transferidos desde otros módulos
   useEffect(() => {
     if (initialItems && initialItems.length > 0) {
         const mapped = initialItems.map(item => ({
@@ -96,6 +77,10 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     setShowPrintModal(newRemito);
   };
 
+  const handlePrint = () => {
+      window.print();
+  };
+
   const convertRemitoToSale = (remito: Remito) => {
       const items: InvoiceItem[] = remito.items.map(item => ({
           product: item.product,
@@ -133,7 +118,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
   return (
     <div className="p-4 h-full flex flex-col space-y-3 bg-slate-100 overflow-hidden">
-      <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
+      <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0 print:hidden">
         <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
           <ClipboardList size={18} className="text-indigo-600"/> Remitos de Entrega
         </h2>
@@ -144,7 +129,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
       </div>
 
       {activeTab === 'NEW' && (
-        <div className="flex-1 flex flex-col gap-3 min-0">
+        <div className="flex-1 flex flex-col gap-3 min-0 print:hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
                 <div className="md:col-span-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Cliente Destino</label>
@@ -207,7 +192,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
       )}
 
       {activeTab === 'HISTORY' && (
-        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in">
+        <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in print:hidden">
              <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div className="flex gap-2">
                     {['PENDING', 'BILLED', 'ALL'].map(f => (
@@ -269,38 +254,94 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         </div>
       )}
 
-      {/* MODAL PRINT PREVIEW */}
+      {/* MODAL PRINT PREVIEW REMITO */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4">
-           <div className="bg-white w-full max-w-lg shadow-2xl rounded-xl overflow-hidden flex flex-col">
-              <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                 <h3 className="text-xs font-black uppercase tracking-widest">Vista Previa de Remito</h3>
-                 <button onClick={() => setShowPrintModal(null)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4 print:bg-white print:p-0 print:block">
+           <div className="bg-white w-full max-w-2xl shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col print:shadow-none print:rounded-none print:w-full">
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50 print:hidden">
+                 <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><FileText size={16}/> Vista Previa de Remito</h3>
+                 <button onClick={() => setShowPrintModal(null)}><X size={24}/></button>
               </div>
-              <div className="p-8 overflow-y-auto max-h-[70vh]">
-                 <div className="border p-6 rounded shadow-inner bg-white">
-                    <h1 className="text-xl font-black text-indigo-600 uppercase mb-4">REMITO R - {showPrintModal.id}</h1>
-                    <p className="text-xs font-bold text-gray-500 uppercase mb-4">Cliente: {showPrintModal.clientName}</p>
-                    <table className="w-full text-[10px] text-left">
-                        <thead><tr className="border-b"><th className="py-1">Cant</th><th className="py-1">Descripción</th><th className="py-1 text-right">Subtotal</th></tr></thead>
-                        <tbody className="divide-y">
+              <div className="flex-1 overflow-y-auto p-12 bg-white print:p-0">
+                 <div className="border border-slate-100 p-10 rounded-[2.5rem] shadow-sm print:border-none print:shadow-none print:p-0">
+                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">Ferretería Bruzzone</h1>
+                    <div className="flex justify-between border-b pb-6 mb-8">
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">REMITO DE ENTREGA</p>
+                            <p className="text-xl font-mono font-black">R - {showPrintModal.id}</p>
+                        </div>
+                        <div className="text-right">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fecha</p>
+                             <p className="text-sm font-bold text-slate-700">{showPrintModal.date}</p>
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Destinatario</p>
+                        <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">{showPrintModal.clientName}</h4>
+                    </div>
+
+                    <table className="w-full text-[11px] text-left">
+                        <thead className="bg-slate-50 border-b">
+                            <tr><th className="py-3 px-2">Descripción del Artículo</th><th className="py-3 px-2 text-center">Cant.</th><th className="py-3 px-2 text-right">Subtotal</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
                             {showPrintModal.items.map((it, i) => (
-                                <tr key={i}><td className="py-1 font-bold">{it.quantity}</td><td className="py-1 uppercase">{it.product.name}</td><td className="py-1 text-right">${(it.quantity * it.historicalPrice).toLocaleString()}</td></tr>
+                                <tr key={i}>
+                                    <td className="py-4 px-2">
+                                        <p className="font-black text-slate-800 uppercase text-xs">{it.product.name}</p>
+                                    </td>
+                                    <td className="py-4 px-2 text-center font-black text-slate-700 text-xs">{it.quantity}</td>
+                                    <td className="py-4 px-2 text-right font-black text-slate-900 text-xs">${(it.quantity * it.historicalPrice).toLocaleString()}</td>
+                                </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="mt-6 text-right pt-2 border-t font-black text-lg">${showPrintModal.items.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString()}</div>
+                    
+                    <div className="mt-20 grid grid-cols-2 gap-12 text-center">
+                        <div className="border-t border-slate-900 pt-2">
+                            <p className="text-[8px] font-black uppercase text-slate-400">Firma y Aclaración Recibido</p>
+                        </div>
+                        <div className="border-t border-slate-900 pt-2">
+                            <p className="text-[8px] font-black uppercase text-slate-400">Control de Despacho</p>
+                        </div>
+                    </div>
                  </div>
               </div>
-              <div className="p-4 bg-gray-50 border-t flex gap-2">
-                 <button onClick={() => setShowPrintModal(null)} className="flex-1 py-2 text-[10px] font-black uppercase bg-white border rounded">Cerrar</button>
-                 <button onClick={() => convertRemitoToSale(showPrintModal)} className="flex-1 py-2 text-[10px] font-black uppercase bg-indigo-600 text-white rounded">Facturar Ahora</button>
+              <div className="p-8 bg-slate-50 border-t flex gap-3 print:hidden">
+                 <button onClick={() => setShowPrintModal(null)} className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Cerrar</button>
+                 <button onClick={handlePrint} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Printer size={18}/> Imprimir Comprobante</button>
+                 <button onClick={() => convertRemitoToSale(showPrintModal)} className="flex-1 py-4 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Receipt size={18}/> Facturar Ahora</button>
               </div>
            </div>
         </div>
       )}
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; pointer-events: none; }
+              .print\\:block, .print\\:block * { visibility: visible; pointer-events: auto; }
+              .print\\:block { 
+                  position: absolute; 
+                  left: 0; 
+                  top: 0; 
+                  width: 100%; 
+                  height: auto;
+                  margin: 0;
+                  padding: 0;
+                  background: white;
+              }
+              @page { size: auto; margin: 1cm; }
+          }
+      `}</style>
     </div>
   );
 };
+
+interface RemitosProps {
+    initialItems?: InvoiceItem[];
+    onItemsConsumed?: () => void;
+    onBillRemitos?: (items: InvoiceItem[]) => void;
+}
 
 export default Remitos;
