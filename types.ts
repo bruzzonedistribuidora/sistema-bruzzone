@@ -98,6 +98,7 @@ export interface CompanyConfig {
   whatsappNumber: string;
   defaultProfitMargin: number;
   paymentAccounts: PaymentAccount[];
+  paymentMethods?: string[]; // Nuevas modalidades de pago personalizadas
   currencies?: CurrencyQuote[];
   loyalty?: LoyaltyConfig;
   smtpHost?: string;
@@ -281,7 +282,7 @@ export interface TreasuryMovement {
   date: string;
   type: 'INCOME' | 'EXPENSE';
   subtype: string;
-  paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO' | 'CHEQUE' | 'ECHEQ' | 'DEBITO' | 'CREDITO' | 'CTACTE' | 'MIXTO' | 'RETENCION';
+  paymentMethod: string;
   amount: number;
   description: string;
   cashRegisterId: string;
