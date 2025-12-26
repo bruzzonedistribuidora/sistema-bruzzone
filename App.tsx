@@ -44,7 +44,6 @@ import { ViewState, User, Role, Client, InvoiceItem } from './types';
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   
-  // Soporte para vista pública de clientes (por ejemplo, vía URL o botón especial)
   const [isPublicMode, setIsPublicMode] = useState(() => {
       return window.location.search.includes('view=fidelidad');
   });
@@ -54,18 +53,11 @@ const App: React.FC = () => {
   
   const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
+  
+  // Estados de transferencia de datos entre módulos
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
-
-  const getRoles = (): Role[] => {
-    const saved = localStorage.getItem('ferrecloud_roles');
-    if (saved) {
-        try { return JSON.parse(saved); } catch(e) {}
-    }
-    return [
-      { id: 'admin', name: 'Administrador Total', color: 'bg-purple-100 text-purple-800', permissions: ['ALL'] },
-      { id: 'seller', name: 'Vendedor', color: 'bg-green-100 text-green-800', permissions: ['DASHBOARD_VIEW', 'POS_ACCESS', 'CLIENTS_VIEW', 'STOCK_VIEW', 'REMITOS_VIEW'] }
-    ];
-  };
+  const [itemsToRemito, setItemsToRemito] = useState<InvoiceItem[] | null>(null);
+  const [itemsToBudget, setItemsToBudget] = useState<InvoiceItem[] | null>(null);
 
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
@@ -111,17 +103,47 @@ const App: React.FC = () => {
       handleNavigate(ViewState.POS);
   };
 
+  const handleConvertToRemito = (items: InvoiceItem[]) => {
+      setItemsToRemito(items);
+      handleNavigate(ViewState.REMITOS);
+  };
+
+  const handleConvertToBudget = (items: InvoiceItem[]) => {
+      setItemsToBudget(items);
+      handleNavigate(ViewState.PRESUPUESTOS);
+  };
+
   const renderViewContent = (view: ViewState) => {
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory />;
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
-      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.POS: return (
+        <POS 
+            initialCart={itemsToBill || undefined} 
+            onCartUsed={() => setItemsToBill(null)} 
+            onTransformToRemito={handleConvertToRemito}
+            onTransformToBudget={handleConvertToBudget}
+        />
+      );
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.ONLINE_SALES: return <OnlineSales />;
-      case ViewState.REMITOS: return <Remitos onBillRemitos={handleConvertToSale} />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={handleConvertToSale} />;
+      case ViewState.REMITOS: return (
+        <Remitos 
+            initialItems={itemsToRemito || undefined}
+            onItemsConsumed={() => setItemsToRemito(null)}
+            onBillRemitos={handleConvertToSale} 
+        />
+      );
+      case ViewState.PRESUPUESTOS: return (
+        <Presupuestos 
+            initialItems={itemsToBudget || undefined}
+            onItemsConsumed={() => setItemsToBudget(null)}
+            onConvertToSale={handleConvertToSale} 
+            onConvertToRemito={handleConvertToRemito}
+        />
+      );
       case ViewState.TREASURY: return <Treasury />;
       case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
       case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
@@ -169,7 +191,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Si estamos en modo público, no requerimos login de empleado
   if (isPublicMode) {
       return <PublicPortal />;
   }
