@@ -4,7 +4,7 @@ import {
     Save, Building2, MapPin, Phone, Mail, Globe, Upload, Image as ImageIcon, 
     Briefcase, FileText, CreditCard, Banknote, QrCode, Plus, Trash2, CheckCircle, 
     X, Landmark, Smartphone, Edit2, Check, Server, Key, Lock, ShieldCheck, RefreshCw, Send,
-    Camera, ToggleLeft, ToggleRight, MoreVertical, MessageCircle, Percent
+    Camera, ToggleLeft, ToggleRight, MoreVertical, MessageCircle, Percent, ListPlus
 } from 'lucide-react';
 import { CompanyConfig, TaxCondition, PaymentAccount } from '../types';
 
@@ -15,6 +15,7 @@ const CompanySettings: React.FC = () => {
   const [isTestingWhatsApp, setIsTestingWhatsApp] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<PaymentAccount | null>(null);
+  const [newMethodName, setNewMethodName] = useState('');
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const qrInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +43,7 @@ const CompanySettings: React.FC = () => {
               { id: '1', type: 'VIRTUAL_WALLET', bankName: 'Mercado Pago', alias: 'ferre.bruzzone.mp', cbu: '', owner: 'Bruzzone SA', active: true },
               { id: '2', type: 'BANK', bankName: 'Banco Galicia', alias: 'bruzzone.galicia', cbu: '0070012345678901234567', owner: 'Bruzzone SA', active: true }
           ],
+          paymentMethods: ['EFECTIVO', 'DEBITO', 'CREDITO', 'TRANSFERENCIA', 'MERCADO_PAGO', 'CTACTE'],
           smtpHost: 'smtp.gmail.com',
           smtpPort: '587',
           smtpUser: '',
@@ -66,16 +68,34 @@ const CompanySettings: React.FC = () => {
 
   const handleSave = () => {
       setIsLoading(true);
-      // Persistir y avisar al sistema
       localStorage.setItem('company_config', JSON.stringify(formData));
-      
-      // Emitir evento personalizado para que el Sidebar se actualice
       window.dispatchEvent(new Event('company_config_updated'));
 
       setTimeout(() => {
           setIsLoading(false);
-          alert('Configuración guardada correctamente. Los cambios ya son visibles en todo el sistema.');
+          alert('Configuración guardada correctamente.');
       }, 600);
+  };
+
+  const addPaymentMethod = () => {
+      if (!newMethodName.trim()) return;
+      const cleanName = newMethodName.trim().toUpperCase();
+      if (formData.paymentMethods?.includes(cleanName)) {
+          alert('Este método ya existe.');
+          return;
+      }
+      setFormData(prev => ({
+          ...prev,
+          paymentMethods: [...(prev.paymentMethods || []), cleanName]
+      }));
+      setNewMethodName('');
+  };
+
+  const removePaymentMethod = (name: string) => {
+      setFormData(prev => ({
+          ...prev,
+          paymentMethods: prev.paymentMethods?.filter(m => m !== name)
+      }));
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,7 +220,7 @@ const CompanySettings: React.FC = () => {
                     </div>
                     <div className="text-center">
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Logo de la Empresa</p>
-                        <p className="text-[10px] text-gray-400 mt-2">Formatos sugeridos: PNG transparente o JPG (máx 1MB)</p>
+                        <p className="text-[10px] text-gray-400 mt-2">PNG transparente o JPG (máx 1MB)</p>
                     </div>
                 </div>
                 
@@ -237,35 +257,17 @@ const CompanySettings: React.FC = () => {
 
                     <div className="space-y-6 pt-4 border-t border-gray-50">
                         <h4 className="font-black text-slate-800 uppercase tracking-tight pb-2 flex items-center gap-2">
-                            <MapPin size={18} className="text-red-500"/> Localización y Contacto
-                        </h4>
-                        <div className="grid grid-cols-1 gap-4">
-                            <input name="address" placeholder="Dirección Legal" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.address} onChange={handleInputChange} />
-                            <div className="grid grid-cols-2 gap-4">
-                                <input name="city" placeholder="Ciudad" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.city} onChange={handleInputChange} />
-                                <input name="phone" placeholder="Teléfono" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.phone} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-6 pt-4 border-t border-gray-50">
-                        <h4 className="font-black text-slate-800 uppercase tracking-tight pb-2 flex items-center gap-2">
                             <Percent size={18} className="text-green-600"/> Parámetros de Venta
                         </h4>
                         <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Margen de Ganancia Sugerido (Default)</label>
-                            <div className="relative group">
-                                <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-green-600 transition-colors" size={20}/>
-                                <input 
-                                    name="defaultProfitMargin" 
-                                    type="number"
-                                    placeholder="Ej: 30" 
-                                    className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-green-500 transition-all text-xl" 
-                                    value={formData.defaultProfitMargin} 
-                                    onChange={handleInputChange} 
-                                />
-                            </div>
-                            <p className="text-[10px] text-gray-400 italic px-2 mt-2 leading-relaxed">Este valor se aplicará automáticamente a cada nuevo artículo o combo que des de alta en el inventario.</p>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Margen de Ganancia Sugerido (%)</label>
+                            <input 
+                                name="defaultProfitMargin" 
+                                type="number"
+                                className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-green-500 transition-all text-xl text-center" 
+                                value={formData.defaultProfitMargin} 
+                                onChange={handleInputChange} 
+                            />
                         </div>
                     </div>
                 </div>
@@ -273,64 +275,96 @@ const CompanySettings: React.FC = () => {
         )}
 
         {activeTab === 'PAYMENTS' && (
-            <div className="space-y-6 animate-fade-in pb-10">
-                <div className="flex justify-between items-center">
-                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Cuentas y Vías de Cobro</h3>
-                    <button 
-                        onClick={() => openAccountModal()}
-                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
-                        <Plus size={16}/> Nueva Cuenta
-                    </button>
+            <div className="space-y-10 animate-fade-in pb-10">
+                {/* SECCIÓN MODALIDADES DE PAGO */}
+                <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
+                    <div className="flex justify-between items-center border-b pb-4">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-lg"><ListPlus size={24}/></div>
+                            <div>
+                                <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Modalidades de Cobro</h3>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Define qué botones de pago verás en el POS</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <input 
+                            type="text" 
+                            placeholder="Nombre de modalidad (ej: Plan Z, Debito 24hs)" 
+                            className="flex-1 p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-slate-700 uppercase"
+                            value={newMethodName}
+                            onChange={e => setNewMethodName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && addPaymentMethod()}
+                        />
+                        <button onClick={addPaymentMethod} className="bg-slate-900 text-white px-8 rounded-2xl font-black text-xs uppercase hover:bg-slate-800 transition-all flex items-center gap-2">
+                            <Plus size={16}/> AGREGAR
+                        </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                        {formData.paymentMethods?.map(m => (
+                            <div key={m} className="bg-white border-2 border-gray-100 pl-5 pr-2 py-3 rounded-2xl flex items-center gap-4 group hover:border-indigo-500 transition-all">
+                                <span className="font-black text-xs text-slate-700 uppercase tracking-tighter">{m}</span>
+                                <button onClick={() => removePaymentMethod(m)} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                    <X size={16}/>
+                                </button>
+                            </div>
+                        ))}
+                        {(!formData.paymentMethods || formData.paymentMethods.length === 0) && (
+                            <p className="text-sm text-slate-400 italic">No hay modalidades personalizadas definidas.</p>
+                        )}
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {formData.paymentAccounts.map(acc => (
-                        <div key={acc.id} className={`bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm relative group flex flex-col transition-all hover:shadow-xl ${!acc.active ? 'opacity-60 grayscale' : ''}`}>
-                            <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-2xl ${acc.type === 'VIRTUAL_WALLET' ? 'bg-yellow-50 text-yellow-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    {acc.type === 'VIRTUAL_WALLET' ? <Smartphone size={28}/> : <Landmark size={28}/>}
-                                </div>
-                                <div className="flex gap-1">
-                                    <button onClick={() => toggleAccountStatus(acc.id)} className={`p-2 rounded-xl transition-all ${acc.active ? 'text-green-600 bg-green-50' : 'text-slate-400 bg-slate-100'}`}>
-                                        {acc.active ? <CheckCircle size={18}/> : <X size={18}/>}
-                                    </button>
-                                    <button onClick={() => openAccountModal(acc)} className="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Edit2 size={18}/></button>
-                                    <button onClick={() => deleteAccount(acc.id)} className="p-2 text-red-500 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
-                                </div>
-                            </div>
+                {/* SECCIÓN CUENTAS BANCARIAS */}
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Cuentas para Transferencias</h3>
+                        <button 
+                            onClick={() => openAccountModal()}
+                            className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+                            <Plus size={16}/> Nueva Cuenta
+                        </button>
+                    </div>
 
-                            <h4 className="font-black text-slate-800 text-xl uppercase tracking-tighter leading-none mb-1">{acc.bankName}</h4>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">{acc.type === 'BANK' ? 'Cta. Bancaria' : 'Billetera Virtual'}</p>
-                            
-                            <div className="space-y-4 flex-1">
-                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Alias de Cobro</p>
-                                    <p className="text-sm font-black text-indigo-600 font-mono truncate">{acc.alias}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {formData.paymentAccounts.map(acc => (
+                            <div key={acc.id} className={`bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm relative group flex flex-col transition-all hover:shadow-xl ${!acc.active ? 'opacity-60 grayscale' : ''}`}>
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className={`p-4 rounded-2xl ${acc.type === 'VIRTUAL_WALLET' ? 'bg-yellow-50 text-yellow-600' : 'bg-blue-50 text-blue-600'}`}>
+                                        {acc.type === 'VIRTUAL_WALLET' ? <Smartphone size={28}/> : <Landmark size={28}/>}
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => toggleAccountStatus(acc.id)} className={`p-2 rounded-xl transition-all ${acc.active ? 'text-green-600 bg-green-50' : 'text-slate-400 bg-slate-100'}`}>
+                                            {acc.active ? <CheckCircle size={18}/> : <X size={18}/>}
+                                        </button>
+                                        <button onClick={() => openAccountModal(acc)} className="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Edit2 size={18}/></button>
+                                        <button onClick={() => deleteAccount(acc.id)} className="p-2 text-red-500 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
+                                    </div>
                                 </div>
-                                {acc.cbu && (
+
+                                <h4 className="font-black text-slate-800 text-xl uppercase tracking-tighter leading-none mb-1">{acc.bankName}</h4>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">{acc.type === 'BANK' ? 'Cta. Bancaria' : 'Billetera Virtual'}</p>
+                                
+                                <div className="space-y-4 flex-1">
                                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">CBU / CVU</p>
-                                        <p className="text-[11px] font-bold text-slate-500 font-mono truncate">{acc.cbu}</p>
+                                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Alias de Cobro</p>
+                                        <p className="text-sm font-black text-indigo-600 font-mono truncate">{acc.alias}</p>
+                                    </div>
+                                </div>
+
+                                {acc.qrImage && (
+                                    <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase">QR Habilitado</span>
+                                        <div className="w-10 h-10 bg-slate-100 rounded-lg p-1">
+                                            <img src={acc.qrImage} className="w-full h-full object-contain" alt="QR Cobro"/>
+                                        </div>
                                     </div>
                                 )}
                             </div>
-
-                            {acc.qrImage && (
-                                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase">QR Habilitado</span>
-                                    <div className="w-10 h-10 bg-slate-100 rounded-lg p-1">
-                                        <img src={acc.qrImage} className="w-full h-full object-contain" alt="QR Cobro"/>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {formData.paymentAccounts.length === 0 && (
-                        <div className="col-span-full py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
-                            <CreditCard size={64} strokeWidth={1} className="mb-4 opacity-20"/>
-                            <p className="font-black uppercase tracking-widest text-sm">No hay cuentas de cobro configuradas</p>
-                        </div>
-                    )}
+                        ))}
+                    </div>
                 </div>
             </div>
         )}
@@ -347,7 +381,6 @@ const CompanySettings: React.FC = () => {
                             <p className="text-xs font-bold text-gray-400 uppercase mt-1">Número emisor para notificaciones y pedidos</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 uppercase tracking-widest"><ShieldCheck size={14}/> Enlace Directo</div>
                 </div>
 
                 <div className="max-w-md space-y-4">
@@ -362,7 +395,6 @@ const CompanySettings: React.FC = () => {
                             onChange={handleInputChange} 
                         />
                     </div>
-                    <p className="text-[10px] text-gray-400 italic px-2">Importante: El número debe incluir el código de país (Ej: 54 para Argentina) sin el signo + ni espacios.</p>
                 </div>
 
                 <button onClick={handleTestWhatsApp} disabled={isTestingWhatsApp} className="w-full py-5 bg-green-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-green-100 hover:bg-green-500 transition-all flex items-center justify-center gap-4">
@@ -376,7 +408,6 @@ const CompanySettings: React.FC = () => {
             <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm animate-fade-in space-y-8">
                 <div className="flex justify-between items-center">
                     <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Configuración de Mensajería Saliente (SMTP)</h3>
-                    <div className="flex items-center gap-2 text-[10px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 uppercase tracking-widest"><ShieldCheck size={14}/> TLS Seguro</div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
