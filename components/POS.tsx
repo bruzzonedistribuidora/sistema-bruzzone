@@ -391,35 +391,54 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 p-6 overflow-y-auto animate-fade-in custom-scrollbar print:hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {salesHistory.map(sale => (
-                            <div key={sale.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-100 w-fit">{sale.id}</span>
-                                        <span className={`text-[8px] font-black mt-2 uppercase ${sale.type === 'FISCAL' ? 'text-indigo-500' : 'text-slate-400'}`}>
-                                            {sale.type === 'FISCAL' ? 'Facturado ARCA' : 'Venta Interna'}
-                                        </span>
-                                    </div>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{sale.date}</p>
-                                </div>
-                                <h4 className="font-black text-slate-800 uppercase text-sm mb-1 tracking-tight leading-none">{sale.client}</h4>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-6 tracking-widest">{sale.paymentMethod}</p>
-                                {sale.checkInfo && (
-                                    <div className="bg-slate-50 p-2 rounded-lg border text-[8px] font-black text-slate-400 uppercase mb-4">
-                                        CHEQUE: {sale.checkInfo.bank} - Nº {sale.checkInfo.number}
-                                    </div>
-                                )}
-                                <div className="flex justify-between items-end border-t border-gray-50 pt-6">
-                                    <div>
-                                        <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1">Monto Total</p>
-                                        <p className="text-2xl font-black text-slate-900 tracking-tighter">${sale.total.toLocaleString('es-AR')}</p>
-                                    </div>
-                                    <button onClick={() => { setLastSale(sale); setShowSuccessModal(true); }} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Printer size={20}/></button>
-                                </div>
-                            </div>
-                        ))}
+                <div className="flex-1 p-6 overflow-hidden flex flex-col animate-fade-in print:hidden">
+                    <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col flex-1">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-900 text-white sticky top-0 z-10 text-[10px] font-black uppercase tracking-widest">
+                                    <tr>
+                                        <th className="px-6 py-4">ID Transacción</th>
+                                        <th className="px-6 py-4">Fecha y Hora</th>
+                                        <th className="px-6 py-4">Cliente</th>
+                                        <th className="px-6 py-4">Tipo Comprobante</th>
+                                        <th className="px-6 py-4">Medio Pago</th>
+                                        <th className="px-6 py-4 text-right">Total</th>
+                                        <th className="px-6 py-4 text-center">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-[11px]">
+                                    {salesHistory.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">No hay ventas registradas</td>
+                                        </tr>
+                                    ) : (
+                                        salesHistory.map(sale => (
+                                            <tr key={sale.id} className="hover:bg-slate-50 transition-colors group">
+                                                <td className="px-6 py-4 font-mono font-bold text-indigo-600">{sale.id}</td>
+                                                <td className="px-6 py-4 text-slate-400">{sale.date}</td>
+                                                <td className="px-6 py-4 font-black uppercase text-slate-700">{sale.client}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${sale.type === 'FISCAL' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                                        {sale.type === 'FISCAL' ? 'FACTURA ARCA' : 'INTERNO'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 font-bold text-slate-500 uppercase">{sale.paymentMethod}</td>
+                                                <td className="px-6 py-4 text-right font-black text-slate-900 text-sm">${sale.total.toLocaleString('es-AR')}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button 
+                                                        onClick={() => { setLastSale(sale); setShowSuccessModal(true); }}
+                                                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        title="Reimprimir"
+                                                    >
+                                                        <Printer size={16}/>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}
