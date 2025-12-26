@@ -331,7 +331,8 @@ const OnlineSales: React.FC = () => {
                                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Client Secret</label>
                                       <div className="relative group">
                                           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
-                                          <input type="password" password="••••••••••••" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-600 transition-all shadow-sm" />
+                                          {/* Fix: Corrected invalid 'password' attribute to 'placeholder' */}
+                                          <input type="password" placeholder="••••••••••••" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-600 transition-all shadow-sm" />
                                       </div>
                                   </div>
                               </>
@@ -372,7 +373,8 @@ const OnlineSales: React.FC = () => {
                                       </div>
                                       <div className="space-y-2">
                                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Consumer Secret</label>
-                                          <input type="password" password="cs_..." className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-purple-600 transition-all shadow-sm" />
+                                          {/* Fix: Corrected invalid 'password' attribute to 'placeholder' */}
+                                          <input type="password" placeholder="cs_..." className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-purple-600 transition-all shadow-sm" />
                                       </div>
                                   </div>
                               </>
