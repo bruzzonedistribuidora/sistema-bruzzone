@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Printer, Trash2, Save, Clock, FileText, ArrowRight, X, Calendar, Minus, Calculator, Pencil, PlusCircle, ShoppingBag, Truck, Receipt } from 'lucide-react';
+import { Search, Plus, Printer, Trash2, Save, Clock, FileText, ArrowRight, X, Calendar, Minus, Calculator, Pencil, PlusCircle, ShoppingBag, Truck, Receipt, Download } from 'lucide-react';
 import { InvoiceItem, Product, Budget } from '../types';
 
 interface PresupuestosProps {
@@ -23,7 +23,6 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
 
   const productsFromStorage: Product[] = JSON.parse(localStorage.getItem('ferrecloud_products') || '[]');
   
-  // Manejar ítems transferidos
   useEffect(() => {
     if (initialItems && initialItems.length > 0) {
         setCart(initialItems);
@@ -69,13 +68,17 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
     setShowPrintModal(newBudget);
   };
 
+  const handlePrint = () => {
+      window.print();
+  };
+
   useEffect(() => {
     localStorage.setItem('ferrecloud_budgets', JSON.stringify(budgets));
   }, [budgets]);
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 print:hidden">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 uppercase tracking-tight">Presupuestos y Cotizaciones</h2>
           <p className="text-gray-500 text-sm italic">Gestión de propuestas comerciales y conversión directa.</p>
@@ -87,7 +90,7 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
       </div>
 
       {activeTab === 'NEW' && (
-        <div className="bg-white rounded-xl shadow-lg border flex flex-col flex-1 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg border flex flex-col flex-1 overflow-hidden print:hidden">
             <div className="p-6 bg-slate-50 border-b grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                 <div className="md:col-span-3">
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cliente</label>
@@ -154,12 +157,12 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
       )}
 
       {activeTab === 'HISTORY' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex-1 animate-fade-in">
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden flex-1 animate-fade-in print:hidden">
             <table className="w-full text-left">
                 <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase border-b">
                     <tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Cliente</th><th className="px-6 py-4">Validez</th><th className="px-6 py-4 text-right">Total</th><th className="px-6 py-4 text-center">Acciones</th></tr>
                 </thead>
-                <tbody className="divide-y text-xs">
+                <tbody className="divide-y divide-xs">
                     {budgets.map(budget => (
                         <tr key={budget.id} className="hover:bg-gray-50 group">
                             <td className="px-6 py-4 font-bold text-indigo-600">{budget.id}</td>
@@ -181,36 +184,82 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
         </div>
       )}
 
-      {/* MODAL PRINT PREVIEW COMPACTO */}
+      {/* MODAL PRINT PREVIEW */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4">
-           <div className="bg-white w-full max-w-lg shadow-2xl rounded-xl overflow-hidden flex flex-col animate-fade-in">
-              <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                 <h3 className="text-xs font-black uppercase">Presupuesto Comercial</h3>
-                 <button onClick={() => setShowPrintModal(null)}><X size={20}/></button>
+        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4 animate-fade-in print:bg-white print:p-0 print:block">
+           <div className="bg-white w-full max-w-2xl shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col animate-fade-in print:shadow-none print:rounded-none print:w-full">
+              <div className="p-6 border-b flex justify-between items-center bg-slate-50 print:hidden">
+                 <h3 className="text-xs font-black uppercase flex items-center gap-2"><FileText size={16}/> Presupuesto Comercial</h3>
+                 <button onClick={() => setShowPrintModal(null)}><X size={24}/></button>
               </div>
-              <div className="p-8">
-                 <div className="border p-6 rounded bg-white shadow-inner">
-                    <h1 className="text-xl font-black text-slate-800 uppercase mb-4">Cotización {showPrintModal.id}</h1>
-                    <p className="text-xs font-bold text-gray-400 mb-6 uppercase">Cliente: {showPrintModal.clientName} | Vto: {showPrintModal.validUntil}</p>
-                    <table className="w-full text-[10px] text-left">
-                        <thead><tr className="border-b"><th className="py-1">Cant</th><th className="py-1">Artículo</th><th className="py-1 text-right">Subtotal</th></tr></thead>
+              <div className="flex-1 overflow-y-auto p-12 bg-white print:p-0">
+                 <div className="border border-slate-100 p-10 rounded-[2.5rem] shadow-sm print:border-none print:shadow-none print:p-0">
+                    <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">Ferretería Bruzzone</h1>
+                    <div className="flex justify-between border-b pb-6 mb-8">
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cotización ID</p>
+                            <p className="text-xl font-mono font-black">{showPrintModal.id}</p>
+                        </div>
+                        <div className="text-right">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Validez hasta</p>
+                             <p className="text-sm font-bold text-slate-700">{showPrintModal.validUntil}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="mb-8">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Presupuesto para</p>
+                        <h4 className="text-xl font-black text-slate-800 uppercase">{showPrintModal.clientName}</h4>
+                    </div>
+
+                    <table className="w-full text-[11px] text-left">
+                        <thead className="bg-slate-50 border-b">
+                            <tr><th className="py-3 px-2">Descripción</th><th className="py-3 px-2 text-center">Cant.</th><th className="py-3 px-2 text-right">Total</th></tr>
+                        </thead>
                         <tbody className="divide-y">
                             {showPrintModal.items.map((it, i) => (
-                                <tr key={i}><td className="py-1 font-bold">{it.quantity}</td><td className="py-1 uppercase">{it.product.name}</td><td className="py-1 text-right">${it.subtotal.toLocaleString()}</td></tr>
+                                <tr key={i}><td className="py-4 px-2 font-bold uppercase">{it.product.name}</td><td className="py-4 px-2 text-center font-black">{it.quantity}</td><td className="py-4 px-2 text-right font-black">${it.subtotal.toLocaleString()}</td></tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="mt-8 text-right font-black text-2xl tracking-tighter">${showPrintModal.total.toLocaleString()}</div>
+                    
+                    <div className="mt-12 flex justify-end">
+                        <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Importe Final</p>
+                            <p className="text-5xl font-black text-slate-900 tracking-tighter">${showPrintModal.total.toLocaleString()}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-20 text-center border-t pt-8">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Los precios de este presupuesto están sujetos a variación sin previo aviso.</p>
+                    </div>
                  </div>
               </div>
-              <div className="p-4 bg-gray-50 border-t flex gap-2">
-                 <button onClick={() => onConvertToSale?.(showPrintModal.items)} className="flex-1 py-3 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-xl shadow-lg flex items-center justify-center gap-2"><Receipt size={14}/> Cobrar Venta</button>
-                 <button onClick={() => onConvertToRemito?.(showPrintModal.items)} className="flex-1 py-3 text-[10px] font-black uppercase bg-slate-900 text-white rounded-xl shadow-lg flex items-center justify-center gap-2"><Truck size={14}/> Enviar Remito</button>
+              <div className="p-8 bg-slate-50 border-t flex gap-3 print:hidden">
+                 <button onClick={() => setShowPrintModal(null)} className="px-8 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Cancelar</button>
+                 <button onClick={handlePrint} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Printer size={18}/> Imprimir / PDF</button>
+                 <button onClick={() => onConvertToSale?.(showPrintModal.items)} className="flex-1 py-4 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Receipt size={18}/> Facturar Venta</button>
               </div>
            </div>
         </div>
       )}
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; pointer-events: none; }
+              .print\\:block, .print\\:block * { visibility: visible; pointer-events: auto; }
+              .print\\:block { 
+                  position: absolute; 
+                  left: 0; 
+                  top: 0; 
+                  width: 100%; 
+                  height: auto;
+                  margin: 0;
+                  padding: 0;
+                  background: white;
+              }
+              @page { size: auto; margin: 1cm; }
+          }
+      `}</style>
     </div>
   );
 };
