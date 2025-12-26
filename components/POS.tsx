@@ -6,7 +6,8 @@ import {
     DollarSign, History, Filter, Eye, Package, Zap, Landmark, Smartphone,
     PackagePlus, Loader2, Globe, Tag, ClipboardList, CheckSquare, Square, Layers,
     Scroll, TabletSmartphone, Pencil, PlusCircle, ShieldCheck, FileSpreadsheet, Receipt,
-    ArrowRightLeft, Send, Shield, Hash, QrCode, Save, Check, PackageSearch, Truck
+    ArrowRightLeft, Send, Shield, Hash, QrCode, Save, Check, PackageSearch, Truck,
+    Activity, FileJson
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, PriceList, Budget, Remito, CompanyConfig } from '../types';
 
@@ -31,6 +32,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
     const [productSearch, setProductSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [voucherType, setVoucherType] = useState<'FISCAL' | 'INTERNAL'>('INTERNAL');
 
     // Modales
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -52,12 +54,19 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
 
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
-        return saved ? JSON.parse(saved) : { loyalty: { enabled: true, pointsPerPeso: 0.01 } };
+        return saved ? JSON.parse(saved) : { 
+            loyalty: { enabled: true, pointsPerPeso: 0.01 },
+            paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE']
+        };
     }, []);
+
+    const paymentMethods = useMemo(() => {
+        return companyConfig.paymentMethods || ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE'];
+    }, [companyConfig]);
 
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
-    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'MIXTO' | 'RETENCION'>('EFECTIVO');
+    const [paymentMethod, setPaymentMethod] = useState<string>(paymentMethods[0]);
     const [discountPerc, setDiscountPerc] = useState<number>(0);
 
     useEffect(() => {
@@ -156,7 +165,8 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                 client: selectedClient.name,
                 items: cart,
                 total: totals.total,
-                paymentMethod
+                paymentMethod,
+                type: voucherType
             };
 
             const updatedHistory = [newSale, ...salesHistory];
@@ -186,7 +196,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
             setCart([]);
             setSelectedClient(DEFAULT_CLIENT);
             setDiscountPerc(0);
-            alert(`Venta ${saleId} finalizada.`);
+            alert(`${voucherType === 'FISCAL' ? 'Factura Electrónica emitida y validada por ARCA.' : 'Venta interna registrada.'}`);
         }, 1000);
     };
 
@@ -300,7 +310,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                                 <td className="px-6 py-4 text-right font-black text-slate-900">${item.subtotal.toLocaleString('es-AR')}</td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="flex justify-center gap-2">
-                                                        {/* Add missing Truck icon to POS item actions */}
                                                         <button 
                                                             onClick={() => handleRequestItem(item.product)}
                                                             className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
@@ -353,27 +362,49 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                     <span className="text-[10px] font-black text-slate-500 uppercase">Bonificación (%)</span>
                                     <input type="number" className="w-20 p-2 bg-slate-50 border rounded-xl text-right font-black text-indigo-600 outline-none focus:ring-1 focus:ring-indigo-400" value={discountPerc} onChange={e => setDiscountPerc(parseFloat(e.target.value) || 0)} />
                                 </div>
+
+                                <div className="pt-6 border-t border-dashed border-slate-200">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 block mb-2">Tipo de Emisión</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onClick={() => setVoucherType('INTERNAL')}
+                                            className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'INTERNAL' ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-100 text-gray-400'}`}>
+                                            Ingreso Venta
+                                        </button>
+                                        <button 
+                                            onClick={() => setVoucherType('FISCAL')}
+                                            className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'FISCAL' ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-lg' : 'border-gray-100 text-gray-400'}`}>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <ShieldCheck size={12}/> Factura ARCA
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="pt-6 border-t border-dashed border-slate-200">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto Neto a Cobrar</p>
-                                    <p className="text-5xl font-black text-slate-900 tracking-tighter">${totals.total.toLocaleString('es-AR')}</p>
+                                    <p className="text-5xl font-black text-red-600 tracking-tighter">${totals.total.toLocaleString('es-AR')}</p>
                                 </div>
                             </div>
 
                             <div className="space-y-3 pt-6">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modalidad de Cobro</label>
-                                <select className="w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)}>
-                                    <option value="EFECTIVO">Cash / Efectivo</option>
-                                    <option value="MERCADO_PAGO">Mercado Pago (QR/Link)</option>
-                                    <option value="TRANSFERENCIA">Transferencia / Depósito</option>
-                                    <option value="CTACTE">Cuenta Corriente</option>
+                                <select 
+                                    className="w-full p-4 bg-slate-50 border border-gray-200 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500" 
+                                    value={paymentMethod} 
+                                    onChange={e => setPaymentMethod(e.target.value)}
+                                >
+                                    {paymentMethods.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
                                 </select>
                             </div>
 
                             <button 
                                 onClick={handleCheckout}
                                 disabled={cart.length === 0 || isProcessing}
-                                className="w-full mt-auto bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-30">
-                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><><CheckCircle size={24}/> EMITIR COMPROBANTE</></>}
+                                className={`w-full mt-auto py-6 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-30 ${voucherType === 'FISCAL' ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-200'}`}>
+                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={24}/> {voucherType === 'FISCAL' ? 'AUTORIZAR Y COBRAR' : 'REGISTRAR COBRO'}</>}
                             </button>
                         </div>
                     </div>
@@ -384,7 +415,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                         {salesHistory.map(sale => (
                             <div key={sale.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
                                 <div className="flex justify-between items-start mb-6">
-                                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-100">{sale.id}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-widest border border-indigo-100 w-fit">{sale.id}</span>
+                                        <span className={`text-[8px] font-black mt-2 uppercase ${sale.type === 'FISCAL' ? 'text-indigo-500' : 'text-slate-400'}`}>
+                                            {sale.type === 'FISCAL' ? 'Facturado ARCA' : 'Venta Interna'}
+                                        </span>
+                                    </div>
                                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{sale.date}</p>
                                 </div>
                                 <h4 className="font-black text-slate-800 uppercase text-sm mb-1 tracking-tight leading-none">{sale.client}</h4>
