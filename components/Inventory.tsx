@@ -25,7 +25,7 @@ const Inventory: React.FC = () => {
 
   const initialProduct: Product = {
     id: '', 
-    internalCodes: [], 
+    internalCodes: [''], 
     barcodes: [], 
     providerCodes: [],
     name: '', brand: '', provider: '', description: '', category: 'General',
@@ -48,20 +48,12 @@ const Inventory: React.FC = () => {
 
   const [brands, setBrands] = useState<Brand[]>(() => {
       const saved = localStorage.getItem('ferrecloud_brands');
-      return saved ? JSON.parse(saved) : [
-          { id: 'b1', name: 'BOSCH' },
-          { id: 'b2', name: 'DEWALT' },
-          { id: 'b3', name: 'STANLEY' }
-      ];
+      return saved ? JSON.parse(saved) : [];
   });
 
   const [categories, setCategories] = useState<Category[]>(() => {
       const saved = localStorage.getItem('ferrecloud_categories');
-      return saved ? JSON.parse(saved) : [
-          { id: 'c1', name: 'HERRAMIENTAS MANUALES' },
-          { id: 'c2', name: 'HERRAMIENTAS ELECTRICAS' },
-          { id: 'c3', name: 'CONSTRUCCION' }
-      ];
+      return saved ? JSON.parse(saved) : [];
   });
 
   const [providers, setProviders] = useState<Provider[]>(() => {
@@ -116,12 +108,21 @@ const Inventory: React.FC = () => {
   }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate, formData.isCombo, formData.comboItems]);
 
   const handleSaveProduct = () => {
-    if (!formData.name || formData.internalCodes.length === 0) {
-        alert("Atención: La descripción y al menos un código interno son obligatorios.");
+    const mainSKU = formData.internalCodes[0]?.trim();
+    const description = formData.name?.trim();
+
+    if (!description || !mainSKU) {
+        alert("Atención: El Código SKU Principal y la Descripción Comercial son campos obligatorios.");
         return;
     }
+
     const totalStock = formData.stockDetails.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
-    const finalProduct = { ...formData, stock: totalStock };
+    const finalProduct = { 
+        ...formData, 
+        internalCodes: formData.internalCodes.filter(c => c.trim() !== ''),
+        stock: totalStock 
+    };
+
     setProducts(prev => {
         const existingIndex = prev.findIndex(p => p.id === finalProduct.id);
         if (existingIndex >= 0) {
@@ -311,13 +312,34 @@ const Inventory: React.FC = () => {
                       {modalTab === 'GENERAL' && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
                               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
-                                  <MultiCodeManager label="SKUs Internos" icon={Hash} codes={formData.internalCodes} setCodes={(c) => setFormData({...formData, internalCodes: c})} placeholder="SKU-..." color="text-indigo-600"/>
+                                  <div>
+                                      <label className="block text-[10px] font-black uppercase mb-2 tracking-widest text-indigo-600">Código SKU Principal *</label>
+                                      <div className="relative">
+                                          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14}/>
+                                          <input 
+                                              className="w-full pl-9 p-2.5 bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 font-black text-xs uppercase outline-none shadow-sm" 
+                                              placeholder="OBLIGATORIO..." 
+                                              value={formData.internalCodes[0] || ''} 
+                                              onChange={e => {
+                                                  const newCodes = [...formData.internalCodes];
+                                                  newCodes[0] = e.target.value.toUpperCase();
+                                                  setFormData({...formData, internalCodes: newCodes});
+                                              }}
+                                          />
+                                      </div>
+                                  </div>
                                   <MultiCodeManager label="Cód. Proveedor" icon={Truck} codes={formData.providerCodes} setCodes={(c) => setFormData({...formData, providerCodes: c})} placeholder="REF-..." color="text-blue-600"/>
                                   <MultiCodeManager label="Códigos de Barras" icon={QrCode} codes={formData.barcodes} setCodes={(c) => setFormData({...formData, barcodes: c})} placeholder="EAN-..." color="text-slate-600"/>
                               </div>
+
                               <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Descripción Comercial</label>
-                                  <input className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-indigo-500 font-bold text-sm uppercase outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Descripción Comercial *</label>
+                                  <input 
+                                      className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl focus:ring-1 focus:ring-indigo-500 font-bold text-sm uppercase outline-none" 
+                                      placeholder="NOMBRE DEL PRODUCTO..."
+                                      value={formData.name} 
+                                      onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} 
+                                  />
                               </div>
                               
                               <div className="space-y-1">
@@ -327,7 +349,7 @@ const Inventory: React.FC = () => {
                                           <option value="">-- SELECCIONAR --</option>
                                           {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                       </select>
-                                      <button onClick={() => setIsQuickAddOpen('BRAND')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all"><Plus size={18}/></button>
+                                      <button onClick={() => setIsQuickAddOpen('BRAND')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all" title="Añadir nueva marca a la lista"><Plus size={18}/></button>
                                   </div>
                               </div>
 
@@ -338,29 +360,29 @@ const Inventory: React.FC = () => {
                                           <option value="">-- SELECCIONAR --</option>
                                           {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                                       </select>
-                                      <button onClick={() => setIsQuickAddOpen('CATEGORY')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all"><Plus size={18}/></button>
+                                      <button onClick={() => setIsQuickAddOpen('CATEGORY')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all" title="Añadir nueva categoría a la lista"><Plus size={18}/></button>
                                   </div>
                               </div>
 
                               <div className="space-y-1 md:col-span-1">
-                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Proveedor Habitual</label>
+                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Proveedor Principal</label>
                                   <div className="flex gap-2">
                                       <select className="flex-1 p-3 bg-slate-50 border border-gray-200 rounded-xl font-bold text-xs outline-none" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
                                           <option value="">-- SELECCIONAR --</option>
                                           {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                                       </select>
-                                      <button onClick={() => setIsQuickAddOpen('PROVIDER')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all"><Plus size={18}/></button>
+                                      <button onClick={() => setIsQuickAddOpen('PROVIDER')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all" title="Añadir nuevo proveedor a la lista"><Plus size={18}/></button>
                                   </div>
                               </div>
 
                               <div className="md:col-span-1">
                                   <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 h-full">
                                       <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                          <Truck size={14}/> Últimos Abastecimientos
+                                          <Truck size={14}/> Historial de Compras
                                       </h4>
                                       <div className="space-y-2">
                                           {(!formData.lastProviders || formData.lastProviders.length === 0) ? (
-                                              <p className="text-[9px] text-slate-400 italic uppercase">Sin compras registradas recientemente</p>
+                                              <p className="text-[9px] text-slate-400 italic uppercase">Sin compras registradas</p>
                                           ) : formData.lastProviders.map((hist, idx) => (
                                               <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                                                   <div className="flex-1 min-w-0 mr-3">
@@ -371,7 +393,7 @@ const Inventory: React.FC = () => {
                                                   </div>
                                                   <div className="text-right">
                                                       <p className="text-[10px] font-black text-indigo-600 tracking-tighter">${hist.price.toLocaleString('es-AR')}</p>
-                                                      <p className="text-[7px] font-black text-slate-300 uppercase">COSTO NETO</p>
+                                                      <p className="text-[7px] font-black text-slate-300 uppercase">COSTO</p>
                                                   </div>
                                               </div>
                                           ))}
@@ -386,14 +408,14 @@ const Inventory: React.FC = () => {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div className="bg-slate-50 p-8 rounded-3xl border border-gray-200 space-y-6">
                                       <div>
-                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Costo de Lista Bruto</label>
+                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Costo Bruto</label>
                                           <div className="relative">
                                               <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={24}/>
                                               <input type="number" className="w-full pl-12 p-4 border-2 border-slate-200 rounded-2xl font-black text-3xl outline-none focus:border-indigo-500" value={formData.listCost} onChange={e => setFormData({...formData, listCost: parseFloat(e.target.value) || 0})}/>
                                           </div>
                                       </div>
                                       <div>
-                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 tracking-widest">Bonificaciones en Cascada (%)</label>
+                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 tracking-widest">Bonificaciones (%)</label>
                                           <div className="grid grid-cols-4 gap-3">
                                               {formData.discounts.map((d, i) => (
                                                   <div key={i} className="relative">
@@ -408,18 +430,18 @@ const Inventory: React.FC = () => {
                                           </div>
                                       </div>
                                       <div className="pt-4 border-t border-slate-200 flex justify-between items-center">
-                                          <span className="text-xs font-black text-slate-400 uppercase">Costo Neto Final:</span>
+                                          <span className="text-xs font-black text-slate-400 uppercase">Costo Neto:</span>
                                           <span className="text-xl font-black text-indigo-600">${formData.costAfterDiscounts.toLocaleString('es-AR')}</span>
                                       </div>
                                   </div>
                                   <div className="bg-slate-900 p-10 rounded-[3rem] text-white space-y-8 shadow-2xl relative overflow-hidden flex flex-col justify-center">
                                       <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><Calculator size={160}/></div>
                                       <div className="relative z-10">
-                                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2"><Percent size={14} className="text-green-400"/> Margen de Utilidad</label>
+                                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest flex items-center gap-2"><Percent size={14} className="text-green-400"/> Margen Utilidad</label>
                                           <input type="number" className="w-full p-4 bg-white/10 border-2 border-white/20 rounded-2xl font-black text-4xl text-white outline-none focus:border-green-500 transition-all" value={formData.profitMargin} onChange={e => setFormData({...formData, profitMargin: parseFloat(e.target.value) || 0})}/>
                                       </div>
                                       <div className="relative z-10 pt-6 border-t border-white/10 text-right">
-                                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Precio al Público (IVA inc.)</label>
+                                          <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">PVP (IVA Inc.)</label>
                                           <p className="text-6xl font-black text-green-400 tracking-tighter leading-none">${formData.priceFinal.toLocaleString('es-AR')}</p>
                                       </div>
                                   </div>
@@ -437,8 +459,8 @@ const Inventory: React.FC = () => {
                                           <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${formData.isCombo ? 'right-1' : 'left-1'}`}></div>
                                       </button>
                                       <div>
-                                          <h4 className="font-black text-purple-900 uppercase text-xs">Modo Articulo Compuesto / Combo</h4>
-                                          <p className="text-[10px] text-purple-400 font-bold uppercase">El costo se calculará sumando los componentes.</p>
+                                          <h4 className="font-black text-purple-900 uppercase text-xs">Modo Artículo Compuesto</h4>
+                                          <p className="text-[10px] text-purple-400 font-bold uppercase">Costo basado en suma de componentes.</p>
                                       </div>
                                   </div>
                               </div>
@@ -446,13 +468,13 @@ const Inventory: React.FC = () => {
                               {formData.isCombo && (
                                   <div className="flex-1 flex flex-col gap-6 animate-fade-in">
                                       <div className="relative">
-                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Buscar producto para añadir al combo</label>
+                                          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Añadir componente al combo</label>
                                           <div className="flex items-center bg-slate-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-purple-500">
                                               <Search className="text-gray-300 mr-3" size={20}/>
                                               <input 
                                                   type="text" 
                                                   className="bg-transparent flex-1 outline-none font-bold text-sm uppercase" 
-                                                  placeholder="Escriba código o nombre..."
+                                                  placeholder="SKU o nombre..."
                                                   value={comboSearch}
                                                   onChange={e => setComboSearch(e.target.value)}
                                               />
@@ -485,7 +507,7 @@ const Inventory: React.FC = () => {
                                               </thead>
                                               <tbody className="divide-y divide-gray-100">
                                                   {formData.comboItems?.length === 0 ? (
-                                                      <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold uppercase text-[10px]">Sin componentes seleccionados</td></tr>
+                                                      <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold uppercase text-[10px]">Sin componentes</td></tr>
                                                   ) : formData.comboItems?.map((item, idx) => (
                                                       <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                           <td className="px-6 py-4 font-black text-slate-700 text-xs uppercase">{item.productName}</td>
@@ -495,19 +517,19 @@ const Inventory: React.FC = () => {
                                                                       const items = [...(formData.comboItems || [])];
                                                                       items[idx].quantity = Math.max(1, items[idx].quantity - 1);
                                                                       setFormData({...formData, comboItems: items});
-                                                                  }} className="p-1 hover:bg-white rounded-lg text-slate-400"><Minus size={12}/></button>
+                                                                  }} className="p-1 text-slate-400"><Minus size={12}/></button>
                                                                   <span className="font-black text-xs">{item.quantity}</span>
                                                                   <button onClick={() => {
                                                                       const items = [...(formData.comboItems || [])];
                                                                       items[idx].quantity += 1;
                                                                       setFormData({...formData, comboItems: items});
-                                                                  }} className="p-1 hover:bg-white rounded-lg text-slate-400"><Plus size={12}/></button>
+                                                                  }} className="p-1 text-slate-400"><Plus size={12}/></button>
                                                               </div>
                                                           </td>
                                                           <td className="px-6 py-4 text-right font-bold text-slate-400">${item.unitCost.toLocaleString('es-AR')}</td>
                                                           <td className="px-6 py-4 text-right font-black text-slate-900">${(item.unitCost * item.quantity).toLocaleString('es-AR')}</td>
                                                           <td className="px-6 py-4 text-right">
-                                                              <button onClick={() => setFormData({...formData, comboItems: formData.comboItems?.filter((_, i) => i !== idx)})} className="p-2 text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                                                              <button onClick={() => setFormData({...formData, comboItems: formData.comboItems?.filter((_, i) => i !== idx)})} className="p-2 text-gray-300 hover:text-red-500"><Trash2 size={16}/></button>
                                                           </td>
                                                       </tr>
                                                   ))}
@@ -523,19 +545,19 @@ const Inventory: React.FC = () => {
                           <div className="space-y-8 animate-fade-in">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                   <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-gray-200 space-y-6">
-                                      <h4 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-3"><AlertTriangle size={20} className="text-orange-500"/> Parámetros de Reposición</h4>
+                                      <h4 className="font-black text-slate-800 uppercase tracking-tight flex items-center gap-3"><AlertTriangle size={20} className="text-orange-500"/> Reposición</h4>
                                       <div className="grid grid-cols-1 gap-6">
                                           <div>
-                                              <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Punto de Pedido / Reorden</label>
+                                              <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Punto de Pedido</label>
                                               <input type="number" className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-xl outline-none" value={formData.reorderPoint} onChange={e => setFormData({...formData, reorderPoint: parseFloat(e.target.value) || 0})}/>
                                           </div>
                                           <div className="grid grid-cols-2 gap-4">
                                               <div>
-                                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Stock Mínimo</label>
+                                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Mínimo</label>
                                                   <input type="number" className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-xl outline-none" value={formData.minStock} onChange={e => setFormData({...formData, minStock: parseFloat(e.target.value) || 0})}/>
                                               </div>
                                               <div>
-                                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Stock Deseado</label>
+                                                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 ml-1">Deseado</label>
                                                   <input type="number" className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-xl outline-none" value={formData.desiredStock} onChange={e => setFormData({...formData, desiredStock: parseFloat(e.target.value) || 0})}/>
                                               </div>
                                           </div>
@@ -544,19 +566,19 @@ const Inventory: React.FC = () => {
 
                                   <div className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden flex flex-col shadow-sm">
                                       <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-                                          <h4 className="font-black uppercase tracking-widest text-xs">Stock por Sucursal</h4>
-                                          <span className="text-[10px] font-black text-indigo-400 uppercase">Total: {formData.stockDetails.reduce((a,c) => a + (Number(c.quantity) || 0), 0)}</span>
+                                          <h4 className="font-black uppercase tracking-widest text-xs">Ubicación de Stock</h4>
+                                          <span className="text-[10px] font-black text-indigo-400">Total: {formData.stockDetails.reduce((a,c) => a + (Number(c.quantity) || 0), 0)}</span>
                                       </div>
                                       <div className="p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                                           {formData.stockDetails.map((sd, idx) => (
-                                              <div key={sd.branchId} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
+                                              <div key={sd.branchId} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                                   <div className="flex items-center gap-3">
-                                                      <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400 group-hover:text-indigo-600 transition-colors"><Store size={18}/></div>
+                                                      <Store size={18} className="text-slate-400"/>
                                                       <span className="font-black text-slate-700 uppercase text-xs">{sd.branchName}</span>
                                                   </div>
                                                   <input 
                                                       type="number" 
-                                                      className="w-24 p-2 bg-white border border-gray-200 rounded-xl text-center font-black text-lg outline-none focus:border-indigo-500" 
+                                                      className="w-24 p-2 bg-white border border-gray-200 rounded-xl text-center font-black text-lg" 
                                                       value={sd.quantity} 
                                                       onChange={e => {
                                                           const newDetails = [...formData.stockDetails];
@@ -574,9 +596,9 @@ const Inventory: React.FC = () => {
                   </div>
 
                   <div className="p-6 border-t border-gray-100 bg-slate-50 flex justify-end gap-3 shrink-0">
-                      <button onClick={() => setIsModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                      <button onClick={handleSaveProduct} className="bg-slate-900 text-white px-12 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-2xl flex items-center gap-3 transition-all hover:bg-slate-800">
-                          <Save size={18}/> {formData.id ? 'Guardar Cambios' : 'Dar de Alta Artículo'}
+                      <button onClick={() => setIsModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase">Cancelar</button>
+                      <button onClick={handleSaveProduct} className="bg-slate-900 text-white px-12 py-3 rounded-xl font-black uppercase text-[10px] shadow-2xl flex items-center gap-3 hover:bg-slate-800 transition-all">
+                          <Save size={18}/> {formData.id ? 'Guardar Cambios' : 'Confirmar Alta'}
                       </button>
                   </div>
               </div>
@@ -587,8 +609,8 @@ const Inventory: React.FC = () => {
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-8 space-y-6">
                   <div className="text-center">
-                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Añadir Nueva {isQuickAddOpen === 'BRAND' ? 'Marca' : isQuickAddOpen === 'CATEGORY' ? 'Categoría' : 'Entidad Proveedora'}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Se vinculará automáticamente al producto</p>
+                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Nueva {isQuickAddOpen === 'BRAND' ? 'Marca' : isQuickAddOpen === 'CATEGORY' ? 'Categoría' : 'Entidad'}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Se añadirá a la lista maestra</p>
                   </div>
                   <input 
                       autoFocus
@@ -600,8 +622,8 @@ const Inventory: React.FC = () => {
                       onKeyDown={e => e.key === 'Enter' && handleQuickAdd()}
                   />
                   <div className="flex gap-3">
-                      <button onClick={() => setIsQuickAddOpen(null)} className="flex-1 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cerrar</button>
-                      <button onClick={handleQuickAdd} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">Confirmar</button>
+                      <button onClick={() => setIsQuickAddOpen(null)} className="flex-1 py-3 text-gray-400 font-black text-[10px] uppercase">Cerrar</button>
+                      <button onClick={handleQuickAdd} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirmar</button>
                   </div>
               </div>
           </div>
