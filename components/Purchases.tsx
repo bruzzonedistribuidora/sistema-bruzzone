@@ -10,7 +10,7 @@ import {
     Scan, Camera, FileCheck, AlertOctagon, Scale, Pencil, UserSearch, Receipt, Send, Scissors, Ban, Mail, MessageCircle, Minus, PlusCircle,
     Tag as TagIcon, Barcode, Store, Building2, ExternalLink, ShoppingCart
 } from 'lucide-react';
-import { Purchase, Provider, Product, PurchaseItem, ProductStock, CompanyConfig, ViewState, CurrencyQuote } from '../types';
+import { Purchase, Provider, Product, PurchaseItem, ProductStock, CompanyConfig, ViewState, CurrencyQuote, ProductProviderHistory } from '../types';
 import { fetchCompanyByCuit, analyzeInvoice } from '../services/geminiService';
 
 interface ProviderPayment {
@@ -388,9 +388,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       }
 
       const provider = providers.find(p => p.id === invoiceMetadata.providerId);
-      // Obtener cotización de moneda si existe para el proveedor
       const quote = currencies.find(c => c.id === provider?.currencyQuoteId);
-      const rate = quote?.value || 1;
 
       const newPurchase: Purchase = {
           id: invoiceMetadata.numeroFactura || `FC-MAN-${Date.now()}`,
@@ -403,34 +401,48 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
           status: 'PENDING'
       };
 
-      if (shouldUpdateCosts) {
-          const currentProducts = JSON.parse(localStorage.getItem('ferrecloud_products') || '[]');
-          const updatedProducts = currentProducts.map((p: Product) => {
-              const match = scannedItems.find(si => si.productId === p.id);
-              if (match) {
-                  // Si la factura está en USD o si el sistema detecta que el costo es USD, aplicamos la tasa del proveedor
-                  const itemCost = match.costoUnitarioNeto;
-                  const unitCostAfterItemDiscount = itemCost * (1 - (match.bonificacion || 0) / 100);
-                  const unitCostFinal = unitCostAfterItemDiscount * (1 - (invoiceMetadata.descuentoGlobal || 0) / 100);
+      // 1. ACTUALIZAR MAESTRO DE PRODUCTOS (COSTOS E HISTORIAL DE PROVEEDORES)
+      const currentProducts = JSON.parse(localStorage.getItem('ferrecloud_products') || '[]');
+      const updatedProducts = currentProducts.map((p: Product) => {
+          const match = scannedItems.find(si => si.productId === p.id);
+          if (match) {
+              const itemCost = match.costoUnitarioNeto;
+              const unitCostAfterItemDiscount = itemCost * (1 - (match.bonificacion || 0) / 100);
+              const unitCostFinal = unitCostAfterItemDiscount * (1 - (invoiceMetadata.descuentoGlobal || 0) / 100);
 
-                  return { 
-                      ...p, 
-                      listCost: match.costoUnitarioNeto, 
-                      costAfterDiscounts: unitCostFinal,
-                      priceNeto: unitCostFinal * (1 + (p.profitMargin / 100)),
-                      priceFinal: (unitCostFinal * (1 + (p.profitMargin / 100))) * (1 + (p.vatRate / 100))
-                  };
+              // Nuevo historial de proveedor
+              const historyEntry: ProductProviderHistory = {
+                  id: invoiceMetadata.providerId,
+                  name: invoiceMetadata.providerName,
+                  date: invoiceMetadata.fecha,
+                  price: match.costoUnitarioNeto
+              };
+
+              // Mantener solo los últimos 2 proveedores (el nuevo va al principio)
+              const updatedLastProviders = [historyEntry, ...(p.lastProviders || [])].slice(0, 2);
+
+              if (shouldUpdateCosts) {
+                return { 
+                    ...p, 
+                    listCost: match.costoUnitarioNeto, 
+                    costAfterDiscounts: unitCostFinal,
+                    priceNeto: unitCostFinal * (1 + (p.profitMargin / 100)),
+                    priceFinal: (unitCostFinal * (1 + (p.profitMargin / 100))) * (1 + (p.vatRate / 100)),
+                    lastProviders: updatedLastProviders
+                };
+              } else {
+                return { ...p, lastProviders: updatedLastProviders };
               }
-              return p;
-          });
-          localStorage.setItem('ferrecloud_products', JSON.stringify(updatedProducts));
-          setProducts(updatedProducts);
-      }
+          }
+          return p;
+      });
+      localStorage.setItem('ferrecloud_products', JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
 
       setProviders(prev => prev.map(p => p.id === invoiceMetadata.providerId ? { ...p, balance: p.balance + totalCalculadoFinal } : p));
       setPurchases([newPurchase, ...purchases]);
       resetCarga();
-      alert("Comprobante registrado. Se aplicó cotización de " + (quote?.name || "Dólar Standard") + " para este proveedor.");
+      alert("Comprobante registrado con éxito. Se actualizó el historial de proveedores de los artículos ingresados.");
   };
 
   const resetCarga = () => {
@@ -624,7 +636,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
                   <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-4">
-                          {/* // Fix: ShoppingCart was missing in lucide-react imports */}
                           <div className="p-3 bg-indigo-500 text-white rounded-2xl shadow-lg shadow-indigo-500/20"><ShoppingCart size={24}/></div>
                           <div>
                               <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Ingreso de Mercadería y Facturación</h3>
