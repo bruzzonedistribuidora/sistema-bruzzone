@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, X, Minus, Square } from 'lucide-react';
 import Sidebar from './components/Sidebar';
-import TopBar from './components/TopBar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
+import MassProductUpdate from './components/MassProductUpdate';
 import POS from './components/POS';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
+import Assistant from './components/Assistant';
 import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
@@ -30,17 +32,29 @@ import DailyMovements from './components/DailyMovements';
 import Employees from './components/Employees';
 import Login from './components/Login';
 import CustomerPortal from './components/CustomerPortal';
-import { ViewState, User, Role, Client } from './types';
-
-// Comentamos el componente que falta para que el build funcione
-// import StockTransfers from './components/StockTransfers';
+import StockTransfers from './components/StockTransfers';
+import ConfigPanel from './components/ConfigPanel';
+import Currencies from './components/Currencies';
+import Marketing from './components/Marketing';
+import PriceAudit from './components/PriceAudit';
+import CreditNotes from './components/CreditNotes';
+import PublicPortal from './components/PublicPortal';
+import { ViewState, User, Role, Client, InvoiceItem } from './types';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.DASHBOARD);
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
-  const [activeBranchName, setActiveBranchName] = useState('Sucursal Central');
+  
+  // Soporte para vista pública de clientes (por ejemplo, vía URL o botón especial)
+  const [isPublicMode, setIsPublicMode] = useState(() => {
+      return window.location.search.includes('view=fidelidad');
+  });
+
+  const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
+  const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
+  
   const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
+  const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
 
   const getRoles = (): Role[] => {
     const saved = localStorage.getItem('ferrecloud_roles');
@@ -53,119 +67,75 @@ const App: React.FC = () => {
     ];
   };
 
-  const hasPermission = (permission: string): boolean => {
-    if (!loggedInUser) return false;
-    if (loggedInUser.id === '1' || loggedInUser.roleId === 'admin') return true;
-    const roles = getRoles();
-    const userRole = roles.find(r => r.id === loggedInUser.roleId);
-    if (!userRole) return false;
-    return userRole.permissions.includes('ALL') || userRole.permissions.includes(permission);
-  };
-
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
     if (savedSession) {
         setLoggedInUser(JSON.parse(savedSession));
-    } else {
-        setCurrentView(ViewState.LOGIN);
     }
   }, []);
+
+  const handleNavigate = (view: ViewState) => {
+    if (!openViews.includes(view)) {
+      setOpenViews([...openViews, view]);
+    }
+    setActiveView(view);
+  };
+
+  const closeView = (view: ViewState, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (view === ViewState.DASHBOARD) return; 
+    
+    const newViews = openViews.filter(v => v !== view);
+    setOpenViews(newViews);
+    if (activeView === view) {
+      setActiveView(newViews[newViews.length - 1]);
+    }
+  };
 
   const handleLogin = (user: User) => {
     setLoggedInUser(user);
     localStorage.setItem('ferrecloud_session', JSON.stringify(user));
-    setCurrentView(ViewState.DASHBOARD);
+    setActiveView(ViewState.DASHBOARD);
   };
 
   const handleLogout = () => {
     setLoggedInUser(null);
     setPortalPreviewClient(null);
     localStorage.removeItem('ferrecloud_session');
-    setCurrentView(ViewState.LOGIN);
+    setOpenViews([ViewState.DASHBOARD]);
+    setActiveView(ViewState.DASHBOARD);
   };
 
-  const handleSwitchBranch = () => {
-      if (activeBranchName === 'Sucursal Central') setActiveBranchName('Sucursal Norte');
-      else if (activeBranchName === 'Sucursal Norte') setActiveBranchName('Depósito General');
-      else setActiveBranchName('Sucursal Central');
+  const handleConvertToSale = (items: InvoiceItem[]) => {
+      setItemsToBill(items);
+      handleNavigate(ViewState.POS);
   };
 
-  const viewPermissions: Partial<Record<ViewState, string>> = {
-    [ViewState.DASHBOARD]: 'DASHBOARD_VIEW',
-    [ViewState.INVENTORY]: 'STOCK_VIEW',
-    [ViewState.POS]: 'POS_ACCESS',
-    [ViewState.SALES_ORDERS]: 'POS_ACCESS',
-    [ViewState.ONLINE_SALES]: 'POS_ACCESS',
-    [ViewState.REMITOS]: 'REMITOS_VIEW',
-    [ViewState.CLIENT_BALANCES]: 'CLIENTS_VIEW',
-    [ViewState.CLIENTS]: 'CLIENTS_VIEW',
-    [ViewState.PRESUPUESTOS]: 'POS_ACCESS',
-    [ViewState.SHORTAGES]: 'STOCK_VIEW',
-    [ViewState.REPLENISHMENT]: 'PURCHASES_VIEW',
-    [ViewState.PURCHASES]: 'PURCHASES_VIEW',
-    [ViewState.PROVIDERS]: 'PURCHASES_VIEW',
-    [ViewState.PRICE_UPDATES]: 'STOCK_EDIT',
-    [ViewState.TREASURY]: 'TREASURY_VIEW',
-    [ViewState.DAILY_MOVEMENTS]: 'TREASURY_VIEW',
-    [ViewState.ACCOUNTING]: 'ACCOUNTING_VIEW',
-    [ViewState.EMPLOYEES]: 'TREASURY_EDIT',
-    [ViewState.STATISTICS]: 'ACCOUNTING_VIEW',
-    [ViewState.REPORTS]: 'ACCOUNTING_VIEW',
-    [ViewState.USERS]: 'CONFIG_ACCESS',
-    [ViewState.COMPANY_SETTINGS]: 'CONFIG_ACCESS',
-    [ViewState.AFIP_CONFIG]: 'CONFIG_ACCESS',
-    [ViewState.BRANCHES]: 'CONFIG_ACCESS',
-    [ViewState.BACKUP]: 'CONFIG_ACCESS',
-    [ViewState.PRINT_CONFIG]: 'CONFIG_ACCESS',
-  };
-
-  const renderView = () => {
-    if (!loggedInUser) return <Login onLogin={handleLogin} />;
-
-    if (currentView === ViewState.CUSTOMER_PORTAL && portalPreviewClient) {
-        return <CustomerPortal client={portalPreviewClient} onLogout={() => setCurrentView(ViewState.CLIENTS)} />;
-    }
-
-    const requiredPermission = viewPermissions[currentView];
-    if (requiredPermission && !hasPermission(requiredPermission)) {
-        return (
-            <div className="h-full flex flex-col items-center justify-center bg-gray-50 p-10 text-center">
-                <div className="bg-red-50 p-12 rounded-[3rem] border border-red-100 max-w-lg shadow-2xl shadow-red-900/5">
-                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-3xl flex items-center justify-center mx-auto mb-8">
-                        <Lock size={40}/>
-                    </div>
-                    <h3 className="text-2xl font-black text-red-800 uppercase tracking-tighter mb-3">Acceso Restringido</h3>
-                    <p className="text-red-700 text-sm font-bold mb-10 leading-relaxed uppercase tracking-wide">
-                        Hola {loggedInUser.name}, tu rol actual no tiene permisos.
-                    </p>
-                    <button 
-                        onClick={() => setCurrentView(ViewState.DASHBOARD)}
-                        className="w-full bg-red-600 text-white py-4 rounded-2xl font-black">
-                        Volver al inicio
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    switch (currentView) {
-      case ViewState.DASHBOARD: return <Dashboard />;
+  const renderViewContent = (view: ViewState) => {
+    switch (view) {
+      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory />;
-      case ViewState.POS: return <POS />;
+      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
+      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.ONLINE_SALES: return <OnlineSales />;
-      case ViewState.REMITOS: return <Remitos />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos />;
+      case ViewState.REMITOS: return <Remitos onBillRemitos={handleConvertToSale} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={handleConvertToSale} />;
       case ViewState.TREASURY: return <Treasury />;
-      case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" />;
-      case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" />;
+      case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
+      case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
       case ViewState.PRICE_UPDATES: return <PriceUpdates />;
+      case ViewState.PRICE_AUDIT: return <PriceAudit />;
+      case ViewState.CREDIT_NOTES: return <CreditNotes />;
+      case ViewState.CURRENCIES: return <Currencies />;
+      case ViewState.MARKETING: return <Marketing />;
       case ViewState.CLIENTS: return (
         <Clients 
             initialClientId={targetClientId} 
             onOpenPortal={(client) => {
                 setPortalPreviewClient(client);
-                setCurrentView(ViewState.CUSTOMER_PORTAL);
+                handleNavigate(ViewState.CUSTOMER_PORTAL);
             }}
         />
       );
@@ -173,7 +143,7 @@ const App: React.FC = () => {
         <ClientBalances 
             onNavigateToHistory={(client) => {
                 setTargetClientId(client.id);
-                setCurrentView(ViewState.CLIENTS);
+                handleNavigate(ViewState.CLIENTS);
             }} 
         />
       );
@@ -183,45 +153,75 @@ const App: React.FC = () => {
       case ViewState.BACKUP: return <Backup />;
       case ViewState.BRANCHES: return <Branches />;
       case ViewState.USERS: return <UsersComponent />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
-      case ViewState.SHORTAGES: return <Shortages />;
+      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { /* handle */ }} />;
       case ViewState.PRINT_CONFIG: return <PrintSettings />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting />;
       case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
       case ViewState.AFIP_CONFIG: return <AfipConfig />;
       case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
       case ViewState.EMPLOYEES: return <Employees />;
-      default: return <Dashboard />;
+      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
+      case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
+      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      default: return null;
     }
   };
 
-  if (currentView === ViewState.LOGIN || !loggedInUser) {
+  // Si estamos en modo público, no requerimos login de empleado
+  if (isPublicMode) {
+      return <PublicPortal />;
+  }
+
+  if (!loggedInUser) {
       return <Login onLogin={handleLogin} />;
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100 font-sans">
+    <div className="flex flex-col h-screen bg-slate-950 font-sans overflow-hidden">
       <Sidebar 
-        currentView={currentView} 
-        onNavigate={(view) => {
-            setTargetClientId(undefined);
-            setCurrentView(view);
-        }} 
+        currentView={activeView} 
+        onNavigate={handleNavigate} 
         user={loggedInUser} 
         onLogout={handleLogout} 
       />
-      <div className="flex-1 ml-64 flex flex-col h-screen overflow-hidden">
-        <TopBar 
-            currentView={currentView} 
-            activeBranchName={activeBranchName}
-            onSwitchBranch={handleSwitchBranch}
-            onNavigate={setCurrentView}
-            user={loggedInUser}
-        />
-        <main className="flex-1 overflow-auto bg-gray-50/50">
-          {renderView()}
-        </main>
-      </div>
+
+      <main className="flex-1 relative bg-slate-100 overflow-hidden">
+        {openViews.map((view) => (
+          <div 
+            key={view}
+            className={`absolute inset-0 transition-opacity duration-300 ${activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
+          >
+            {renderViewContent(view)}
+          </div>
+        ))}
+      </main>
+
+      <footer className="h-14 bg-slate-900 border-t border-slate-800 flex items-center px-4 gap-2 z-50 overflow-x-auto shrink-0 no-scrollbar">
+        {openViews.map((view) => (
+          <button
+            key={view}
+            onClick={() => setActiveView(view)}
+            className={`flex items-center gap-3 px-4 h-10 rounded-xl transition-all border ${
+              activeView === view 
+                ? 'bg-ferre-orange text-white border-orange-400 shadow-lg shadow-orange-900/20' 
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+            }`}
+          >
+            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+              {view === ViewState.DASHBOARD ? 'Escritorio' : view.replace(/_/g, ' ')}
+            </span>
+            {view !== ViewState.DASHBOARD && (
+              <X 
+                size={14} 
+                className="hover:text-white" 
+                onClick={(e) => closeView(view, e)} 
+              />
+            )}
+          </button>
+        ))}
+      </footer>
     </div>
   );
 };
