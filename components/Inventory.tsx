@@ -7,7 +7,7 @@ import {
     AlertCircle, LayoutGrid, Database, Calculator, ShoppingCart,
     UserPlus, BookmarkPlus, FolderPlus, Box, List, ChevronDown, Minus,
     Hash, QrCode, PlusCircle, Check, ToggleLeft, ToggleRight, 
-    Settings2, Boxes, AlertTriangle
+    Settings2, Boxes, AlertTriangle, Calendar
 } from 'lucide-react';
 import { Product, ProductStock, Brand, Category, ComboItem, Provider, CompanyConfig, Branch } from '../types';
 
@@ -37,7 +37,8 @@ const Inventory: React.FC = () => {
     minStock: 0, desiredStock: 0, reorderPoint: 0, location: '',
     ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
     isCombo: false,
-    comboItems: []
+    comboItems: [],
+    lastProviders: []
   };
 
   const [products, setProducts] = useState<Product[]>(() => {
@@ -345,7 +346,7 @@ const Inventory: React.FC = () => {
                                   </div>
                               </div>
 
-                              <div className="space-y-1 md:col-span-2">
+                              <div className="space-y-1 md:col-span-1">
                                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest">Proveedor Habitual</label>
                                   <div className="flex gap-2">
                                       <select className="flex-1 p-3 bg-slate-50 border border-gray-200 rounded-xl font-bold text-xs outline-none" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
@@ -353,6 +354,32 @@ const Inventory: React.FC = () => {
                                           {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                                       </select>
                                       <button onClick={() => setIsQuickAddOpen('PROVIDER')} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all"><Plus size={18}/></button>
+                                  </div>
+                              </div>
+
+                              <div className="md:col-span-1">
+                                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 h-full">
+                                      <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                          <Truck size={14}/> Últimos Abastecimientos
+                                      </h4>
+                                      <div className="space-y-2">
+                                          {(!formData.lastProviders || formData.lastProviders.length === 0) ? (
+                                              <p className="text-[9px] text-slate-400 italic uppercase">Sin compras registradas recientemente</p>
+                                          ) : formData.lastProviders.map((hist, idx) => (
+                                              <div key={idx} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                                                  <div className="flex-1 min-w-0 mr-3">
+                                                      <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-none mb-1">{hist.name}</p>
+                                                      <div className="flex items-center gap-2 text-[8px] font-bold text-slate-400 uppercase">
+                                                          <Calendar size={10}/> {hist.date}
+                                                      </div>
+                                                  </div>
+                                                  <div className="text-right">
+                                                      <p className="text-[10px] font-black text-indigo-600 tracking-tighter">${hist.price.toLocaleString('es-AR')}</p>
+                                                      <p className="text-[7px] font-black text-slate-300 uppercase">COSTO NETO</p>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
                                   </div>
                               </div>
                           </div>
