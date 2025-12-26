@@ -7,7 +7,7 @@ import {
     PackagePlus, Loader2, Globe, Tag, ClipboardList, CheckSquare, Square, Layers,
     Scroll, TabletSmartphone, Pencil, PlusCircle, ShieldCheck, FileSpreadsheet, Receipt,
     ArrowRightLeft, Send, Shield, Hash, QrCode, Save, Check, PackageSearch, Truck,
-    Activity, FileJson
+    Activity, FileJson, ArrowRight
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, PriceList, Budget, Remito, CompanyConfig } from '../types';
 
@@ -25,14 +25,19 @@ const DEFAULT_CLIENT: Client = {
 interface POSProps {
     initialCart?: InvoiceItem[];
     onCartUsed?: () => void;
+    onTransformToRemito?: (items: InvoiceItem[]) => void;
+    onTransformToBudget?: (items: InvoiceItem[]) => void;
 }
 
-const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
+const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito, onTransformToBudget }) => {
     const [activeTab, setActiveTab] = useState<'SALES' | 'HISTORY'>('SALES');
     const [productSearch, setProductSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [voucherType, setVoucherType] = useState<'FISCAL' | 'INTERNAL'>('INTERNAL');
+
+    // Estado para datos de Cheque
+    const [checkData, setCheckData] = useState({ bank: '', number: '', dueDate: '', issuer: '' });
 
     // Modales
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -56,12 +61,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { 
             loyalty: { enabled: true, pointsPerPeso: 0.01 },
-            paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE']
+            paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE', 'CHEQUE', 'E-CHEQ']
         };
     }, []);
 
     const paymentMethods = useMemo(() => {
-        return companyConfig.paymentMethods || ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE'];
+        const methods = companyConfig.paymentMethods || ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CTACTE'];
+        // Asegurar que existan cheque y echeq si el usuario los necesita
+        if (!methods.includes('CHEQUE')) methods.push('CHEQUE');
+        if (!methods.includes('E-CHEQ')) methods.push('E-CHEQ');
+        return methods;
     }, [companyConfig]);
 
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
@@ -137,24 +146,14 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         setIsManualModalOpen(false);
     };
 
-    const handleRequestItem = (product: Product) => {
-        if (product.id.toString().includes('manual')) {
-            alert("No se puede pedir reposición de un ítem manual.");
-            return;
-        }
-        const savedManual = localStorage.getItem('ferrecloud_manual_shortages');
-        const manualIds: string[] = savedManual ? JSON.parse(savedManual) : [];
-        if (!manualIds.includes(product.id)) {
-            manualIds.push(product.id);
-            localStorage.setItem('ferrecloud_manual_shortages', JSON.stringify(manualIds));
-            alert(`"${product.name}" agregado a faltantes.`);
-        } else {
-            alert(`Este artículo ya está en la lista de pedidos.`);
-        }
-    };
-
     const handleCheckout = () => {
         if (cart.length === 0) return;
+        
+        if ((paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') && (!checkData.bank || !checkData.number)) {
+            alert("Por favor complete los datos del cheque.");
+            return;
+        }
+
         setIsProcessing(true);
 
         setTimeout(() => {
@@ -166,12 +165,28 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                 items: cart,
                 total: totals.total,
                 paymentMethod,
-                type: voucherType
+                type: voucherType,
+                checkInfo: (paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') ? checkData : null
             };
 
             const updatedHistory = [newSale, ...salesHistory];
             setSalesHistory(updatedHistory);
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify(updatedHistory));
+
+            // Si es cheque, registrarlo en tesorería automáticamente
+            if (paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') {
+                const checks = JSON.parse(localStorage.getItem('ferrecloud_checks') || '[]');
+                checks.push({
+                    id: `CHQ-${Date.now()}`,
+                    bank: checkData.bank,
+                    number: checkData.number,
+                    dueDate: checkData.dueDate,
+                    amount: totals.total,
+                    status: 'IN_PORTFOLIO',
+                    date: new Date().toLocaleDateString()
+                });
+                localStorage.setItem('ferrecloud_checks', JSON.stringify(checks));
+            }
 
             const updatedProducts = products.map(p => {
                 const cartItem = cart.find(item => item.product.id === p.id);
@@ -183,20 +198,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
             setProducts(updatedProducts);
             localStorage.setItem('ferrecloud_products', JSON.stringify(updatedProducts));
 
-            if (companyConfig.loyalty?.enabled && selectedClient.id !== 'cf-default') {
-                const pointsEarned = Math.floor(totals.total * (companyConfig.loyalty.pointsPerPeso || 0.01));
-                const updatedClients = clients.map(c => 
-                    c.id === selectedClient.id ? { ...c, points: (c.points || 0) + pointsEarned } : c
-                );
-                setClients(updatedClients);
-                localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
-            }
-
             setIsProcessing(false);
             setCart([]);
             setSelectedClient(DEFAULT_CLIENT);
             setDiscountPerc(0);
-            alert(`${voucherType === 'FISCAL' ? 'Factura Electrónica emitida y validada por ARCA.' : 'Venta interna registrada.'}`);
+            setCheckData({ bank: '', number: '', dueDate: '', issuer: '' });
+            alert(`${voucherType === 'FISCAL' ? 'Factura Electrónica emitida.' : 'Venta interna registrada.'}`);
         }, 1000);
     };
 
@@ -311,20 +318,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="flex justify-center gap-2">
                                                         <button 
-                                                            onClick={() => handleRequestItem(item.product)}
-                                                            className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-white rounded-lg transition-all"
-                                                            title="Pedir Reposición"
-                                                        >
-                                                            <Truck size={16}/>
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => alert('Edición de ítem en carro próximamente...')}
-                                                            className="p-2 text-slate-300 hover:text-green-600 hover:bg-white rounded-lg transition-all"
-                                                            title="Editar ítem"
-                                                        >
-                                                            <Pencil size={16}/>
-                                                        </button>
-                                                        <button 
                                                             onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} 
                                                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-white rounded-lg transition-all"
                                                             title="Quitar"
@@ -339,7 +332,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                             <tr>
                                                 <td colSpan={5} className="py-32 text-center opacity-20">
                                                     <ShoppingCart size={80} className="mx-auto mb-4" />
-                                                    <p className="font-black uppercase tracking-widest text-sm">Escaneando o buscando productos...</p>
+                                                    <p className="font-black uppercase tracking-widest text-sm">Cargue productos para comenzar...</p>
                                                 </td>
                                             </tr>
                                         )}
@@ -349,9 +342,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col gap-4">
-                        <div className="bg-white border border-gray-200 rounded-[2rem] shadow-sm p-8 space-y-6 flex-1 flex flex-col">
-                            <h3 className="font-black text-[10px] uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Liquidación de Venta</h3>
+                    <div className="flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+                        <div className="bg-white border border-gray-200 rounded-[2rem] shadow-sm p-6 space-y-4 flex flex-col">
+                            <h3 className="font-black text-[10px] uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Checkout de Venta</h3>
                             
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
@@ -363,34 +356,24 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                     <input type="number" className="w-20 p-2 bg-slate-50 border rounded-xl text-right font-black text-indigo-600 outline-none focus:ring-1 focus:ring-indigo-400" value={discountPerc} onChange={e => setDiscountPerc(parseFloat(e.target.value) || 0)} />
                                 </div>
 
-                                <div className="pt-6 border-t border-dashed border-slate-200">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 block mb-2">Tipo de Emisión</label>
+                                <div className="pt-4 border-t border-dashed border-slate-200">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Tipo de Comprobante</label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button 
-                                            onClick={() => setVoucherType('INTERNAL')}
-                                            className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'INTERNAL' ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-100 text-gray-400'}`}>
-                                            Ingreso Venta
-                                        </button>
-                                        <button 
-                                            onClick={() => setVoucherType('FISCAL')}
-                                            className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'FISCAL' ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-lg' : 'border-gray-100 text-gray-400'}`}>
-                                            <div className="flex items-center justify-center gap-2">
-                                                <ShieldCheck size={12}/> Factura ARCA
-                                            </div>
-                                        </button>
+                                        <button onClick={() => setVoucherType('INTERNAL')} className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'INTERNAL' ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-100 text-gray-400'}`}>Interno</button>
+                                        <button onClick={() => setVoucherType('FISCAL')} className={`py-3 rounded-xl font-black text-[10px] uppercase border-2 transition-all ${voucherType === 'FISCAL' ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-lg' : 'border-gray-100 text-gray-400'}`}>Factura ARCA</button>
                                     </div>
                                 </div>
 
-                                <div className="pt-6 border-t border-dashed border-slate-200">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto Neto a Cobrar</p>
-                                    <p className="text-5xl font-black text-red-600 tracking-tighter">${totals.total.toLocaleString('es-AR')}</p>
+                                <div className="pt-4">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total a Cobrar</p>
+                                    <p className="text-4xl font-black text-red-600 tracking-tighter">${totals.total.toLocaleString('es-AR')}</p>
                                 </div>
                             </div>
 
-                            <div className="space-y-3 pt-6">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Modalidad de Cobro</label>
+                            <div className="space-y-3 pt-4 border-t border-dashed border-slate-200">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modalidad de Cobro</label>
                                 <select 
-                                    className="w-full p-4 bg-slate-50 border border-gray-200 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500" 
+                                    className="w-full p-3 bg-slate-50 border border-gray-200 rounded-xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500" 
                                     value={paymentMethod} 
                                     onChange={e => setPaymentMethod(e.target.value)}
                                 >
@@ -400,12 +383,40 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                 </select>
                             </div>
 
+                            {/* Formulario de Cheque (Solo si aplica) */}
+                            {(paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') && (
+                                <div className="bg-slate-50 p-4 rounded-2xl border-2 border-indigo-100 space-y-3 animate-fade-in">
+                                    <p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1"><Landmark size={12}/> Datos del Cheque</p>
+                                    <input type="text" placeholder="Banco Emisor" className="w-full p-2 bg-white border rounded-lg text-xs font-bold uppercase" value={checkData.bank} onChange={e => setCheckData({...checkData, bank: e.target.value.toUpperCase()})} />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input type="text" placeholder="Número" className="w-full p-2 bg-white border rounded-lg text-xs font-bold" value={checkData.number} onChange={e => setCheckData({...checkData, number: e.target.value})} />
+                                        <input type="date" placeholder="Fecha Vto" className="w-full p-2 bg-white border rounded-lg text-xs font-bold" value={checkData.dueDate} onChange={e => setCheckData({...checkData, dueDate: e.target.value})} />
+                                    </div>
+                                </div>
+                            )}
+
                             <button 
                                 onClick={handleCheckout}
                                 disabled={cart.length === 0 || isProcessing}
-                                className={`w-full mt-auto py-6 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-30 ${voucherType === 'FISCAL' ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200' : 'bg-slate-900 hover:bg-slate-800 text-white shadow-slate-200'}`}>
-                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={24}/> {voucherType === 'FISCAL' ? 'AUTORIZAR Y COBRAR' : 'REGISTRAR COBRO'}</>}
+                                className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95 disabled:opacity-30 bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3">
+                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={20}/> FINALIZAR COBRO</>}
                             </button>
+
+                            {/* Botones de Transformación */}
+                            <div className="grid grid-cols-2 gap-2 pt-2">
+                                <button 
+                                    disabled={cart.length === 0}
+                                    onClick={() => onTransformToRemito?.(cart)}
+                                    className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-[9px] uppercase hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30">
+                                    <Truck size={14}/> Conv. Remito
+                                </button>
+                                <button 
+                                    disabled={cart.length === 0}
+                                    onClick={() => onTransformToBudget?.(cart)}
+                                    className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 text-slate-500 rounded-xl font-black text-[9px] uppercase hover:bg-indigo-50 hover:text-indigo-600 transition-all disabled:opacity-30">
+                                    <FileSpreadsheet size={14}/> Conv. Presup.
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -425,6 +436,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                 </div>
                                 <h4 className="font-black text-slate-800 uppercase text-sm mb-1 tracking-tight leading-none">{sale.client}</h4>
                                 <p className="text-[10px] text-gray-400 font-bold uppercase mb-6 tracking-widest">{sale.paymentMethod}</p>
+                                {sale.checkInfo && (
+                                    <div className="bg-slate-50 p-2 rounded-lg border text-[8px] font-black text-slate-400 uppercase mb-4">
+                                        CHEQUE: {sale.checkInfo.bank} - Nº {sale.checkInfo.number}
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-end border-t border-gray-50 pt-6">
                                     <div>
                                         <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-1">Monto Total</p>
@@ -438,43 +454,27 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                 </div>
             )}
 
-            {/* MODAL: ITEM MANUAL (NUEVO) */}
+            {/* MODAL: ITEM MANUAL */}
             {isManualModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200">
                         <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <PackageSearch size={20} className="text-indigo-400"/>
-                                <h3 className="font-black text-xs uppercase tracking-widest">Artículo no catalogado</h3>
+                                <h3 className="font-black text-xs uppercase tracking-widest">Artículo Especial</h3>
                             </div>
                             <button onClick={() => setIsManualModalOpen(false)}><X size={24}/></button>
                         </div>
                         <div className="p-8 space-y-6">
                             <div>
-                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Descripción del Ítem</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase"
-                                    placeholder="Ej: Retazo de manguera, Servicio..."
-                                    value={manualItemForm.name}
-                                    onChange={e => setManualItemForm({...manualItemForm, name: e.target.value})}
-                                />
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Descripción</label>
+                                <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase" placeholder="Ej: Servicio de Corte..." value={manualItemForm.name} onChange={e => setManualItemForm({...manualItemForm, name: e.target.value})} />
                             </div>
                             <div>
                                 <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Precio Final ($)</label>
-                                <input 
-                                    type="number" 
-                                    className="w-full p-4 bg-indigo-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-3xl text-indigo-700"
-                                    placeholder="0.00"
-                                    value={manualItemForm.price || ''}
-                                    onChange={e => setManualItemForm({...manualItemForm, price: parseFloat(e.target.value) || 0})}
-                                />
+                                <input type="number" className="w-full p-4 bg-indigo-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-3xl text-indigo-700" placeholder="0.00" value={manualItemForm.price || ''} onChange={e => setManualItemForm({...manualItemForm, price: parseFloat(e.target.value) || 0})} />
                             </div>
-                            <button 
-                                onClick={addManualItem}
-                                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95">
-                                Agregar al Carrito
-                            </button>
+                            <button onClick={addManualItem} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all active:scale-95">Agregar al Carrito</button>
                         </div>
                     </div>
                 </div>
