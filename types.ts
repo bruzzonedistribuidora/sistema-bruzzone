@@ -1,424 +1,229 @@
 
-export enum ViewState {
-  LOGIN = 'LOGIN',
-  DASHBOARD = 'DASHBOARD',
-  INVENTORY = 'INVENTORY',
-  POS = 'POS',
-  REMITOS = 'REMITOS',
-  PRESUPUESTOS = 'PRESUPUESTOS',
-  CLIENTS = 'CLIENTS',
-  CLIENT_BALANCES = 'CLIENT_BALANCES',
-  PURCHASES = 'PURCHASES',
-  PROVIDERS = 'PROVIDERS',
-  TREASURY = 'TREASURY',
-  ACCOUNTING = 'ACCOUNTING',
-  STATISTICS = 'STATISTICS',
-  REPORTS = 'REPORTS',
-  BACKUP = 'BACKUP',
-  BRANCHES = 'BRANCHES',
-  AI_ASSISTANT = 'AI_ASSISTANT',
-  PRICE_UPDATES = 'PRICE_UPDATES',
-  USERS = 'USERS',
-  REPLENISHMENT = 'REPLENISHMENT',
-  SHORTAGES = 'SHORTAGES',
-  SALES_ORDERS = 'SALES_ORDERS',
-  ONLINE_SALES = 'ONLINE_SALES',
-  PRINT_CONFIG = 'PRINT_CONFIG',
-  LABEL_PRINTING = 'LABEL_PRINTING',
-  COMPANY_SETTINGS = 'COMPANY_SETTINGS',
-  AFIP_CONFIG = 'AFIP_CONFIG',
-  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL',
-  DAILY_MOVEMENTS = 'DAILY_MOVEMENTS',
-  EMPLOYEES = 'EMPLOYEES',
-  STOCK_TRANSFERS = 'STOCK_TRANSFERS'
-}
+import React, { useState, useEffect } from 'react';
+import { Lock, X, Minus, Square } from 'lucide-react';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import Inventory from './components/Inventory';
+import MassProductUpdate from './components/MassProductUpdate';
+import POS from './components/POS';
+import Remitos from './components/Remitos';
+import Presupuestos from './components/Presupuestos';
+import Assistant from './components/Assistant';
+import Treasury from './components/Treasury';
+import Purchases from './components/Purchases';
+import Clients from './components/Clients';
+import ClientBalances from './components/ClientBalances';
+import Accounting from './components/Accounting';
+import Statistics from './components/Statistics';
+import Backup from './components/Backup';
+import Branches from './components/Branches';
+import UsersComponent from './components/Users';
+import PriceUpdates from './components/PriceUpdates';
+import Replenishment from './components/Replenishment';
+import Shortages from './components/Shortages';
+import SalesOrders from './components/SalesOrders';
+import PrintSettings from './components/PrintSettings';
+import CompanySettings from './components/CompanySettings';
+import OnlineSales from './components/OnlineSales';
+import AfipConfig from './components/AfipConfig';
+import Reports from './components/Reports';
+import LabelPrinting from './components/LabelPrinting';
+import DailyMovements from './components/DailyMovements';
+import Employees from './components/Employees';
+import Login from './components/Login';
+import CustomerPortal from './components/CustomerPortal';
+import StockTransfers from './components/StockTransfers';
+import ConfigPanel from './components/ConfigPanel';
+import Currencies from './components/Currencies';
+import Marketing from './components/Marketing';
+import PriceAudit from './components/PriceAudit';
+import CreditNotes from './components/CreditNotes';
+import PublicPortal from './components/PublicPortal';
+import { ViewState, User, Role, Client, InvoiceItem } from './types';
 
-export interface StockTransferItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-}
+const App: React.FC = () => {
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  
+  // Soporte para vista pública de clientes (por ejemplo, vía URL o botón especial)
+  const [isPublicMode, setIsPublicMode] = useState(() => {
+      return window.location.search.includes('view=fidelidad');
+  });
 
-export interface StockTransfer {
-  id: string;
-  date: string;
-  sourceBranchId: string;
-  sourceBranchName: string;
-  destBranchId: string;
-  destBranchName: string;
-  items: StockTransferItem[];
-  notes?: string;
-  status: 'COMPLETED' | 'CANCELLED';
-}
+  const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
+  const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
+  
+  const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
+  const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
+  const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
 
-export interface Check {
-  id: string;
-  type: 'FISICO' | 'ECHEQ';
-  bank: string;
-  number: string;
-  amount: number;
-  paymentDate: string; // Vencimiento
-  entryDate: string;   // Ingreso
-  status: 'CARTERA' | 'DEPOSITADO' | 'RECHAZADO' | 'ENTREGADO';
-  origin: string;      // Cliente que lo dio
-  destination?: string; // Proveedor a quien se le pagó
-  issuerCuit?: string;
-}
-
-export interface DailyExpense {
-    id: string;
-    date: string;
-    description: string;
-    amount: number;
-    category: 'FIXED' | 'VARIABLE';
-    paymentMethod: string;
-    type: 'EXPENSE' | 'INCOME';
-}
-
-export interface Employee {
-    id: string;
-    name: string;
-    position: string;
-    baseSalary: number;
-    dni: string;
-    startDate: string;
-    active: boolean;
-    movements: EmployeeMovement[];
-}
-
-export interface EmployeeMovement {
-    id: string;
-    date: string;
-    type: 'SALARY' | 'ADVANCE' | 'BONUS' | 'DEDUCTION';
-    amount: number;
-    description: string;
-    month: string; // e.g., "2023-10"
-}
-
-export interface PaymentAccount {
-    id: string;
-    type: 'BANK' | 'VIRTUAL_WALLET';
-    bankName: string; 
-    alias: string;
-    cbu: string;
-    owner: string;
-    qrImage?: string | null;
-    active: boolean;
-}
-
-export interface CompanyConfig {
-    name: string;
-    fantasyName: string;
-    cuit: string;
-    taxCondition: string;
-    iibb: string;
-    startDate: string;
-    address: string;
-    city: string;
-    zipCode: string;
-    phone: string;
-    email: string;
-    web: string;
-    logo: string | null;
-    slogan: string;
-    paymentAccounts: PaymentAccount[];
-    // SMTP Config
-    smtpHost?: string;
-    smtpPort?: string;
-    smtpUser?: string;
-    smtpPassword?: string;
-    smtpSSL?: boolean;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  cuit: string;
-  phone: string;
-  address: string;
-  balance: number;
-  limit: number;
-  portalEnabled?: boolean;
-  portalHash?: string;
-  email?: string;
-}
-
-export interface CurrentAccountMovement {
-    id: string;
-    date: string;
-    voucherType: string;
-    description: string;
-    debit: number;
-    credit: number;
-    balance: number;
-    clientId?: string;
-    providerId?: string;
-}
-
-export interface ProductStock {
-    branchId: string;
-    branchName: string;
-    quantity: number;
-}
-
-export interface Product {
-  id: string;
-  internalCode: string;
-  barcodes: string[];
-  providerCodes: string[];
-  name: string;
-  brand: string;
-  provider: string;
-  description: string;
-  category: string;
-  measureUnitSale: string;
-  measureUnitPurchase: string;
-  conversionFactor: number;
-  purchaseCurrency: 'ARS' | 'USD';
-  saleCurrency: 'ARS' | 'USD';
-  vatRate: 10.5 | 21.0 | 27.0 | 0;
-  listCost: number;
-  discounts: [number, number, number, number];
-  costAfterDiscounts: number;
-  profitMargin: number;
-  priceNeto: number;
-  priceFinal: number;
-  stock: number;
-  stockDetails: ProductStock[];
-  minStock: number;
-  desiredStock: number;
-  reorderPoint: number;
-  location: string;
-  ecommerce: any;
-}
-
-export interface InvoiceItem {
-  product: Product;
-  quantity: number;
-  subtotal: number;
-  appliedPrice: number;
-  priceListId?: string;
-}
-
-export enum TaxCondition {
-  RESPONSABLE_INSCRIPTO = 'Responsable Inscripto',
-  MONOTRIBUTO = 'Monotributo',
-  CONSUMIDOR_FINAL = 'Consumidor Final',
-  EXENTO = 'Exento'
-}
-
-export interface DashboardStats {}
-
-export interface PriceList {
-  id: string;
-  name: string;
-  type: 'BASE' | 'CUSTOM';
-  fixedMargin?: number;
-  active: boolean;
-}
-
-export interface RemitoItem {
-  product: Product;
-  quantity: number;
-  historicalPrice: number;
-}
-
-export interface Remito {
-  id: string;
-  clientId: string;
-  clientName: string;
-  date: string;
-  status: 'PENDING' | 'BILLED';
-  items: RemitoItem[];
-  relatedInvoice?: string;
-}
-
-export interface Provider {
-  id: string;
-  name: string;
-  cuit: string;
-  contact: string;
-  balance: number;
-  defaultDiscounts: [number, number, number];
-  address?: string;
-  authorizedPersonnel?: string[];
-}
-
-export interface ReplenishmentItem {
-  product: Product;
-  quantity: number;
-  selectedProviderId: string;
-  selectedProviderName: string;
-}
-
-export interface ReplenishmentOrder {
-  id: string;
-  date: string;
-  providerId: string;
-  providerName: string;
-  items: ReplenishmentItem[];
-  status: 'DRAFT' | 'SENT';
-  totalItems: number;
-  estimatedCost: number;
-}
-
-export interface PurchaseItem {
-  id: string;
-  productCode: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
-}
-
-export interface Purchase {
-  id: string;
-  providerId: string;
-  providerName: string;
-  date: string;
-  type: 'FACTURA_A' | 'FACTURA_B' | 'FACTURA_C' | 'LIQUIDACION';
-  items: number;
-  total: number;
-  status: 'PAID' | 'PENDING';
-  details?: PurchaseItem[];
-}
-
-export interface Budget {
-  id: string;
-  clientName: string;
-  date: string;
-  validUntil: string;
-  items: InvoiceItem[];
-  total: number;
-  status: 'OPEN' | 'EXPIRED' | 'BILLED';
-}
-
-export interface CashRegister {
-  id: string;
-  name: string;
-  balance: number;
-  isOpen: boolean;
-}
-
-export interface TreasuryMovement {
-  id: string;
-  date: string;
-  type: 'INCOME' | 'EXPENSE';
-  subtype: 'VENTA' | 'COBRO_CTACTE' | 'PAGO_PROVEEDOR' | 'GASTO_VARIO' | 'RETIRO_SOCIO';
-  paymentMethod: 'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CHEQUE' | 'ECHEQ' | 'CTACTE';
-  amount: number;
-  description: string;
-  cashRegisterId: string;
-}
-
-export interface JournalEntry {
-  id: string;
-  date: string;
-  concept: string;
-  debit: number;
-  credit: number;
-  details: any[];
-}
-
-export interface Branch {
-  id: string;
-  code: string;
-  name: string;
-  address: string;
-  phone: string;
-  manager: string;
-  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
-  active: boolean;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  password?: string;
-  roleId: string;
-  active: boolean;
-  lastLogin: string;
-  branchId: string;
-}
-
-export interface Role {
-  id: string;
-  name: string;
-  color: string;
-  permissions: string[];
-}
-
-export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
-
-export interface SalesOrder {
-  id: string;
-  clientName: string;
-  date: string;
-  priority: 'NORMAL' | 'URGENTE';
-  status: SalesOrderStatus;
-  items: InvoiceItem[];
-  notes: string;
-  total: number;
-}
-
-export type DocumentType = 'FACTURA' | 'TICKET_INTERNO' | 'REMITO' | 'PRESUPUESTO' | 'ORDEN_PEDIDO';
-export type PaperSize = 'A4' | 'TICKET_80MM' | 'A4_QUARTER' | 'CUSTOM';
-
-export interface Position {
-  x: number;
-  y: number;
-  visible: boolean;
-}
-
-export interface PrintTemplate {
-  id: string;
-  name: string;
-  paperSize: PaperSize;
-  customWidth?: number;
-  customHeight?: number;
-  showLogo: boolean;
-  headerText: string;
-  subHeaderText: string;
-  footerText: string;
-  showPrice: boolean;
-  showTotal: boolean;
-  fontSize: 'SMALL' | 'MEDIUM' | 'LARGE';
-  positions: {
-    logo: Position;
-    header: Position;
-    docInfo: Position;
-    client: Position;
-    table: Position;
-    footer: Position;
-    totals: Position;
-    qr: Position;
+  const getRoles = (): Role[] => {
+    const saved = localStorage.getItem('ferrecloud_roles');
+    if (saved) {
+        try { return JSON.parse(saved); } catch(e) {}
+    }
+    return [
+      { id: 'admin', name: 'Administrador Total', color: 'bg-purple-100 text-purple-800', permissions: ['ALL'] },
+      { id: 'seller', name: 'Vendedor', color: 'bg-green-100 text-green-800', permissions: ['DASHBOARD_VIEW', 'POS_ACCESS', 'CLIENTS_VIEW', 'STOCK_VIEW', 'REMITOS_VIEW'] }
+    ];
   };
-}
 
-export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WOOCOMMERCE';
-export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+  useEffect(() => {
+    const savedSession = localStorage.getItem('ferrecloud_session');
+    if (savedSession) {
+        setLoggedInUser(JSON.parse(savedSession));
+    }
+  }, []);
 
-export interface OnlineOrder {
-  id: string;
-  platformId: string;
-  platform: OnlinePlatform;
-  date: string;
-  customer: {
-    name: string;
-    nickname?: string;
-    address: string;
-    city: string;
-    zipCode: string;
-    phone: string;
-    dni: string;
+  const handleNavigate = (view: ViewState) => {
+    if (!openViews.includes(view)) {
+      setOpenViews([...openViews, view]);
+    }
+    setActiveView(view);
   };
-  items: InvoiceItem[];
-  total: number;
-  shippingCost: number;
-  shippingMethod: 'MERCADOENVIOS' | 'CORREO' | 'RETIRO_SUCURSAL';
-  status: OnlineOrderStatus;
-  labelPrinted: boolean;
-  invoiced: boolean;
-  trackingCode?: string;
-}
+
+  const closeView = (view: ViewState, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (view === ViewState.DASHBOARD) return; 
+    
+    const newViews = openViews.filter(v => v !== view);
+    setOpenViews(newViews);
+    if (activeView === view) {
+      setActiveView(newViews[newViews.length - 1]);
+    }
+  };
+
+  const handleLogin = (user: User) => {
+    setLoggedInUser(user);
+    localStorage.setItem('ferrecloud_session', JSON.stringify(user));
+    setActiveView(ViewState.DASHBOARD);
+  };
+
+  const handleLogout = () => {
+    setLoggedInUser(null);
+    setPortalPreviewClient(null);
+    localStorage.removeItem('ferrecloud_session');
+    setOpenViews([ViewState.DASHBOARD]);
+    setActiveView(ViewState.DASHBOARD);
+  };
+
+  const handleConvertToSale = (items: InvoiceItem[]) => {
+      setItemsToBill(items);
+      handleNavigate(ViewState.POS);
+  };
+
+  const renderViewContent = (view: ViewState) => {
+    switch (view) {
+      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
+      case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
+      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.SALES_ORDERS: return <SalesOrders />;
+      case ViewState.ONLINE_SALES: return <OnlineSales />;
+      case ViewState.REMITOS: return <Remitos onBillRemitos={handleConvertToSale} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={handleConvertToSale} />;
+      case ViewState.TREASURY: return <Treasury />;
+      case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
+      case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
+      case ViewState.PRICE_UPDATES: return <PriceUpdates />;
+      case ViewState.PRICE_AUDIT: return <PriceAudit />;
+      case ViewState.CREDIT_NOTES: return <CreditNotes />;
+      case ViewState.CURRENCIES: return <Currencies />;
+      case ViewState.MARKETING: return <Marketing />;
+      case ViewState.CLIENTS: return (
+        <Clients 
+            initialClientId={targetClientId} 
+            onOpenPortal={(client) => {
+                setPortalPreviewClient(client);
+                handleNavigate(ViewState.CUSTOMER_PORTAL);
+            }}
+        />
+      );
+      case ViewState.CLIENT_BALANCES: return (
+        <ClientBalances 
+            onNavigateToHistory={(client) => {
+                setTargetClientId(client.id);
+                handleNavigate(ViewState.CLIENTS);
+            }} 
+        />
+      );
+      case ViewState.ACCOUNTING: return <Accounting />;
+      case ViewState.STATISTICS: return <Statistics />;
+      case ViewState.REPORTS: return <Reports />;
+      case ViewState.BACKUP: return <Backup />;
+      case ViewState.BRANCHES: return <Branches />;
+      case ViewState.USERS: return <UsersComponent />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
+      case ViewState.REPLENISHMENT: return <Replenishment />;
+      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { /* handle */ }} />;
+      case ViewState.PRINT_CONFIG: return <PrintSettings />;
+      case ViewState.LABEL_PRINTING: return <LabelPrinting />;
+      case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
+      case ViewState.AFIP_CONFIG: return <AfipConfig />;
+      case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
+      case ViewState.EMPLOYEES: return <Employees />;
+      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
+      case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
+      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      default: return null;
+    }
+  };
+
+  // Si estamos en modo público, no requerimos login de empleado
+  if (isPublicMode) {
+      return <PublicPortal />;
+  }
+
+  if (!loggedInUser) {
+      return <Login onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-950 font-sans overflow-hidden">
+      <Sidebar 
+        currentView={activeView} 
+        onNavigate={handleNavigate} 
+        user={loggedInUser} 
+        onLogout={handleLogout} 
+      />
+
+      <main className="flex-1 relative bg-slate-100 overflow-hidden">
+        {openViews.map((view) => (
+          <div 
+            key={view}
+            className={`absolute inset-0 transition-opacity duration-300 ${activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}
+          >
+            {renderViewContent(view)}
+          </div>
+        ))}
+      </main>
+
+      <footer className="h-14 bg-slate-900 border-t border-slate-800 flex items-center px-4 gap-2 z-50 overflow-x-auto shrink-0 no-scrollbar">
+        {openViews.map((view) => (
+          <button
+            key={view}
+            onClick={() => setActiveView(view)}
+            className={`flex items-center gap-3 px-4 h-10 rounded-xl transition-all border ${
+              activeView === view 
+                ? 'bg-ferre-orange text-white border-orange-400 shadow-lg shadow-orange-900/20' 
+                : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+            }`}
+          >
+            <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+              {view === ViewState.DASHBOARD ? 'Escritorio' : view.replace(/_/g, ' ')}
+            </span>
+            {view !== ViewState.DASHBOARD && (
+              <X 
+                size={14} 
+                className="hover:text-white" 
+                onClick={(e) => closeView(view, e)} 
+              />
+            )}
+          </button>
+        ))}
+      </footer>
+    </div>
+  );
+};
+
+export default App;
