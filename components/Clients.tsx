@@ -38,7 +38,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
     const saved = localStorage.getItem('company_config');
     return saved ? JSON.parse(saved) : { 
         loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 },
-        paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA']
+        paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CHEQUE', 'E-CHEQ']
     };
   }, []);
 
@@ -194,6 +194,13 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 <td className="px-8 py-5">
                                     <div className="flex justify-center gap-2">
                                         <button 
+                                            onClick={() => { setSelectedClient(client); setIsReceiptModalOpen(true); }} 
+                                            className="p-3 bg-green-50 text-green-600 rounded-2xl hover:bg-green-600 hover:text-white transition-all shadow-sm active:scale-90"
+                                            title="Cobrar Ahora (Recibo)"
+                                        >
+                                            <Banknote size={18}/>
+                                        </button>
+                                        <button 
                                             onClick={() => { setSelectedClient(client); setIsHistoryOpen(true); }} 
                                             className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-indigo-600 transition-all shadow-md active:scale-90"
                                             title="Ver Cuenta Corriente"
@@ -235,22 +242,21 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Resumen de Cuenta Corriente Histórico</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Saldo Adeudado</p>
-                            <h4 className="text-4xl font-black tracking-tighter">${selectedClient.balance.toLocaleString('es-AR')}</h4>
+                        <div className="flex items-center gap-10">
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Saldo Adeudado</p>
+                                <h4 className="text-4xl font-black tracking-tighter">${selectedClient.balance.toLocaleString('es-AR')}</h4>
+                            </div>
+                            <button 
+                                onClick={() => setIsReceiptModalOpen(true)}
+                                className="bg-green-600 text-white px-8 py-5 rounded-[1.5rem] font-black uppercase text-xs tracking-widest flex items-center gap-3 shadow-xl shadow-green-500/20 hover:bg-green-700 transition-all active:scale-95"
+                            >
+                                <Receipt size={24}/> Registrar Cobro
+                            </button>
                         </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50">
-                        <div className="mb-6 flex justify-end">
-                            <button 
-                                onClick={() => setIsReceiptModalOpen(true)}
-                                className="bg-green-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center gap-3 shadow-lg shadow-green-900/20 hover:bg-green-700 transition-all active:scale-95"
-                            >
-                                <Receipt size={18}/> Registrar Cobro (Recibo)
-                            </button>
-                        </div>
-
                         <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b">
@@ -279,7 +285,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                         </div>
                     </div>
                     
-                    <div className="p-8 border-t border-gray-100 flex justify-between items-center shrink-0">
+                    <div className="p-8 border-t border-gray-100 flex justify-between items-center shrink-0 bg-white">
                         <button className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest"><Download size={16}/> Descargar Resumen (PDF)</button>
                         <button onClick={() => setIsHistoryOpen(false)} className="bg-slate-900 text-white px-10 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all">Cerrar Historial</button>
                     </div>
@@ -295,7 +301,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-white/20 rounded-2xl"><Banknote size={24}/></div>
                             <div>
-                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Nuevo Recibo</h3>
+                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Emisión de Recibo</h3>
                                 <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">Imputación a Cuenta Corriente</p>
                             </div>
                         </div>
@@ -309,10 +315,10 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
 
                         <div className="space-y-6">
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe a Cobrar ($)</label>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe Recibido ($)</label>
                                 <input 
                                     type="number" 
-                                    className="w-full p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-green-600 outline-none font-black text-4xl text-center text-green-700 shadow-sm" 
+                                    className="w-full p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-green-600 outline-none font-black text-5xl text-center text-green-700 shadow-sm" 
                                     value={receiptForm.amount || ''} 
                                     onChange={e => setReceiptForm({...receiptForm, amount: parseFloat(e.target.value) || 0})}
                                     placeholder="0.00"
@@ -332,10 +338,10 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Observaciones</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Notas / Concepto</label>
                                     <textarea 
                                         className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-green-500 h-24 resize-none uppercase text-xs"
-                                        placeholder="Ej: Pago parcial factura Octubre..."
+                                        placeholder="Ej: Pago total factura pendiente..."
                                         value={receiptForm.notes}
                                         onChange={e => setReceiptForm({...receiptForm, notes: e.target.value})}
                                     />
@@ -347,7 +353,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                             onClick={handleRegisterReceipt}
                             className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
                         >
-                            <FileCheck size={24}/> Confirmar Cobranza
+                            <FileCheck size={24}/> Generar Comprobante de Cobro
                         </button>
                     </div>
                 </div>
