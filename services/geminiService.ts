@@ -64,3 +64,4 @@ export const fetchLatestFinancingRates = async () => {
     return { cuotas3: 15, cuotas6: 30, cuotas12: 65 };
   }
 };
+// Versión corregida v2
