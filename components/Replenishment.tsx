@@ -9,14 +9,16 @@ interface ReplenishmentProps {
 }
 
 // Mock Data Factories
-// Fix: Updated createMockProduct to use internalCodes array property instead of internalCode string
+// Fix: Updated createMockProduct to include missing isCombo and comboItems properties
 const createMockProduct = (id: string, internalCode: string, name: string, providerName: string, providerCode: string, stock: number, cost: number): Product => ({
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [providerCode], 
   name, brand: 'Generico', provider: providerName, category: 'General', description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: cost, discounts: [0,0,0,0], costAfterDiscounts: cost, profitMargin: 40,
   priceNeto: cost * 1.4, priceFinal: cost * 1.4 * 1.21, stock, stockDetails: [], minStock: 10, desiredStock: 50, reorderPoint: 20,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
+  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+  isCombo: false,
+  comboItems: []
 });
 
 const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsConsumed }) => {
@@ -201,7 +203,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
       sendOrder(order.id);
   };
 
-  // Fix: Updated product filter to use internalCodes array property
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.internalCodes.some(c => c.toLowerCase().includes(searchTerm.toLowerCase())));
 
   return (
@@ -256,7 +257,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                   <tr key={p.id} className="hover:bg-gray-50">
                                       <td className="px-4 py-3">
                                           <div className="font-bold text-gray-800 text-sm">{p.name}</div>
-                                          {/* Fix: Updated internalCode display to use internalCodes[0] */}
                                           <div className="text-xs text-gray-500 font-mono">{p.internalCodes[0]}</div>
                                       </td>
                                       <td className="px-4 py-3 text-sm">
