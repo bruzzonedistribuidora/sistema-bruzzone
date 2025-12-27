@@ -26,13 +26,16 @@ interface ProductToPrint {
     quantity: number;
 }
 
+// Fix: Updated createMockProduct to include missing isCombo and comboItems properties
 const createMockProduct = (id: string, internalCode: string, name: string, price: number): Product => ({
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [],
   name, brand: 'Generico', provider: 'Proveedor', category: 'General', description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: price * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: price * 0.6, profitMargin: 40,
   priceNeto: price / 1.21, priceFinal: price, stock: 100, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
+  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+  isCombo: false,
+  comboItems: []
 });
 
 const mockProducts: Product[] = [
