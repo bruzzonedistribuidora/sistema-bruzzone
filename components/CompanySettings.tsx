@@ -4,38 +4,18 @@ import {
     Save, Building2, CreditCard, Plus, Trash2, CheckCircle, 
     X, Edit2, RefreshCw, Camera,
     Percent, CreditCard as CardIcon, Zap, ChevronRight, Info,
-    Calculator, Smartphone, Landmark, Download, UploadCloud
+    Calculator, Smartphone, Landmark, Globe, Search, Link2
 } from 'lucide-react';
 import { CompanyConfig, PaymentSystem, CreditInstallment } from '../types';
-
-const PLATFORM_TEMPLATES: Record<string, Partial<PaymentSystem>> = {
-    'GALICIA NAVE': {
-        name: 'GALICIA NAVE',
-        debitSurcharge: 0.8,
-        creditInstallments: [
-            { id: 'n1', installments: 1, surcharge: 0, label: '1 Pago' },
-            { id: 'n3', installments: 3, surcharge: 14.5, label: '3 Cuotas Nave' },
-            { id: 'n6', installments: 6, surcharge: 28.2, label: '6 Cuotas Nave' },
-            { id: 'n9', installments: 9, surcharge: 42.1, label: '9 Cuotas Nave' },
-            { id: 'n12', installments: 12, surcharge: 58.4, label: '12 Cuotas Nave' },
-        ]
-    },
-    'MERCADO PAGO': {
-        name: 'MERCADO PAGO',
-        debitSurcharge: 3.5,
-        creditInstallments: [
-            { id: 'm1', installments: 1, surcharge: 0, label: '1 Pago' },
-            { id: 'm3', installments: 3, surcharge: 12.0, label: '3 Cuotas MP' },
-            { id: 'm6', installments: 6, surcharge: 24.5, label: '6 Cuotas MP' },
-        ]
-    }
-};
+import { fetchLatestFinancingRates } from '../services/geminiService';
 
 const CompanySettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'CARDS'>('GENERAL');
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAiSearching, setIsAiSearching] = useState(false);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
+  const [lastSources, setLastSources] = useState<{title: string, uri: string}[]>([]);
   
   const [formData, setFormData] = useState<CompanyConfig>(() => {
       const saved = localStorage.getItem('company_config');
@@ -67,29 +47,37 @@ const CompanySettings: React.FC = () => {
       window.dispatchEvent(new Event('storage'));
   }, [formData]);
 
-  const addFromTemplate = (templateKey: string) => {
-      const template = PLATFORM_TEMPLATES[templateKey];
-      const newSystem: PaymentSystem = {
-          id: `sys-${Date.now()}`,
-          name: template.name!,
-          debitSurcharge: template.debitSurcharge || 0,
-          creditInstallments: template.creditInstallments!.map(ci => ({...ci, id: `inst-${Math.random()}`}))
-      };
+  const handleSyncWithAI = async (systemId: string) => {
+      const system = formData.paymentSystems?.find(s => s.id === systemId);
+      if (!system) return;
 
-      setFormData(prev => ({
-          ...prev,
-          paymentSystems: [...(prev.paymentSystems || []), newSystem]
-      }));
-      setSelectedSystemId(newSystem.id);
-      alert(`Plataforma ${templateKey} agregada con esquema de cuotas oficial.`);
+      setIsAiSearching(true);
+      try {
+          const result = await fetchLatestFinancingRates(system.name);
+          setFormData(prev => ({
+              ...prev,
+              paymentSystems: prev.paymentSystems?.map(s => {
+                  if (s.id === systemId) {
+                      return { ...s, creditInstallments: result.installments };
+                  }
+                  return s;
+              })
+          }));
+          setLastSources(result.sources);
+          alert(`Sincronización exitosa para ${system.name}. Se han cargado ${result.installments.length} planes de cuotas.`);
+      } catch (error) {
+          alert("Error al buscar las tasas en la web. Inténtelo manualmente.");
+      } finally {
+          setIsAiSearching(false);
+      }
   };
 
   const addManualSystem = () => {
-      const name = prompt("Nombre de la plataforma manual:");
+      const name = prompt("Ingrese nombre de la plataforma (ej: Galicia Nave, Mercado Pago, Fiserv):");
       if (!name) return;
       const newSystem: PaymentSystem = {
           id: `sys-${Date.now()}`,
-          name: name.toUpperCase(),
+          name: name.toUpperCase().trim(),
           debitSurcharge: 0,
           creditInstallments: [{ id: `inst-${Date.now()}`, installments: 1, surcharge: 0, label: '1 Pago' }]
       };
@@ -102,31 +90,6 @@ const CompanySettings: React.FC = () => {
           setFormData(prev => ({ ...prev, paymentSystems: prev.paymentSystems?.filter(s => s.id !== id) }));
           if (selectedSystemId === id) setSelectedSystemId(null);
       }
-  };
-
-  const applyIvaToInterests = (systemId: string) => {
-      setIsSyncing(true);
-      setTimeout(() => {
-          setFormData(prev => ({
-              ...prev,
-              paymentSystems: prev.paymentSystems?.map(s => {
-                  if (s.id === systemId) {
-                      return {
-                          ...s,
-                          creditInstallments: s.creditInstallments.map(inst => {
-                              if (inst.installments === 1) return inst;
-                              // Coeficiente bancario + 21% de IVA sobre el interes
-                              const finalSurcharge = parseFloat((inst.surcharge * 1.21).toFixed(2));
-                              return { ...inst, surcharge: finalSurcharge, label: `${inst.installments} Cuotas (Inc. IVA)` };
-                          })
-                      };
-                  }
-                  return s;
-              })
-          }));
-          setIsSyncing(false);
-          alert("Tasas recalculadas: Se ha sumado el 21% de IVA sobre los intereses para cubrir el costo bancario real.");
-      }, 600);
   };
 
   const currentSystem = formData.paymentSystems?.find(s => s.id === selectedSystemId);
@@ -149,39 +112,13 @@ const CompanySettings: React.FC = () => {
             </div>
         </div>
 
-        {activeTab === 'GENERAL' && (
-            <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm animate-fade-in space-y-8">
-                <div className="flex items-center gap-6 border-b pb-8">
-                    <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white relative group overflow-hidden shadow-lg">
-                        {formData.logo ? <img src={formData.logo} alt="Logo" className="w-full h-full object-contain" /> : <Building2 size={40} />}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"><Camera size={24} /></div>
-                    </div>
-                    <div>
-                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter mb-2">{formData.name}</h3>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formData.taxCondition} • CUIT {formData.cuit}</p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Nombre de Fantasía</label>
-                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold uppercase outline-none focus:bg-white focus:border-indigo-500 transition-all" value={formData.fantasyName} onChange={e => setFormData({...formData, fantasyName: e.target.value.toUpperCase()})} />
-                    </div>
-                    <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">WhatsApp Comercial</label>
-                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-green-500 transition-all" value={formData.whatsappNumber} onChange={e => setFormData({...formData, whatsappNumber: e.target.value})} />
-                    </div>
-                </div>
-            </div>
-        )}
-
         {activeTab === 'CARDS' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-                {/* PANEL DE SELECCIÓN */}
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-sm space-y-6">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Sistemas Activos</h3>
-                            <button onClick={addManualSystem} className="p-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200"><Plus size={18}/></button>
+                            <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Sistemas de Financiación</h3>
+                            <button onClick={addManualSystem} className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-md transition-all active:scale-95"><Plus size={18}/></button>
                         </div>
                         
                         <div className="space-y-2">
@@ -199,38 +136,45 @@ const CompanySettings: React.FC = () => {
                             ))}
                         </div>
 
-                        <div className="pt-6 border-t space-y-3">
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] text-center">Auto-Sincronizar Esquemas</p>
-                            <button onClick={() => addFromTemplate('GALICIA NAVE')} className="w-full py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-black text-[10px] uppercase border border-indigo-100 hover:bg-indigo-100 flex items-center justify-center gap-3">
-                                <Landmark size={16}/> Cargar Galicia Nave
-                            </button>
-                            <button onClick={() => addFromTemplate('MERCADO PAGO')} className="w-full py-4 bg-yellow-50 text-yellow-700 rounded-2xl font-black text-[10px] uppercase border border-yellow-100 hover:bg-yellow-100 flex items-center justify-center gap-3">
-                                <Smartphone size={16}/> Cargar Mercado Pago
-                            </button>
-                        </div>
+                        {currentSystem && (
+                            <div className="pt-6 border-t border-slate-100 space-y-3">
+                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] text-center mb-2">Automatización Inteligente</p>
+                                <button 
+                                    onClick={() => handleSyncWithAI(currentSystem.id)} 
+                                    disabled={isAiSearching}
+                                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
+                                    {isAiSearching ? <RefreshCw className="animate-spin" size={16}/> : <Globe size={16}/>}
+                                    {isAiSearching ? 'Buscando Tasas Oficiales...' : `Sincronizar ${currentSystem.name} con IA`}
+                                </button>
+                                <p className="text-[8px] text-slate-400 text-center font-medium px-4">Utiliza Google Search para encontrar los coeficientes vigentes de esta plataforma.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* DETALLE DEL SISTEMA */}
                 <div className="lg:col-span-2">
                     {currentSystem ? (
                         <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm space-y-8 animate-fade-in">
                             <div className="flex justify-between items-center border-b pb-6">
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">{currentSystem.name}</h3>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configuración de Cuotas e IVA sobre Interés</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Esquema de Cuotas e Intereses</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => applyIvaToInterests(currentSystem.id)} 
-                                        disabled={isSyncing}
-                                        className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all flex items-center gap-2 font-black text-[9px] uppercase border border-green-100">
-                                        {isSyncing ? <RefreshCw className="animate-spin" size={14}/> : <Calculator size={14}/>}
-                                        Sincronizar IVA 21%
-                                    </button>
-                                    <button onClick={() => deleteSystem(currentSystem.id)} className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={20}/></button>
-                                </div>
+                                <button onClick={() => deleteSystem(currentSystem.id)} className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={20}/></button>
                             </div>
+
+                            {lastSources.length > 0 && (
+                                <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 space-y-3">
+                                    <h4 className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-2"><Link2 size={14}/> Fuentes Web Utilizadas por IA</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {lastSources.map((s, idx) => (
+                                            <a key={idx} href={s.uri} target="_blank" rel="noreferrer" className="bg-white px-3 py-1 rounded-full text-[9px] font-black text-indigo-500 border border-indigo-200 hover:bg-indigo-600 hover:text-white transition-all">
+                                                {s.title.slice(0, 30)}...
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="space-y-6">
@@ -252,31 +196,28 @@ const CompanySettings: React.FC = () => {
                                             <Percent size={24} className="text-slate-300"/>
                                         </div>
                                     </div>
-
-                                    <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100">
-                                        <div className="flex gap-4 items-start text-blue-800">
-                                            <Info size={24} className="shrink-0"/>
-                                            <div>
-                                                <h4 className="text-[10px] font-black uppercase mb-1 tracking-widest">Motor de Cálculo</h4>
-                                                <p className="text-[10px] font-medium leading-relaxed italic">El botón "Sincronizar IVA 21%" calcula automáticamente el Costo Financiero Total (CFT) sumando el impuesto sobre el interés que te cobra el banco.</p>
-                                            </div>
+                                    <div className="p-6 bg-blue-50 rounded-3xl border border-blue-100 flex gap-4 items-start text-blue-800">
+                                        <Info size={24} className="shrink-0"/>
+                                        <div>
+                                            <h4 className="text-[10px] font-black uppercase mb-1">Nota sobre Coeficientes</h4>
+                                            <p className="text-[10px] font-medium leading-relaxed italic">Los intereses aquí configurados se aplicarán sobre el precio final en el punto de venta (POS).</p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center">
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Planes de Crédito</label>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Planes Detectados</label>
                                         <button onClick={() => {
                                             const inst = parseInt(prompt("Cantidad de Cuotas:") || "0");
                                             if(!inst) return;
-                                            const sur = parseFloat(prompt("% Recargo Banco (sin IVA):") || "0");
+                                            const sur = parseFloat(prompt("% Recargo:") || "0");
                                             const newPlan = { id: `inst-${Date.now()}`, installments: inst, surcharge: sur, label: `${inst} Cuotas` };
                                             setFormData(prev => ({
                                                 ...prev,
                                                 paymentSystems: prev.paymentSystems?.map(s => s.id === currentSystem.id ? {...s, creditInstallments: [...s.creditInstallments, newPlan]} : s)
                                             }));
-                                        }} className="text-indigo-600 font-black text-[10px] uppercase hover:underline">+ Añadir Cuota</button>
+                                        }} className="text-indigo-600 font-black text-[10px] uppercase hover:underline">+ Agregar Manual</button>
                                     </div>
                                     <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
                                         <table className="w-full text-left">
@@ -284,7 +225,7 @@ const CompanySettings: React.FC = () => {
                                                 <tr>
                                                     <th className="px-5 py-4">Planes</th>
                                                     <th className="px-5 py-4 text-right">Recargo %</th>
-                                                    <th className="px-5 py-4"></th>
+                                                    <th className="px-5 py-4 w-10"></th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-50">
@@ -314,7 +255,7 @@ const CompanySettings: React.FC = () => {
                                                                     ...prev,
                                                                     paymentSystems: prev.paymentSystems?.map(s => s.id === currentSystem.id ? {...s, creditInstallments: newInst} : s)
                                                                 }));
-                                                            }} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
+                                                            }} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -327,9 +268,34 @@ const CompanySettings: React.FC = () => {
                     ) : (
                         <div className="bg-white p-20 rounded-[3rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400">
                             <CardIcon size={48} className="opacity-20 mb-4"/>
-                            <p className="font-black uppercase tracking-[0.2em] text-[10px]">Selecciona o Carga una plataforma para editar cuotas</p>
+                            <p className="font-black uppercase tracking-[0.2em] text-[10px]">Selecciona o crea una plataforma para sincronizar sus tasas</p>
                         </div>
                     )}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'GENERAL' && (
+            <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm animate-fade-in space-y-8">
+                <div className="flex items-center gap-6 border-b pb-8">
+                    <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white relative group overflow-hidden shadow-lg">
+                        {formData.logo ? <img src={formData.logo} alt="Logo" className="w-full h-full object-contain" /> : <Building2 size={40} />}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"><Camera size={24} /></div>
+                    </div>
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter mb-2">{formData.name}</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formData.taxCondition} • CUIT {formData.cuit}</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Nombre de Fantasía</label>
+                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold uppercase outline-none focus:bg-white focus:border-indigo-500 transition-all" value={formData.fantasyName} onChange={e => setFormData({...formData, fantasyName: e.target.value.toUpperCase()})} />
+                    </div>
+                    <div className="space-y-4">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">WhatsApp Comercial</label>
+                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-green-500 transition-all" value={formData.whatsappNumber} onChange={e => setFormData({...formData, whatsappNumber: e.target.value})} />
+                    </div>
                 </div>
             </div>
         )}
