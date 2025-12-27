@@ -31,6 +31,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [productSearch, setProductSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [syncKey, setSyncKey] = useState(0);
     
     const [lastSale, setLastSale] = useState<any>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -39,13 +40,24 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
+    // Escuchar cambios globales en la configuración para actualizar intereses en tiempo real
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('company_config_updated', handleSync);
+        window.addEventListener('storage', handleSync);
+        return () => {
+            window.removeEventListener('company_config_updated', handleSync);
+            window.removeEventListener('storage', handleSync);
+        };
+    }, []);
+
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { 
             paymentMethods: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'],
             paymentSystems: []
         };
-    }, []);
+    }, [syncKey]);
 
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
@@ -56,7 +68,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
 
     const currentSystem = useMemo(() => 
-        companyConfig.paymentSystems?.find(s => s.id === selectedSystemId),
+        (companyConfig.paymentSystems || []).find(s => s.id === selectedSystemId),
     [selectedSystemId, companyConfig]);
 
     const cardInterest = useMemo(() => {
@@ -245,7 +257,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                 onChange={e => { setSelectedSystemId(e.target.value); setSelectedCuotaId(''); }}
                                             >
                                                 <option value="">-- SELECCIONE PLATAFORMA --</option>
-                                                {companyConfig.paymentSystems?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                                {(companyConfig.paymentSystems || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                             </select>
                                         </div>
 
