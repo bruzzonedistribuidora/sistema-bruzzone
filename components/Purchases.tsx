@@ -8,7 +8,7 @@ import {
     AlertTriangle, Edit, Box, Tag, Layers, Calculator, Landmark, 
     History, ArrowDownLeft, CheckSquare, Square, ArrowRight, Info, Scroll, Smartphone, Loader2, Zap, ShieldCheck, UserCheck, LayoutTemplate, MapPin,
     Scan, Camera, FileCheck, AlertOctagon, Scale, Pencil, UserSearch, Receipt, Send, Scissors, Ban, Mail, MessageCircle, Minus, PlusCircle,
-    Tag as TagIcon, Barcode, Store, Building2, ExternalLink, ShoppingCart
+    Tag as TagIcon, Barcode, Store, Building2, ExternalLink, ShoppingCart, FileUp
 } from 'lucide-react';
 import { Purchase, Provider, Product, PurchaseItem, ProductStock, CompanyConfig, ViewState, CurrencyQuote, ProductProviderHistory } from '../types';
 import { fetchCompanyByCuit, analyzeInvoice } from '../services/geminiService';
@@ -58,6 +58,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       descuentoGlobal: 0
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const providerImportRef = useRef<HTMLInputElement>(null);
 
   const [isQuickProductModalOpen, setIsQuickProductModalOpen] = useState(false);
   const [quickProductTab, setQuickProductTab] = useState<'GENERAL' | 'PRICING' | 'STOCK'>('GENERAL');
@@ -134,6 +135,48 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   useEffect(() => {
     localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
   }, [purchases]);
+
+  const handleImportProviders = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
+        
+        const currentCuits = new Set(providers.map(p => p.cuit.replace(/[^0-9]/g, '')));
+        const newProviders: Provider[] = [];
+
+        lines.forEach(line => {
+            const [name, cuit, contact, address] = line.split(',').map(s => s?.trim());
+            const cleanCuit = cuit?.replace(/[^0-9]/g, '');
+
+            if (name && cleanCuit && !currentCuits.has(cleanCuit)) {
+                newProviders.push({
+                    id: `prov-${Date.now()}-${Math.random()}`,
+                    name: name.toUpperCase(),
+                    cuit: cuit,
+                    contact: contact || '',
+                    address: address || '',
+                    balance: 0,
+                    defaultDiscounts: [0, 0, 0],
+                    currencyQuoteId: ''
+                });
+                currentCuits.add(cleanCuit);
+            }
+        });
+
+        if (newProviders.length > 0) {
+            setProviders([...newProviders, ...providers]);
+            alert(`Importación finalizada. Se agregaron ${newProviders.length} proveedores nuevos.`);
+        } else {
+            alert("No se encontraron proveedores nuevos para importar.");
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handleSearchCuit = async () => {
     if (!providerForm.cuit || providerForm.cuit.length < 8) {
@@ -468,6 +511,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden">
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleInvoiceFile} />
+      <input type="file" ref={providerImportRef} className="hidden" accept=".csv,.txt" onChange={handleImportProviders} />
 
       <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
         <div>
@@ -547,6 +591,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <input type="text" placeholder="Filtrar por razón social..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-indigo-100 outline-none transition-all font-bold" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                     <div className="flex gap-2 ml-4">
+                        <button 
+                            onClick={() => providerImportRef.current?.click()}
+                            className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                            <FileSpreadsheet size={16} /> Importar Proveedores
+                        </button>
                         <button 
                             onClick={() => handleOpenPaymentOrder()}
                             className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-900/10 active:scale-95 transition-all hover:bg-indigo-700">
