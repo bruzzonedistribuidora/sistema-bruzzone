@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Search, Plus, Package, X, Save, Globe, DollarSign, 
     Barcode, Pen, Trash2, Tag, Truck, Layers, Info, 
@@ -7,12 +7,14 @@ import {
     AlertCircle, LayoutGrid, Database, Calculator, ShoppingCart,
     UserPlus, BookmarkPlus, FolderPlus, Box, List, ChevronDown, Minus,
     Hash, QrCode, PlusCircle, Check, ToggleLeft, ToggleRight, 
-    Settings2, Boxes, AlertTriangle, Calendar
+    Settings2, Boxes, AlertTriangle, Calendar, FileUp, FileSpreadsheet,
+    Download, UploadCloud, RefreshCw
 } from 'lucide-react';
 import { Product, ProductStock, Brand, Category, ComboItem, Provider, CompanyConfig, Branch } from '../types';
 
 const Inventory: React.FC = () => {
   const [inventoryTab, setInventoryTab] = useState<'PRODUCTS' | 'BRANDS' | 'CATEGORIES'>('PRODUCTS');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const companyConfig: CompanyConfig = useMemo(() => {
     const saved = localStorage.getItem('company_config');
@@ -154,6 +156,45 @@ const Inventory: React.FC = () => {
       setQuickAddValue('');
   };
 
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const content = event.target?.result as string;
+          // Separar por líneas y limpiar
+          const items = content.split(/\r?\n/).map(line => line.trim().toUpperCase()).filter(line => line.length > 0);
+          
+          if (inventoryTab === 'BRANDS') {
+              const currentNames = new Set(brands.map(b => b.name));
+              const newBrands: Brand[] = [];
+              items.forEach(name => {
+                  if (!currentNames.has(name)) {
+                      newBrands.push({ id: `b-${Date.now()}-${Math.random()}`, name });
+                      currentNames.add(name);
+                  }
+              });
+              setBrands([...brands, ...newBrands]);
+              alert(`Importación finalizada. Se agregaron ${newBrands.length} marcas nuevas.`);
+          } else if (inventoryTab === 'CATEGORIES') {
+              const currentNames = new Set(categories.map(c => c.name));
+              const newCats: Category[] = [];
+              items.forEach(name => {
+                  if (!currentNames.has(name)) {
+                      newCats.push({ id: `c-${Date.now()}-${Math.random()}`, name });
+                      currentNames.add(name);
+                  }
+              });
+              setCategories([...categories, ...newCats]);
+              alert(`Importación finalizada. Se agregaron ${newCats.length} categorías nuevas.`);
+          }
+      };
+      reader.readAsText(file);
+      // Resetear input para poder subir el mismo archivo si se limpia
+      e.target.value = '';
+  };
+
   const addComboComponent = (p: Product) => {
       if (p.id === formData.id) {
           alert("Un combo no puede contenerse a sí mismo.");
@@ -181,6 +222,16 @@ const Inventory: React.FC = () => {
         p.brand.toLowerCase().includes(term)
     );
   }, [searchTerm, products]);
+
+  const filteredBrands = useMemo(() => {
+      const term = searchTerm.toLowerCase().trim();
+      return brands.filter(b => b.name.toLowerCase().includes(term)).sort((a,b) => a.name.localeCompare(b.name));
+  }, [searchTerm, brands]);
+
+  const filteredCategories = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return categories.filter(c => c.name.toLowerCase().includes(term)).sort((a,b) => a.name.localeCompare(b.name));
+  }, [searchTerm, categories]);
 
   const comboSearchResults = useMemo(() => {
       if (!comboSearch) return [];
@@ -220,71 +271,120 @@ const Inventory: React.FC = () => {
 
   return (
     <div className="p-4 h-full flex flex-col max-w-full mx-auto space-y-3 bg-slate-50 overflow-hidden">
+      <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleImportFile} />
+
       <div className="flex justify-between items-end bg-white p-4 rounded-2xl border border-gray-200 shadow-sm shrink-0">
           <div>
               <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                   <Database size={22} className="text-indigo-600"/> Inventario Maestro
               </h2>
               <div className="flex mt-3 bg-slate-100 p-1 rounded-xl gap-1">
-                  <button onClick={() => setInventoryTab('PRODUCTS')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'PRODUCTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Artículos</button>
-                  <button onClick={() => setInventoryTab('BRANDS')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'BRANDS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Marcas</button>
-                  <button onClick={() => setInventoryTab('CATEGORIES')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'CATEGORIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Categorías</button>
+                  <button onClick={() => { setInventoryTab('PRODUCTS'); setSearchTerm(''); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'PRODUCTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Artículos ({products.length})</button>
+                  <button onClick={() => { setInventoryTab('BRANDS'); setSearchTerm(''); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'BRANDS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Marcas ({brands.length})</button>
+                  <button onClick={() => { setInventoryTab('CATEGORIES'); setSearchTerm(''); }} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${inventoryTab === 'CATEGORIES' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400 hover:text-slate-600'}`}>Categorías ({categories.length})</button>
               </div>
           </div>
-          <button onClick={() => {setFormData({...initialProduct, profitMargin: getDefaultProfitMargin(), id: Date.now().toString(), stockDetails: branches.map(b => ({ branchId: b.id, branchName: b.name, quantity: 0 }))}); setModalTab('GENERAL'); setIsModalOpen(true);}} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black shadow-xl flex items-center gap-3 transition-all uppercase text-xs tracking-widest hover:bg-slate-800">
-              <Plus size={18} /> Nuevo Artículo
-          </button>
+          
+          <div className="flex gap-3">
+              {(inventoryTab === 'BRANDS' || inventoryTab === 'CATEGORIES') && (
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-xl font-black flex items-center gap-3 transition-all border border-indigo-100 uppercase text-xs tracking-widest hover:bg-indigo-100">
+                    <FileSpreadsheet size={18} /> Importar Excel/CSV
+                  </button>
+              )}
+              {inventoryTab === 'PRODUCTS' && (
+                  <button onClick={() => {setFormData({...initialProduct, profitMargin: getDefaultProfitMargin(), id: Date.now().toString(), stockDetails: branches.map(b => ({ branchId: b.id, branchName: b.name, quantity: 0 }))}); setModalTab('GENERAL'); setIsModalOpen(true);}} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black shadow-xl flex items-center gap-3 transition-all uppercase text-xs tracking-widest hover:bg-slate-800">
+                      <Plus size={18} /> Nuevo Artículo
+                  </button>
+              )}
+              {inventoryTab !== 'PRODUCTS' && (
+                  <button onClick={() => setIsQuickAddOpen(inventoryTab === 'BRANDS' ? 'BRAND' : 'CATEGORY')} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black shadow-xl flex items-center gap-3 transition-all uppercase text-xs tracking-widest hover:bg-slate-800">
+                      <Plus size={18} /> Nueva {inventoryTab === 'BRANDS' ? 'Marca' : 'Categoría'}
+                  </button>
+              )}
+          </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 shrink-0">
             <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
-                <input type="text" placeholder="Buscar por código, descripción o marca..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder={`Buscar en ${inventoryTab === 'PRODUCTS' ? 'catálogo...' : inventoryTab === 'BRANDS' ? 'listado de marcas...' : 'categorías...'}`} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 overflow-hidden flex flex-col">
         <div className="flex-1 overflow-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
-                    <tr>
-                        <th className="px-4 py-3 border-r border-slate-800">Cód. SKU</th>
-                        <th className="px-4 py-3 border-r border-slate-800">Descripción / Marca</th>
-                        <th className="px-4 py-3 border-r border-slate-800 text-center">Tipo</th>
-                        <th className="px-4 py-3 text-right border-r border-slate-800">Stock Total</th>
-                        <th className="px-4 py-3 text-right border-r border-slate-800">Venta Final</th>
-                        <th className="px-4 py-3 text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-[11px]">
-                    {filteredProducts.map((product) => (
-                        <tr key={product.id} className="hover:bg-slate-50/80 transition-colors group">
-                            <td className="px-4 py-2.5 font-mono font-bold text-slate-500">
-                                {product.internalCodes[0] || 'S/C'}
-                            </td>
-                            <td className="px-4 py-2.5">
-                                <p className="font-black text-slate-800 uppercase leading-none mb-1">{product.name}</p>
-                                <p className="text-indigo-600 font-black uppercase text-[9px]">{product.brand}</p>
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${product.isCombo ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{product.isCombo ? 'Combo' : 'Simple'}</span>
-                            </td>
-                            <td className={`px-4 py-2.5 text-right font-black ${product.stock <= product.reorderPoint ? 'text-red-600' : 'text-slate-700'}`}>
-                                {product.stock}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-black text-slate-900 bg-indigo-50/20">
-                                ${product.priceFinal.toLocaleString('es-AR')}
-                            </td>
-                            <td className="px-4 py-2.5">
-                                <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setFormData(product); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-all"><Pen size={14} /></button>
-                                    <button onClick={() => { if(confirm('¿Eliminar producto?')) setProducts(products.filter(p => p.id !== product.id)) }} className="p-1.5 text-slate-400 hover:text-red-600 rounded-md transition-all"><Trash2 size={14} /></button>
-                                </div>
-                            </td>
+            {inventoryTab === 'PRODUCTS' && (
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
+                        <tr>
+                            <th className="px-4 py-3 border-r border-slate-800">Cód. SKU</th>
+                            <th className="px-4 py-3 border-r border-slate-800">Descripción / Marca</th>
+                            <th className="px-4 py-3 border-r border-slate-800 text-center">Tipo</th>
+                            <th className="px-4 py-3 text-right border-r border-slate-800">Stock Total</th>
+                            <th className="px-4 py-3 text-right border-r border-slate-800">Venta Final</th>
+                            <th className="px-4 py-3 text-center">Acciones</th>
                         </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-[11px]">
+                        {filteredProducts.map((product) => (
+                            <tr key={product.id} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="px-4 py-2.5 font-mono font-bold text-slate-500">
+                                    {product.internalCodes[0] || 'S/C'}
+                                </td>
+                                <td className="px-4 py-2.5">
+                                    <p className="font-black text-slate-800 uppercase leading-none mb-1">{product.name}</p>
+                                    <p className="text-indigo-600 font-black uppercase text-[9px]">{product.brand}</p>
+                                </td>
+                                <td className="px-4 py-2.5 text-center">
+                                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${product.isCombo ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>{product.isCombo ? 'Combo' : 'Simple'}</span>
+                                </td>
+                                <td className={`px-4 py-2.5 text-right font-black ${product.stock <= product.reorderPoint ? 'text-red-600' : 'text-slate-700'}`}>
+                                    {product.stock}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-black text-slate-900 bg-indigo-50/20">
+                                    ${product.priceFinal.toLocaleString('es-AR')}
+                                </td>
+                                <td className="px-4 py-2.5">
+                                    <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => { setFormData(product); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md transition-all"><Pen size={14} /></button>
+                                        <button onClick={() => { if(confirm('¿Eliminar producto?')) setProducts(products.filter(p => p.id !== product.id)) }} className="p-1.5 text-slate-400 hover:text-red-600 rounded-md transition-all"><Trash2 size={14} /></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
+            {inventoryTab === 'BRANDS' && (
+                <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 animate-fade-in">
+                    {filteredBrands.map(brand => (
+                        <div key={brand.id} className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex justify-between items-center group hover:bg-white hover:border-indigo-200 hover:shadow-sm transition-all">
+                            <span className="font-black text-[10px] uppercase text-slate-700 truncate mr-2">{brand.name}</span>
+                            <button onClick={() => { if(confirm('¿Eliminar marca?')) setBrands(brands.filter(b => b.id !== brand.id)) }} className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12}/></button>
+                        </div>
                     ))}
-                </tbody>
-            </table>
+                    {filteredBrands.length === 0 && (
+                        <div className="col-span-full py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin resultados en marcas</div>
+                    )}
+                </div>
+            )}
+
+            {inventoryTab === 'CATEGORIES' && (
+                <div className="p-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 animate-fade-in">
+                    {filteredCategories.map(cat => (
+                        <div key={cat.id} className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex justify-between items-center group hover:bg-white hover:border-indigo-200 hover:shadow-sm transition-all">
+                            <span className="font-black text-[10px] uppercase text-slate-700 truncate mr-2">{cat.name}</span>
+                            <button onClick={() => { if(confirm('¿Eliminar categoría?')) setCategories(categories.filter(c => c.id !== cat.id)) }} className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12}/></button>
+                        </div>
+                    ))}
+                    {filteredCategories.length === 0 && (
+                        <div className="col-span-full py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin resultados en categorías</div>
+                    )}
+                </div>
+            )}
         </div>
       </div>
 
