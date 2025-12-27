@@ -9,14 +9,16 @@ import {
 import { InvoiceItem, Product, SalesOrder, SalesOrderStatus } from '../types';
 
 // Helper para crear productos de prueba
-// Fix: Updated createMockProduct to use internalCodes array property instead of internalCode string
+// Fix: Updated createMockProduct to include missing isCombo and comboItems properties
 const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string, brand: string = 'GENERICO'): Product => ({
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [],
   name, brand, provider: 'Proveedor Demo', category, description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: priceFinal * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 40,
   priceNeto: priceFinal / 1.21, priceFinal: priceFinal, stock, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
+  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+  isCombo: false,
+  comboItems: []
 });
 
 const SalesOrders: React.FC = () => {
@@ -59,7 +61,6 @@ const SalesOrders: React.FC = () => {
       ];
   });
 
-  // Fix: Updated product filter to use internalCodes array property
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.internalCodes.some(c => c.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -125,7 +126,7 @@ const SalesOrders: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-full h-full flex flex-col space-y-4 bg-slate-50 overflow-hidden">
+    <div className="p-4 md:p-6 max-full h-full flex flex-col space-y-4 bg-slate-50 overflow-hidden">
       <div className="flex justify-between items-center bg-white p-5 rounded-[2rem] border border-gray-200 shadow-sm shrink-0">
         <div>
           <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3 leading-none">
@@ -172,7 +173,6 @@ const SalesOrders: React.FC = () => {
                                     <div>
                                         <h4 className="font-black text-slate-800 text-xs uppercase tracking-tight leading-none mb-1.5">{p.name}</h4>
                                         <div className="flex items-center gap-3">
-                                            {/* Fix: Updated display to use internalCodes[0] */}
                                             <span className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-tighter">{p.internalCodes[0]}</span>
                                             <span className="w-0.5 h-0.5 bg-gray-200 rounded-full"></span>
                                             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{p.brand}</span>
@@ -269,7 +269,6 @@ const SalesOrders: React.FC = () => {
                                         <tr key={item.product.id} className="bg-white hover:bg-indigo-50/30 transition-colors group">
                                             <td className="px-6 py-3">
                                                 <p className="font-black text-slate-800 text-xs uppercase leading-tight mb-1">{item.product.name}</p>
-                                                {/* Fix: Updated display to use internalCodes[0] */}
                                                 <p className="text-[9px] text-gray-400 font-mono font-bold">{item.product.internalCodes[0]}</p>
                                             </td>
                                             <td className="px-4 py-3">
