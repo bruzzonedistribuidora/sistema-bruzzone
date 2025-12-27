@@ -2,8 +2,7 @@
 import React from 'react';
 import { 
     Settings, Building2, ShieldCheck, Shield, Store, LayoutTemplate, 
-    HardDrive, Mail, DollarSign, Globe, Smartphone, Landmark,
-    ArrowRight, Calculator, Bell, RefreshCw, FileText, UserCheck, Key
+    HardDrive, ArrowRight, Key, RefreshCw, Zap
 } from 'lucide-react';
 import { ViewState } from '../types';
 
@@ -15,8 +14,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onNavigate }) => {
     const configCards = [
         { 
             id: ViewState.COMPANY_SETTINGS, 
-            label: 'Mi Empresa', 
-            desc: 'Razón social, logo, datos fiscales y cuentas bancarias.', 
+            label: 'Mi Empresa e Impuestos', 
+            desc: 'Razón social, logo, datos fiscales y sistemas de financiación.', 
             icon: Building2, 
             color: 'bg-indigo-500' 
         },
@@ -96,17 +95,15 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onNavigate }) => {
                 ))}
             </div>
 
-            {/* SECCIÓN TÉCNICA RÁPIDA */}
             <div className="bg-slate-900 rounded-[3rem] p-10 text-white flex flex-col lg:flex-row justify-between items-center gap-10 shadow-2xl relative overflow-hidden shrink-0">
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Key size={180}/></div>
                 <div className="relative z-10 max-w-lg">
-                    <h4 className="text-2xl font-black uppercase tracking-tighter mb-4">Mantenimiento de Catálogo</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed italic font-medium">Herramientas críticas para el procesamiento masivo de datos. Use con precaución en horarios de poca actividad comercial.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tighter mb-4">Herramientas de Mantenimiento</h4>
+                    <p className="text-slate-400 text-sm leading-relaxed italic font-medium">Procesamiento masivo de datos para los 140k artículos. Use con precaución.</p>
                 </div>
                 <div className="relative z-10 flex flex-wrap justify-center gap-3">
                     <button onClick={() => onNavigate(ViewState.PRICE_UPDATES)} className="bg-white/10 hover:bg-white/20 border border-white/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Sincronizar Costos</button>
                     <button onClick={() => onNavigate(ViewState.MASS_PRODUCT_UPDATE)} className="bg-white/10 hover:bg-white/20 border border-white/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Modificar Masivo</button>
-                    <button onClick={() => onNavigate(ViewState.AI_ASSISTANT)} className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all">Optimizar con IA</button>
                 </div>
             </div>
         </div>
