@@ -1,253 +1,340 @@
-import React, { useState, useEffect } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, CreditCard, Banknote, DollarSign, Calendar, Lock, CheckCircle, FileText, Plus, X, Save, Calculator, AlertTriangle, QrCode, Scroll, Smartphone } from 'lucide-react';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    Wallet, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, CreditCard, 
+    Banknote, DollarSign, Calendar, Lock, CheckCircle, FileText, 
+    Plus, X, Save, Calculator, AlertTriangle, QrCode, Scroll, 
+    Smartphone, Search, Filter, History, Truck, MoreVertical, 
+    ArrowDownRight, Landmark, Receipt, Info, LogOut, LogIn, Download,
+    RotateCcw, Send, Building, LockKeyhole, Unlock, CheckCircle2, XCircle,
+    Printer
+} from 'lucide-react';
 import { CashRegister, Check, TreasuryMovement } from '../types';
 
 const Treasury: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'CAJAS' | 'MOVIMIENTOS' | 'CHEQUES'>('CAJAS');
-
-  // --- PERSISTENCE LOGIC ---
-  const defaultRegisters: CashRegister[] = [
-    { id: '1', name: 'Caja Central', balance: 154200, isOpen: true },
-    { id: '2', name: 'Caja Mostrador 1', balance: 45000, isOpen: false },
-    { id: '3', name: 'Caja Chica Administración', balance: 12000, isOpen: true },
-  ];
-
+  const [activeTab, setActiveTab] = useState<'CAJAS' | 'MOVIMIENTOS' | 'CHEQUES' | 'BANCOS'>('CAJAS');
+  
   const [registers, setRegisters] = useState<CashRegister[]>(() => {
-      const saved = localStorage.getItem('ferrecloud_registers');
-      return saved ? JSON.parse(saved) : defaultRegisters;
+    const saved = localStorage.getItem('ferrecloud_registers');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Caja Mostrador Principal', balance: 154200, isOpen: true },
+      { id: '2', name: 'Caja Administración', balance: 45000, isOpen: true },
+      { id: '3', name: 'Caja Sucursal Norte', balance: 12000, isOpen: false },
+    ];
   });
 
   const [movements, setMovements] = useState<TreasuryMovement[]>(() => {
-      const saved = localStorage.getItem('ferrecloud_movements');
+    const saved = localStorage.getItem('ferrecloud_treasury_movements');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [checks, setChecks] = useState<Check[]>(() => {
+      const saved = localStorage.getItem('ferrecloud_checks');
       return saved ? JSON.parse(saved) : [];
   });
 
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_registers', JSON.stringify(registers));
-  }, [registers]);
-
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
-  }, [movements]);
-
-  const [checks] = useState<Check[]>([
-    { id: 'CH-5542', bank: 'Banco Galicia', number: '55421100', amount: 125000, paymentDate: '2023-11-15', status: 'CARTERA', origin: 'Constructora Del Norte' },
-    { id: 'CH-9921', bank: 'Banco Macro', number: '99213322', amount: 45000, paymentDate: '2023-10-30', status: 'DEPOSITADO', origin: 'Juan Perez' },
-  ]);
-
-  // --- ADD REGISTER LOGIC ---
-  const [isAddRegisterOpen, setIsAddRegisterOpen] = useState(false);
-  const [newRegisterName, setNewRegisterName] = useState('');
-  const [newRegisterBalance, setNewRegisterBalance] = useState(0);
-
-  const handleAddRegister = () => {
-      if (!newRegisterName) return;
-      const newReg: CashRegister = {
-          id: Date.now().toString(),
-          name: newRegisterName,
-          balance: newRegisterBalance,
-          isOpen: true
-      };
-      setRegisters([...registers, newReg]);
-      setIsAddRegisterOpen(false);
-      setNewRegisterName('');
-      setNewRegisterBalance(0);
-  };
-
-  // --- NEW MOVEMENT FORM STATE ---
-  const [movementForm, setMovementForm] = useState({
-      type: 'INCOME' as 'INCOME' | 'EXPENSE',
-      subtype: 'VENTA',
-      paymentMethod: 'EFECTIVO' as TreasuryMovement['paymentMethod'],
-      amount: '',
-      description: '',
-      cashRegisterId: '1'
+  // Modal y Estados de Visualización
+  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [selectedRegisterForHistory, setSelectedRegisterForHistory] = useState<CashRegister | null>(null);
+  const [manualForm, setManualForm] = useState<Partial<TreasuryMovement>>({
+      type: 'INCOME', subtype: 'GASTO_VARIO', paymentMethod: 'EFECTIVO', amount: 0, description: '', cashRegisterId: '1'
   });
 
-  const handleCreateMovement = () => {
-      if (!movementForm.amount || !movementForm.description) {
-          alert("Ingrese monto y descripción");
-          return;
-      }
-      
-      const amountVal = parseFloat(movementForm.amount);
-      
-      const newMov: TreasuryMovement = {
-          id: `M-${Date.now()}`,
-          date: new Date().toLocaleString(),
-          type: movementForm.type,
-          subtype: movementForm.subtype as any,
-          paymentMethod: movementForm.paymentMethod,
-          amount: amountVal,
-          description: movementForm.description,
-          cashRegisterId: movementForm.cashRegisterId
-      };
+  useEffect(() => {
+    localStorage.setItem('ferrecloud_registers', JSON.stringify(registers));
+    localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify(movements));
+    localStorage.setItem('ferrecloud_checks', JSON.stringify(checks));
+  }, [registers, movements, checks]);
 
-      setMovements([newMov, ...movements]);
+  // Lógica mejorada de Apertura/Cierre
+  const toggleRegisterStatus = (id: string) => {
+      const reg = registers.find(r => r.id === id);
+      if (!reg) return;
+
+      const action = reg.isOpen ? 'CIERRE' : 'APERTURA';
+      if (!confirm(`¿Confirmar ${action} de ${reg.name}?`)) return;
 
       setRegisters(prev => prev.map(r => {
-          if (r.id === movementForm.cashRegisterId) {
-              const newBalance = movementForm.type === 'INCOME' 
-                  ? r.balance + amountVal 
-                  : r.balance - amountVal;
-              return { ...r, balance: newBalance };
+          if (r.id === id) {
+              const newState = !r.isOpen;
+              // Registrar evento en el log de movimientos para trazabilidad
+              const auditEvent: TreasuryMovement = {
+                  id: `LOG-${Date.now()}`,
+                  date: new Date().toLocaleString(),
+                  type: 'INCOME', // No afecta saldo real
+                  subtype: 'GASTO_VARIO',
+                  paymentMethod: 'EFECTIVO',
+                  amount: 0,
+                  description: `*** ${action} DE CAJA - SALDO: $${r.balance.toLocaleString()} ***`,
+                  cashRegisterId: r.id
+              };
+              setMovements(m => [auditEvent, ...m]);
+              return { ...r, isOpen: newState };
           }
           return r;
       }));
-
-      setMovementForm({ ...movementForm, amount: '', description: '' });
-      alert("Movimiento registrado correctamente.");
   };
 
-  // --- TRANSFER LOGIC ---
-  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-  const [transferData, setTransferData] = useState({ fromId: '', toId: '', amount: '' });
-
-  const handleTransfer = () => {
-      const amount = parseFloat(transferData.amount);
-      if (!transferData.fromId || !transferData.toId || isNaN(amount) || amount <= 0) {
-          alert("Verifique los datos de la transferencia");
-          return;
-      }
-      const sourceReg = registers.find(r => r.id === transferData.fromId);
-      if (!sourceReg || sourceReg.balance < amount) {
-          alert("Saldo insuficiente en la caja de origen");
+  const handleAddMovement = () => {
+      if (!manualForm.amount || !manualForm.description || !manualForm.cashRegisterId) {
+          alert("Faltan datos obligatorios.");
           return;
       }
 
+      const reg = registers.find(r => r.id === manualForm.cashRegisterId);
+      if (!reg?.isOpen) {
+          alert("Error: La caja seleccionada se encuentra CERRADA. Debe abrirla para operar.");
+          return;
+      }
+
+      const newMov: TreasuryMovement = {
+          ...manualForm as TreasuryMovement,
+          id: `M-${Date.now()}`,
+          date: new Date().toLocaleString()
+      };
+
+      setMovements([newMov, ...movements]);
       setRegisters(prev => prev.map(r => {
-          if (r.id === transferData.fromId) return { ...r, balance: r.balance - amount };
-          if (r.id === transferData.toId) return { ...r, balance: r.balance + amount };
+          if (r.id === manualForm.cashRegisterId) {
+              const impact = newMov.type === 'INCOME' ? newMov.amount : -newMov.amount;
+              return { ...r, balance: r.balance + impact };
+          }
           return r;
       }));
-
-      const commonDesc = `Transferencia interna de ${sourceReg.name} a ${registers.find(r=>r.id===transferData.toId)?.name}`;
-      const outMov: TreasuryMovement = { id: `TR-OUT-${Date.now()}`, date: new Date().toLocaleString(), type: 'EXPENSE', subtype: 'RETIRO_SOCIO', paymentMethod: 'EFECTIVO', amount: amount, description: commonDesc, cashRegisterId: transferData.fromId };
-      const inMov: TreasuryMovement = { id: `TR-IN-${Date.now()}`, date: new Date().toLocaleString(), type: 'INCOME', subtype: 'GASTO_VARIO', paymentMethod: 'EFECTIVO', amount: amount, description: commonDesc, cashRegisterId: transferData.toId };
-
-      setMovements([inMov, outMov, ...movements]);
-      setIsTransferModalOpen(false);
-      setTransferData({ fromId: '', toId: '', amount: '' });
+      setIsManualEntryOpen(false);
+      setManualForm({ ...manualForm, amount: 0, description: '' });
   };
 
+  const registerMovements = useMemo(() => {
+      if (!selectedRegisterForHistory) return [];
+      return movements.filter(m => m.cashRegisterId === selectedRegisterForHistory.id);
+  }, [movements, selectedRegisterForHistory]);
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 h-full flex flex-col bg-slate-50 overflow-hidden font-sans">
+      
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Tesorería y Finanzas</h2>
-          <p className="text-gray-500 text-sm">Control de cajas y movimientos de fondos con guardado local.</p>
+          <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
+              <Wallet className="text-indigo-600"/> Tesorería y Fondos
+          </h2>
+          <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-1 italic">Control de Efectivo, Valores y Arqueos</p>
         </div>
-        <div className="flex gap-4">
-             {activeTab === 'CAJAS' && (
-                <button onClick={() => setIsAddRegisterOpen(true)} className="bg-ferre-orange text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-orange-600 transition-colors shadow-sm text-sm font-medium">
-                    <Plus size={16} /> Nueva Caja
-                </button>
-             )}
-            <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-                <button onClick={() => setActiveTab('CAJAS')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'CAJAS' ? 'bg-yellow-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>Cajas</button>
-                <button onClick={() => setActiveTab('MOVIMIENTOS')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'MOVIMIENTOS' ? 'bg-yellow-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>Ordenes y Recibos</button>
-                <button onClick={() => setActiveTab('CHEQUES')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'CHEQUES' ? 'bg-yellow-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>Cartera de Cheques</button>
-            </div>
+        <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
+            <button onClick={() => setActiveTab('CAJAS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CAJAS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Puntos de Efectivo</button>
+            <button onClick={() => setActiveTab('CHEQUES')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CHEQUES' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cartera Valores</button>
+            <button onClick={() => setActiveTab('MOVIMIENTOS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'MOVIMIENTOS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Libro Diario</button>
         </div>
       </div>
 
-      {activeTab === 'CAJAS' && (
-        <div className="space-y-6 animate-fade-in">
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {registers.map(reg => (
-                  <div key={reg.id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all relative overflow-hidden">
-                      <div className="flex justify-between items-start mb-4">
-                          <div className="p-3 bg-yellow-50 text-yellow-600 rounded-lg"><Wallet size={24} /></div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${reg.isOpen ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {reg.isOpen ? 'ABIERTA' : 'CERRADA'}
-                          </span>
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+          
+          {activeTab === 'CAJAS' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in pb-10">
+                  {registers.map(reg => (
+                      <div key={reg.id} className={`bg-white rounded-[2.5rem] p-8 border transition-all duration-300 relative group flex flex-col ${reg.isOpen ? 'border-gray-200 shadow-sm' : 'border-red-100 bg-red-50/20 grayscale-[0.3]'}`}>
+                          <div className="flex justify-between items-start mb-8">
+                              <div className={`p-4 rounded-3xl transition-all ${reg.isOpen ? 'bg-indigo-50 text-indigo-600 shadow-lg shadow-indigo-100' : 'bg-red-100 text-red-600'}`}>
+                                  {reg.isOpen ? <Unlock size={28}/> : <LockKeyhole size={28}/>}
+                              </div>
+                              <div className="text-right">
+                                  <h4 className="font-black text-slate-800 uppercase tracking-tight text-lg leading-none mb-1.5">{reg.name}</h4>
+                                  <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${reg.isOpen ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                      {reg.isOpen ? 'OPERATIVA' : 'CERRADA'}
+                                  </span>
+                              </div>
+                          </div>
+                          
+                          <div className="mb-10">
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Saldo en Caja</p>
+                              <p className={`text-4xl font-black tracking-tighter ${reg.isOpen ? 'text-slate-900' : 'text-slate-400'}`}>
+                                  ${reg.balance.toLocaleString('es-AR')}
+                              </p>
+                          </div>
+
+                          <div className="mt-auto grid grid-cols-2 gap-3">
+                              <button 
+                                  onClick={() => { setManualForm({...manualForm, cashRegisterId: reg.id}); setIsManualEntryOpen(true); }}
+                                  disabled={!reg.isOpen}
+                                  className={`py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${reg.isOpen ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}>
+                                  <Plus size={14}/> Movimiento
+                              </button>
+                              <button 
+                                onClick={() => setSelectedRegisterForHistory(reg)}
+                                className="bg-slate-100 text-slate-500 hover:bg-white hover:text-indigo-600 border border-slate-200 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                                  <History size={16}/> Historial
+                              </button>
+                          </div>
+
+                          <button 
+                            onClick={() => toggleRegisterStatus(reg.id)}
+                            className={`mt-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${reg.isOpen ? 'text-red-400 border-red-100 hover:bg-red-50' : 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'}`}>
+                              {reg.isOpen ? <><XCircle size={14}/> Realizar Arqueo y Cerrar</> : <><CheckCircle2 size={14}/> Abrir Punto de Venta</>}
+                          </button>
                       </div>
-                      <h3 className="text-gray-500 text-sm font-medium uppercase tracking-wide">{reg.name}</h3>
-                      <p className="text-3xl font-bold text-gray-800 mt-2">${reg.balance.toLocaleString('es-AR')}</p>
-                      <div className="mt-6 flex gap-2">
-                          <button onClick={() => setActiveTab('MOVIMIENTOS')} className="flex-1 text-xs bg-ferre-dark text-white hover:bg-slate-800 py-2 rounded font-medium">Ver Movimientos</button>
-                      </div>
+                  ))}
+              </div>
+          )}
+
+          {activeTab === 'MOVIMIENTOS' && (
+              <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden animate-fade-in flex flex-col flex-1 min-h-[500px]">
+                  <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                      <h3 className="font-black text-slate-800 uppercase tracking-tighter">Libro de Caja Unificado</h3>
+                      <button className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border border-indigo-100 px-4 py-2 rounded-xl hover:bg-indigo-50 transition-all flex items-center gap-2">
+                          <Download size={14}/> Excel / CSV
+                      </button>
                   </div>
-              ))}
-           </div>
-           <div className="bg-white p-6 rounded-xl border border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-full"><ArrowRightLeft size={24} /></div>
-                    <div>
-                        <h4 className="font-bold text-gray-800">Transferencia entre Cajas</h4>
-                        <p className="text-sm text-gray-500">Mover fondos de forma segura entre tus cuentas.</p>
-                    </div>
-                </div>
-                <button onClick={() => setIsTransferModalOpen(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Nueva Transferencia</button>
-           </div>
-        </div>
-      )}
+                  <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                          <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em] sticky top-0">
+                              <tr>
+                                  <th className="px-8 py-5">Fecha / Auditoría</th>
+                                  <th className="px-8 py-5">Caja</th>
+                                  <th className="px-8 py-5">Concepto</th>
+                                  <th className="px-8 py-5">Medio</th>
+                                  <th className="px-8 py-5 text-right">Monto</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                              {movements.length === 0 ? (
+                                  <tr><td colSpan={5} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">No se registran movimientos en el período</td></tr>
+                              ) : movements.map(m => (
+                                  <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${m.description.includes('***') ? 'bg-slate-50/50 italic' : ''}`}>
+                                      <td className="px-8 py-5 text-[11px] font-bold text-slate-400">{m.date}</td>
+                                      <td className="px-8 py-5">
+                                          <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2 py-1 rounded-lg uppercase">
+                                              {registers.find(r => r.id === m.cashRegisterId)?.name || 'S/D'}
+                                          </span>
+                                      </td>
+                                      <td className="px-8 py-5 font-black text-slate-800 uppercase text-[11px] tracking-tight">{m.description}</td>
+                                      <td className="px-8 py-5 text-[10px] font-bold text-gray-400 uppercase">{m.paymentMethod}</td>
+                                      <td className={`px-8 py-5 text-right font-black text-lg tracking-tighter ${m.amount === 0 ? 'text-slate-300' : m.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                                          {m.amount === 0 ? '-' : (m.type === 'INCOME' ? '+' : '-') + '$' + m.amount.toLocaleString('es-AR')}
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          )}
+      </div>
 
-      {activeTab === 'MOVIMIENTOS' && (
-        <div className="flex gap-6 h-full animate-fade-in">
-            <div className="w-1/3 bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-fit">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><FileText size={18} /> Nuevo Movimiento</h3>
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setMovementForm({ ...movementForm, type: 'INCOME' })} className={`py-2 border-2 rounded-lg text-xs flex items-center justify-center gap-1 transition-colors ${movementForm.type === 'INCOME' ? 'border-green-500 bg-green-50 text-green-700 font-bold' : 'border-gray-200 text-gray-600'}`}>RECIBO</button>
-                        <button onClick={() => setMovementForm({ ...movementForm, type: 'EXPENSE' })} className={`py-2 border-2 rounded-lg text-xs flex items-center justify-center gap-1 transition-colors ${movementForm.type === 'EXPENSE' ? 'border-red-500 bg-red-50 text-red-700 font-bold' : 'border-gray-200 text-gray-600'}`}>ORDEN PAGO</button>
-                    </div>
-                    <select className="w-full border border-gray-300 rounded p-2 text-sm bg-white" value={movementForm.cashRegisterId} onChange={(e) => setMovementForm({...movementForm, cashRegisterId: e.target.value})}>
-                        {registers.map(reg => <option key={reg.id} value={reg.id}>{reg.name}</option>)}
-                    </select>
-                    <input type="number" className="w-full border border-gray-300 rounded p-2 text-sm outline-none font-bold" placeholder="Monto $" value={movementForm.amount} onChange={(e) => setMovementForm({...movementForm, amount: e.target.value})}/>
-                    <textarea className="w-full border border-gray-300 rounded p-2 text-sm outline-none h-20" placeholder="Descripción..." value={movementForm.description} onChange={(e) => setMovementForm({...movementForm, description: e.target.value})}></textarea>
-                    <button onClick={handleCreateMovement} className={`w-full text-white font-bold py-3 rounded-lg shadow-md ${movementForm.type === 'INCOME' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>Registrar</button>
-                </div>
-            </div>
-            <div className="w-2/3 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-gray-700">Historial Reciente</div>
-                <div className="flex-1 overflow-auto">
-                    <table className="w-full text-left">
-                        <tbody className="divide-y divide-gray-100">
-                            {movements.map(mov => (
-                                <tr key={mov.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 text-xs text-gray-500">{mov.date}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-800">{mov.description}</td>
-                                    <td className={`px-6 py-4 text-sm font-bold text-right ${mov.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {mov.type === 'INCOME' ? '+' : '-'}${mov.amount.toLocaleString('es-AR')}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-      )}
-
-      {/* Modals are simplified to keep length focused on persistence */}
-      {isAddRegisterOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl p-6 w-full max-w-sm">
-                  <h3 className="font-bold mb-4">Nueva Caja</h3>
-                  <input type="text" className="w-full p-2 border rounded mb-4" placeholder="Nombre" value={newRegisterName} onChange={e => setNewRegisterName(e.target.value)} />
-                  <button onClick={handleAddRegister} className="w-full bg-ferre-orange text-white py-2 rounded font-bold">Crear</button>
-                  <button onClick={() => setIsAddRegisterOpen(false)} className="w-full mt-2 text-gray-500 text-sm">Cancelar</button>
+      {/* MODAL: MOVIMIENTO MANUAL */}
+      {isManualEntryOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><ArrowRightLeft size={24}/></div>
+                          <div>
+                              <h3 className="font-black uppercase tracking-tighter text-xl">Nueva Operación</h3>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ingreso / Egreso a Caja</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsManualEntryOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                  </div>
+                  <div className="p-10 space-y-8 bg-slate-50/50">
+                      <div className="grid grid-cols-2 gap-4">
+                          <button onClick={() => setManualForm({...manualForm, type: 'INCOME'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'INCOME' ? 'border-green-600 bg-green-50 text-green-700 shadow-md shadow-green-100' : 'border-gray-200 bg-white text-gray-400'}`}>Ingreso (+)</button>
+                          <button onClick={() => setManualForm({...manualForm, type: 'EXPENSE'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'EXPENSE' ? 'border-red-600 bg-red-50 text-red-700 shadow-md shadow-red-100' : 'border-gray-200 bg-white text-gray-400'}`}>Egreso (-)</button>
+                      </div>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Detalle de la Operación</label>
+                              <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all uppercase" placeholder="Ej: Pago Flete, Venta Mostrador..." value={manualForm.description} onChange={e => setManualForm({...manualForm, description: e.target.value.toUpperCase()})} />
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe Final ($)</label>
+                              <input type="number" className="w-full p-5 bg-white border border-gray-200 rounded-3xl outline-none font-black text-3xl text-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all" value={manualForm.amount || ''} onChange={e => setManualForm({...manualForm, amount: parseFloat(e.target.value) || 0})} placeholder="0.00" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Caja</label>
+                                  <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.cashRegisterId} onChange={e => setManualForm({...manualForm, cashRegisterId: e.target.value})}>
+                                      {registers.map(r => <option key={r.id} value={r.id} disabled={!r.isOpen}>{r.name} {!r.isOpen ? '(CERRADA)' : ''}</option>)}
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Medio</label>
+                                  <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.paymentMethod} onChange={e => setManualForm({...manualForm, paymentMethod: e.target.value as any})}>
+                                      <option value="EFECTIVO">Efectivo</option>
+                                      <option value="TRANSFERENCIA">Transferencia</option>
+                                      <option value="MERCADO_PAGO">Mercado Pago</option>
+                                  </select>
+                              </div>
+                          </div>
+                      </div>
+                      <button onClick={handleAddMovement} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all active:scale-95">Validar y Registrar</button>
+                  </div>
               </div>
           </div>
       )}
-      
-      {isTransferModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                  <h3 className="font-bold mb-4">Transferencia</h3>
-                  <select className="w-full p-2 border rounded mb-2" value={transferData.fromId} onChange={e => setTransferData({...transferData, fromId: e.target.value})}>
-                      <option value="">Origen...</option>
-                      {registers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                  <select className="w-full p-2 border rounded mb-2" value={transferData.toId} onChange={e => setTransferData({...transferData, toId: e.target.value})}>
-                      <option value="">Destino...</option>
-                      {registers.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                  <input type="number" className="w-full p-2 border rounded mb-4" placeholder="Monto" value={transferData.amount} onChange={e => setTransferData({...transferData, amount: e.target.value})} />
-                  <button onClick={handleTransfer} className="w-full bg-blue-600 text-white py-2 rounded font-bold">Transferir</button>
-                  <button onClick={() => setIsTransferModalOpen(false)} className="w-full mt-2 text-gray-500 text-sm">Cancelar</button>
+
+      {/* DRAWER: HISTORIAL DETALLADO POR CAJA */}
+      {selectedRegisterForHistory && (
+          <div className="fixed inset-0 z-[250] flex justify-end bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col animate-slide-in-right">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-6">
+                          <div className="w-16 h-16 bg-white/10 rounded-[1.8rem] flex items-center justify-center text-white shadow-xl">
+                              <History size={32}/>
+                          </div>
+                          <div>
+                              <h3 className="text-2xl font-black uppercase tracking-tighter">{selectedRegisterForHistory.name}</h3>
+                              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Historial de Operaciones Localizadas</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setSelectedRegisterForHistory(null)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X size={32}/></button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between">
+                          <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo en este Punto</p>
+                              <p className="text-4xl font-black text-slate-900 tracking-tighter">${selectedRegisterForHistory.balance.toLocaleString('es-AR')}</p>
+                          </div>
+                          <div className={`px-4 py-2 rounded-2xl border font-black text-[10px] uppercase tracking-widest ${selectedRegisterForHistory.isOpen ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                              {selectedRegisterForHistory.isOpen ? 'OPERATIVA' : 'CERRADA'}
+                          </div>
+                      </div>
+
+                      <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 border-b border-gray-100 bg-slate-50/50">
+                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Scroll size={14}/> Movimientos del Punto</h4>
+                          </div>
+                          <div className="overflow-x-auto">
+                              <table className="w-full text-left">
+                                  <thead className="bg-white text-[9px] font-black text-gray-400 uppercase tracking-widest border-b">
+                                      <tr>
+                                          <th className="px-6 py-4">Fecha</th>
+                                          <th className="px-6 py-4">Detalle</th>
+                                          <th className="px-6 py-4 text-right">Monto</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-50 text-[11px]">
+                                      {registerMovements.length === 0 ? (
+                                          <tr><td colSpan={3} className="py-20 text-center text-gray-300 font-black uppercase">Sin registros en este punto de efectivo</td></tr>
+                                      ) : registerMovements.map(m => (
+                                          <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${m.description.includes('***') ? 'bg-slate-50 italic' : ''}`}>
+                                              <td className="px-6 py-4 font-bold text-gray-400">{m.date.split(',')[1] || m.date}</td>
+                                              <td className="px-6 py-4 font-black text-slate-700 uppercase">{m.description}</td>
+                                              <td className={`px-6 py-4 text-right font-black ${m.amount === 0 ? 'text-slate-300' : m.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
+                                                  {m.amount === 0 ? '-' : (m.type === 'INCOME' ? '+' : '-') + '$' + m.amount.toLocaleString('es-AR')}
+                                              </td>
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+                  
+                  <div className="p-8 border-t border-gray-100 bg-white">
+                      <button onClick={() => window.print()} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+                          <Printer size={18}/> Imprimir Arqueo de Punto
+                      </button>
+                  </div>
               </div>
           </div>
       )}

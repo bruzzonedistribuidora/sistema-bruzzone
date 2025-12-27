@@ -1,239 +1,250 @@
 
-import React from 'react';
-import { TrendingUp, TrendingDown, DollarSign, ArrowUpRight, MoreHorizontal, FileText, ShoppingBag, Users, Wallet, Scroll, Smartphone, Package, Truck, CreditCard } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { DashboardStats } from '../types';
+import React, { useState, useEffect } from 'react';
+import { 
+    Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
+    Calculator, Settings, Layers, ClipboardList, TrendingUp, 
+    Activity, ArrowUpRight, Search, FileText, Bot, Tags,
+    History, Globe, Landmark, ShieldCheck, FileSpreadsheet,
+    FileBarChart2, AlertTriangle, Star, Check, Edit3, X, Plus,
+    ListOrdered, Tag, CalendarDays, Shield, ArrowLeftRight,
+    Building2, HardDrive, LayoutTemplate, Store, DollarSign,
+    Zap, Boxes, FileUp, Smartphone, UserCheck, CheckCircle,
+    Sparkles, ShieldAlert, RotateCcw
+} from 'lucide-react';
+import { ViewState } from '../types';
 
-const salesData = [
-  { name: 'Sem 1', ventas: 420000 },
-  { name: 'Sem 2', ventas: 380000 },
-  { name: 'Sem 3', ventas: 510000 },
-  { name: 'Sem 4', ventas: 640000 },
+interface DashboardProps {
+    onNavigate: (view: ViewState) => void;
+}
+
+interface Shortcut {
+    id: ViewState;
+    label: string;
+    category: string;
+    icon: any;
+    color: string;
+}
+
+const ALL_SHORTCUTS: Shortcut[] = [
+    // --- VENTAS ---
+    { id: ViewState.POS, label: "Punto de Venta", category: "Ventas", icon: Receipt, color: "bg-gradient-to-br from-green-400 to-emerald-600" },
+    { id: ViewState.SALES_ORDERS, label: "Pedidos Clientes", category: "Ventas", icon: ListOrdered, color: "bg-gradient-to-br from-green-500 to-teal-600" },
+    { id: ViewState.CREDIT_NOTES, label: "Notas de Crédito", category: "Ventas", icon: RotateCcw, color: "bg-gradient-to-br from-red-400 to-rose-600" },
+    { id: ViewState.ONLINE_SALES, label: "Ventas Online", category: "Ventas", icon: Globe, color: "bg-gradient-to-br from-sky-400 to-blue-600" },
+    { id: ViewState.REMITOS, label: "Remitos / Cta Cte", category: "Ventas", icon: ClipboardList, color: "bg-gradient-to-br from-blue-500 to-indigo-600" },
+    { id: ViewState.CLIENTS, label: "Fichero Clientes", category: "Ventas", icon: Users, color: "bg-gradient-to-br from-slate-400 to-slate-600" },
+    { id: ViewState.CLIENT_BALANCES, label: "Saldos Clientes", category: "Ventas", icon: Landmark, color: "bg-gradient-to-br from-rose-400 to-red-600" },
+    { id: ViewState.PRESUPUESTOS, label: "Presupuestos", category: "Ventas", icon: FileSpreadsheet, color: "bg-gradient-to-br from-emerald-400 to-teal-600" },
+
+    // --- STOCK & COMPRAS ---
+    { id: ViewState.INVENTORY, label: "Artículos", category: "Stock", icon: Package, color: "bg-gradient-to-br from-indigo-400 to-indigo-700" },
+    { id: ViewState.PRICE_UPDATES, label: "Listas Precios", category: "Stock", icon: Layers, color: "bg-gradient-to-br from-violet-400 to-purple-700" },
+    { id: ViewState.MASS_PRODUCT_UPDATE, label: "Cambios Masivos", category: "Stock", icon: Zap, color: "bg-gradient-to-br from-amber-400 to-orange-500" },
+    { id: ViewState.STOCK_TRANSFERS, label: "Traslados", category: "Stock", icon: ArrowLeftRight, color: "bg-gradient-to-br from-slate-600 to-slate-800" },
+    { id: ViewState.PURCHASES, label: "Cargar Compras", category: "Stock", icon: Truck, color: "bg-gradient-to-br from-slate-700 to-slate-900" },
+    { id: ViewState.REPLENISHMENT, label: "Pedidos Prov.", category: "Stock", icon: ShoppingCart, color: "bg-gradient-to-br from-indigo-600 to-blue-800" },
+    { id: ViewState.SHORTAGES, label: "Faltantes", category: "Stock", icon: AlertTriangle, color: "bg-gradient-to-br from-orange-400 to-red-500" },
+    { id: ViewState.LABEL_PRINTING, label: "Etiquetas", category: "Stock", icon: Tag, color: "bg-gradient-to-br from-amber-500 to-yellow-600" },
+
+    // --- FINANZAS ---
+    { id: ViewState.TREASURY, label: "Tesorería", category: "Finanzas", icon: Wallet, color: "bg-gradient-to-br from-orange-400 to-orange-600" },
+    { id: ViewState.DAILY_MOVEMENTS, label: "Gastos Diarios", category: "Finanzas", icon: CalendarDays, color: "bg-gradient-to-br from-rose-500 to-pink-700" },
+    { id: ViewState.ACCOUNTING, label: "Contabilidad", category: "Finanzas", icon: Calculator, color: "bg-gradient-to-br from-slate-500 to-slate-700" },
+    { id: ViewState.STATISTICS, label: "Estadísticas", category: "Finanzas", icon: TrendingUp, color: "bg-gradient-to-br from-cyan-400 to-blue-500" },
+    { id: ViewState.REPORTS, label: "Reportes", category: "Finanzas", icon: FileBarChart2, color: "bg-gradient-to-br from-sky-500 to-indigo-600" },
+    { id: ViewState.EMPLOYEES, label: "Personal", category: "Finanzas", icon: UserCheck, color: "bg-gradient-to-br from-indigo-500 to-purple-600" },
+
+    // --- CONFIGURACIÓN ---
+    { id: ViewState.CONFIG_PANEL, label: "Panel Maestro", category: "Sistema", icon: Settings, color: "bg-gradient-to-br from-slate-800 to-slate-950" },
+    { id: ViewState.COMPANY_SETTINGS, label: "Mi Empresa", category: "Sistema", icon: Building2, color: "bg-gradient-to-br from-blue-600 to-indigo-800" },
+    { id: ViewState.AFIP_CONFIG, label: "Enlace AFIP", category: "Sistema", icon: ShieldCheck, color: "bg-gradient-to-br from-blue-400 to-indigo-500" },
+    { id: ViewState.USERS, label: "Usuarios/Roles", category: "Sistema", icon: Shield, color: "bg-gradient-to-br from-purple-500 to-indigo-700" },
+    { id: ViewState.BRANCHES, label: "Sucursales", category: "Sistema", icon: Store, color: "bg-gradient-to-br from-teal-500 to-emerald-700" },
+    { id: ViewState.PRINT_CONFIG, label: "Imprenta", category: "Sistema", icon: LayoutTemplate, color: "bg-gradient-to-br from-orange-500 to-amber-700" },
+    { id: ViewState.BACKUP, label: "Base de Datos", category: "Sistema", icon: HardDrive, color: "bg-gradient-to-br from-slate-600 to-slate-900" },
+
+    // --- INTELIGENCIA ---
+    { id: ViewState.AI_ASSISTANT, label: "FerreBot IA", category: "Inteligencia", icon: Bot, color: "bg-gradient-to-br from-pink-500 to-rose-600" },
+    { id: ViewState.MARKETING, label: "Marketing", category: "Inteligencia", icon: Sparkles, color: "bg-gradient-to-br from-indigo-600 to-purple-700" },
+    { id: ViewState.PRICE_AUDIT, label: "Auditoría Precios", category: "Inteligencia", icon: ShieldAlert, color: "bg-gradient-to-br from-red-500 to-orange-600" },
 ];
 
-const recentSales = [
-    { id: '#FC-2024-001', client: 'Constructora Del Norte', amount: 154000, status: 'Completado', date: 'Hace 10 min' },
-    { id: '#FC-2024-002', client: 'Juan Pérez (Final)', amount: 12500, status: 'Completado', date: 'Hace 25 min' },
-    { id: '#FC-2024-003', client: 'Mantenimiento Sur SRL', amount: 89000, status: 'Pendiente', date: 'Hace 40 min' },
-    { id: '#FC-2024-004', client: 'Consumidor Final', amount: 3500, status: 'Completado', date: 'Hace 1 hora' },
-    { id: '#FC-2024-005', client: 'Arq. López', amount: 245000, status: 'Enviado', date: 'Hace 2 horas' },
-];
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<ViewState[]>(() => {
+    const saved = localStorage.getItem('ferrecloud_pinned_v3');
+    return saved ? JSON.parse(saved) : [ViewState.POS, ViewState.INVENTORY, ViewState.REMITOS, ViewState.TREASURY, ViewState.PURCHASES, ViewState.PRESUPUESTOS, ViewState.CLIENT_BALANCES, ViewState.PRICE_UPDATES, ViewState.AI_ASSISTANT, ViewState.REPORTS, ViewState.MARKETING, ViewState.PRICE_AUDIT, ViewState.CREDIT_NOTES];
+  });
 
-const Dashboard: React.FC = () => {
-  // Mock Financial Data
-  const treasury = {
-      cashTotal: 211200,
-      registers: [
-          { name: 'Caja Central', amount: 154200 },
-          { name: 'Caja Mostrador 1', amount: 45000 },
-          { name: 'Caja Chica', amount: 12000 },
-      ],
-      checksPhysical: 125000, // Cheques
-      checksElectronic: 45000, // ECheqs
-      clientDebt: 540000, // Saldo Clientes
-      providerDebt: 320000, // Saldo Proveedores
-      stockValue: 15430000 // Stock Valorizado
+  useEffect(() => {
+    localStorage.setItem('ferrecloud_pinned_v3', JSON.stringify(pinnedIds));
+  }, [pinnedIds]);
+
+  const togglePin = (id: ViewState) => {
+    if (pinnedIds.includes(id)) {
+        if (pinnedIds.length > 1) {
+            setPinnedIds(pinnedIds.filter(p => p !== id));
+        }
+    } else {
+        setPinnedIds([...pinnedIds, id]);
+    }
   };
 
+  const DesktopIcon: React.FC<{ shortcut: Shortcut, isPinned: boolean, editMode: boolean }> = ({ shortcut, isPinned, editMode }) => (
+    <div className="relative group animate-fade-in">
+        <div 
+            onClick={() => !editMode && onNavigate(shortcut.id)}
+            className={`w-full flex flex-col items-center gap-3 p-4 rounded-[2.5rem] transition-all cursor-pointer ${
+                editMode ? 'scale-95' : 'hover:bg-white/40 hover:backdrop-blur-md hover:scale-105 active:scale-95'
+            } ${editMode && !isPinned ? 'opacity-40 grayscale hover:opacity-70' : 'opacity-100'}`}
+        >
+            <div className={`w-20 h-20 rounded-[1.8rem] ${shortcut.color} flex items-center justify-center text-white shadow-2xl transition-all border border-white/20 relative overflow-visible`}>
+                <shortcut.icon size={32} />
+                
+                {editMode && (
+                    <button 
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            togglePin(shortcut.id); 
+                        }}
+                        className={`absolute -top-3 -right-3 w-9 h-9 rounded-full flex items-center justify-center shadow-2xl border-2 transition-all z-30 ${
+                            isPinned ? 'bg-green-500 border-white text-white' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white hover:bg-slate-700'
+                        }`}
+                        title={isPinned ? "Quitar del escritorio" : "Anclar al escritorio"}
+                    >
+                        {isPinned ? <Check size={18} strokeWidth={4}/> : <Plus size={18} strokeWidth={4}/>}
+                    </button>
+                )}
+            </div>
+            <div className="text-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1 opacity-70">{shortcut.category}</p>
+                <p className={`text-[11px] font-black uppercase tracking-tighter transition-colors ${editMode && !isPinned ? 'text-slate-400' : 'text-slate-800'}`}>{shortcut.label}</p>
+            </div>
+        </div>
+    </div>
+  );
+
+  const categories = Array.from(new Set(ALL_SHORTCUTS.map(s => s.category)));
+
   return (
-    <div className="p-8 space-y-6 animate-fade-in max-w-7xl mx-auto">
-      
-      {/* --- TOP ROW: FINANCIAL KPIs --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* CAJA ACTUAL */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-              <Wallet size={24} />
+    <div className="h-full bg-slate-50 relative overflow-hidden flex flex-col custom-scrollbar overflow-y-auto">
+      {/* Fondos Decorativos Dinámicos */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-100 rounded-full blur-[120px] opacity-40"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-100 rounded-full blur-[120px] opacity-40"></div>
+
+      <div className="relative z-10 flex-1 flex flex-col p-8 max-w-7xl mx-auto w-full">
+        {/* Cabecera Superior */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+            <div>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">
+                    {isEditMode ? 'Personalizar Escritorio' : 'Mi Escritorio'}
+                </h1>
+                <p className="text-xs font-bold text-slate-400 mt-2 uppercase tracking-[0.2em] flex items-center gap-2">
+                    {isEditMode 
+                        ? 'Selecciona los módulos que utilizas con frecuencia' 
+                        : <><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Bruzzone Cloud OS • 140.000 Artículos</>
+                    }
+                </p>
             </div>
-            <span className="text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-              <ArrowUpRight size={12} /> Activo
-            </span>
-          </div>
-          <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Caja Actual (Total)</h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">${treasury.cashTotal.toLocaleString('es-AR')}</p>
+            
+            <div className="flex items-center gap-4">
+                <button 
+                    onClick={() => setIsEditMode(!isEditMode)}
+                    className={`flex items-center gap-3 px-10 py-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 text-xs ${
+                        isEditMode ? 'bg-indigo-600 text-white ring-8 ring-indigo-50' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                >
+                    {isEditMode ? <><CheckCircle size={18}/> Finalizar Edición</> : <><Edit3 size={18}/> Personalizar Iconos</>}
+                </button>
+            </div>
         </div>
 
-        {/* CHEQUES EN CARTERA */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
-              <Scroll size={24} />
+        {/* MODO EDICIÓN: Agrupado por categorías */}
+        {isEditMode ? (
+            <div className="space-y-12 animate-fade-in pb-20">
+                {categories.map(cat => (
+                    <div key={cat} className="space-y-6">
+                        <div className="flex items-center gap-4">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] whitespace-nowrap">{cat}</h3>
+                            <div className="h-px bg-slate-200 w-full"></div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                            {ALL_SHORTCUTS.filter(s => s.category === cat).map(s => (
+                                <DesktopIcon 
+                                    key={s.id} 
+                                    shortcut={s} 
+                                    isPinned={pinnedIds.includes(s.id)} 
+                                    editMode={true} 
+                                />
+                            ))}
+                        </div>
+                    </div>
+                ))}
             </div>
-            <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-              Cartera
-            </span>
-          </div>
-          <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Cheques + ECheqs</h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">${(treasury.checksPhysical + treasury.checksElectronic).toLocaleString('es-AR')}</p>
-        </div>
-
-        {/* SALDO CLIENTES */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4">
-             <div className="p-3 bg-orange-50 text-orange-600 rounded-lg">
-              <Users size={24} />
+        ) : (
+            /* MODO NORMAL: Grilla limpia de favoritos */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-6 gap-y-12 animate-fade-in">
+                {ALL_SHORTCUTS.filter(s => pinnedIds.includes(s.id)).map(s => (
+                    <DesktopIcon 
+                        key={s.id} 
+                        shortcut={s} 
+                        isPinned={true} 
+                        editMode={false} 
+                    />
+                ))}
+                
+                {/* Botón de Añadir Rápido al final */}
+                <button 
+                    onClick={() => setIsEditMode(true)}
+                    className="flex flex-col items-center gap-3 p-4 rounded-[2.5rem] opacity-40 hover:opacity-100 hover:bg-white/40 transition-all group"
+                >
+                    <div className="w-20 h-20 rounded-[1.8rem] border-4 border-dashed border-slate-300 flex items-center justify-center text-slate-400 group-hover:border-indigo-400 group-hover:text-indigo-500 transition-all">
+                        <Plus size={32} />
+                    </div>
+                    <span className="text-[11px] font-black uppercase tracking-tighter text-slate-400">Añadir Más</span>
+                </button>
             </div>
-            <span className="text-orange-600 bg-orange-50 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-               A Cobrar
-            </span>
-          </div>
-          <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Saldo Clientes</h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">${treasury.clientDebt.toLocaleString('es-AR')}</p>
-        </div>
+        )}
 
-        {/* SALDO PROVEEDORES */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg">
-              <Truck size={24} />
-            </div>
-            <span className="text-red-600 bg-red-50 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-               A Pagar
-            </span>
-          </div>
-          <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Saldo Proveedores</h3>
-          <p className="text-2xl font-bold text-gray-800 mt-1">${treasury.providerDebt.toLocaleString('es-AR')}</p>
-        </div>
-      </div>
+        {/* Widgets de Estado (Solo modo normal) */}
+        {!isEditMode && (
+            <div className="mt-auto pt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-white shadow-xl flex items-center gap-6 group hover:bg-white/80 transition-all">
+                    <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:scale-110 transition-transform">
+                        <Activity size={24}/>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Base de Datos</p>
+                        <h4 className="text-xl font-black text-slate-800 uppercase tracking-tighter mt-1">140k SKUs OK</h4>
+                    </div>
+                </div>
 
-      {/* --- SECOND ROW: STOCK & TREASURY BREAKDOWN --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* STOCK VALORIZADO */}
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-lg p-6 text-white flex flex-col justify-between relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Package size={120} />
-              </div>
-              <div>
-                  <div className="flex items-center gap-2 mb-2 opacity-80">
-                      <Package size={20}/>
-                      <span className="text-sm font-bold uppercase tracking-wider">Inventario</span>
-                  </div>
-                  <h3 className="text-lg font-medium text-slate-300">Stock Valorizado</h3>
-                  <p className="text-4xl font-bold mt-2 text-white">${treasury.stockValue.toLocaleString('es-AR')}</p>
-              </div>
-              <div className="mt-6 pt-6 border-t border-slate-700">
-                  <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Artículos en Sistema</span>
-                      <span className="font-bold">14,200</span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-1">
-                      <span className="text-slate-400">Rotación Mensual Est.</span>
-                      <span className="font-bold text-green-400">12.5%</span>
-                  </div>
-              </div>
-          </div>
+                <div className="bg-white/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-white shadow-xl flex items-center gap-6 group hover:bg-white/80 transition-all">
+                    <div className="p-4 bg-green-50 text-green-600 rounded-2xl group-hover:scale-110 transition-transform">
+                        <ShieldCheck size={24}/>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fiscal ARCA</p>
+                        <h4 className="text-xl font-black text-slate-800 uppercase tracking-tighter mt-1">Conectado</h4>
+                    </div>
+                </div>
 
-          {/* TREASURY BREAKDOWN GRID */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <DollarSign className="text-ferre-orange" size={20}/> Desglose de Disponibilidades
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {/* Cajas Individuales */}
-                  {treasury.registers.map((reg, idx) => (
-                      <div key={idx} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                          <p className="text-xs text-gray-500 font-bold uppercase mb-1">{reg.name}</p>
-                          <p className="font-bold text-gray-800">${reg.amount.toLocaleString('es-AR')}</p>
-                      </div>
-                  ))}
-                  
-                  {/* Cheques Físicos */}
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                      <div className="flex items-center gap-2 mb-1">
-                          <Scroll size={14} className="text-blue-600"/>
-                          <p className="text-xs text-blue-700 font-bold uppercase">Cheques Físicos</p>
-                      </div>
-                      <p className="font-bold text-gray-800">${treasury.checksPhysical.toLocaleString('es-AR')}</p>
-                  </div>
-
-                  {/* E-Cheqs */}
-                  <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                      <div className="flex items-center gap-2 mb-1">
-                          <Smartphone size={14} className="text-indigo-600"/>
-                          <p className="text-xs text-indigo-700 font-bold uppercase">E-Cheqs</p>
-                      </div>
-                      <p className="font-bold text-gray-800">${treasury.checksElectronic.toLocaleString('es-AR')}</p>
-                  </div>
-              </div>
-          </div>
-      </div>
-
-      {/* --- CHART ROW --- */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <TrendingUp size={20} className="text-ferre-orange"/> Ventas por Períodos
-                    </h3>
-                    <p className="text-sm text-gray-500">Evolución de facturación mensual</p>
+                <div className="bg-white/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-white shadow-xl flex items-center gap-6 group hover:bg-white/80 transition-all">
+                    <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
+                        <DollarSign size={24}/>
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ventas Hoy</p>
+                        <h4 className="text-xl font-black text-slate-800 uppercase tracking-tighter mt-1">$215.420</h4>
+                    </div>
                 </div>
             </div>
-            <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                    <linearGradient id="colorVentas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                    </linearGradient>
-                </defs>
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000}k`} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-                    formatter={(val: number) => [`$${val.toLocaleString('es-AR')}`, 'Ventas']}
-                />
-                <Area type="monotone" dataKey="ventas" stroke="#f97316" strokeWidth={3} fillOpacity={1} fill="url(#colorVentas)" />
-                </AreaChart>
-            </ResponsiveContainer>
-            </div>
-        </div>
-
-      {/* --- RECENT TRANSACTIONS (Kept for context) --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-bold text-gray-800">Últimos Movimientos</h3>
-            <button className="text-sm text-ferre-orange font-medium hover:text-orange-700">Ver todos</button>
-        </div>
-        <div className="overflow-x-auto">
-            <table className="w-full">
-                <thead className="bg-gray-50">
-                    <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Transacción</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {recentSales.map((sale) => (
-                        <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sale.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{sale.client}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    sale.status === 'Completado' ? 'bg-green-100 text-green-800' : 
-                                    sale.status === 'Pendiente' ? 'bg-yellow-100 text-yellow-800' : 
-                                    'bg-blue-100 text-blue-800'
-                                }`}>
-                                    {sale.status}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold">
-                                ${sale.amount.toLocaleString('es-AR')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{sale.date}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+        )}
       </div>
+
+      <footer className="p-8 text-center mt-auto">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Bruzzone Cloud OS v4.1</p>
+      </footer>
     </div>
   );
 };

@@ -1,584 +1,180 @@
-import React, { useState, useEffect } from 'react';
-import { User, Plus, Search, Phone, MapPin, FileText, ArrowLeft, ArrowDownLeft, CheckCircle, Wallet, X, DollarSign, Printer, Download, Upload, FileSpreadsheet, Globe, Save, RefreshCw, Key, Mail, Lock, ExternalLink } from 'lucide-react';
-import { Client, CurrentAccountMovement, ViewState } from '../types';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    User, Plus, Search, FileText, Globe, X, Copy, MessageCircle, Key, 
+    ExternalLink, History, Eye, ChevronRight, ShoppingBag, Receipt, 
+    Printer, Mail, DollarSign, ArrowDownLeft, CheckCircle, Wallet, 
+    CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
+    ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
+    Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil
+} from 'lucide-react';
+import { Client, CurrentAccountMovement, CompanyConfig } from '../types';
+import { fetchCompanyByCuit } from '../services/geminiService';
 
 interface ClientsProps {
+    initialClientId?: string;
     onOpenPortal?: (client: Client) => void;
 }
 
-const Clients: React.FC<ClientsProps> = ({ onOpenPortal }) => {
-  const [viewMode, setViewMode] = useState<'LIST' | 'ACCOUNT'>('LIST');
+const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  
-  // Portal Management Modal
-  const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
-  const [portalClient, setPortalClient] = useState<Client | null>(null);
-  const [generatedHash, setGeneratedHash] = useState<string>('');
-
-  // Import Modal State
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importStep, setImportStep] = useState<'UPLOAD' | 'PREVIEW'>('UPLOAD');
-  const [importFile, setImportFile] = useState<File | null>(null);
-
-  // Client Form Modal State
-  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [clientFormData, setClientFormData] = useState<Client>({
-      id: '', name: '', cuit: '', phone: '', address: '', balance: 0, limit: 0, portalEnabled: false, email: ''
-  });
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Mock data for import preview
-  const MOCK_PREVIEW_ROWS = [
-      ['Empresa Importada SRL', '30-55555555-5', '11-0000-0000', 'Calle Importada 1', '100000'],
-      ['Consumidor Importado', '20-44444444-4', '11-1111-1111', 'Calle Importada 2', '50000']
-  ];
-  const IMPORT_FIELDS = ['Nombre/Razón Social', 'CUIT', 'Teléfono', 'Dirección', 'Límite Crédito', 'Ignorar'];
-
-  const defaultClients: Client[] = [
-    { id: '1', name: 'Constructora del Norte', cuit: '30-12345678-9', phone: '11-4455-6677', address: 'Av. Libertador 1200', balance: 540000, limit: 1000000, portalEnabled: true, email: 'admin@cdnorte.com', portalHash: 'SUDw2VjNDd57pbvH450tygiEC' },
-    { id: '2', name: 'Juan Perez', cuit: '20-11223344-5', phone: '11-9988-7766', address: 'Calle 123, Local 4', balance: 0, limit: 200000, portalEnabled: false, email: 'juan@gmail.com' },
-    { id: '3', name: 'Estudio Arquitectura López', cuit: '30-99887766-1', phone: '11-2233-4455', address: 'San Martin 400', balance: 12500, limit: 500000, portalEnabled: true, email: 'arq.lopez@estudio.com', portalHash: 'X998877AAABBB' },
-  ];
-
-  // --- CLIENTS STATE WITH PERSISTENCE ---
   const [clients, setClients] = useState<Client[]>(() => {
       const saved = localStorage.getItem('ferrecloud_clients');
-      return saved ? JSON.parse(saved) : defaultClients;
+      return saved ? JSON.parse(saved) : [
+        { id: '1', name: 'Constructora del Norte', cuit: '30-12345678-9', phone: '11-4455-6677', address: 'Av. Libertador 1200', balance: 540000, limit: 1000000, points: 12500, portalEnabled: true, portalHash: 'C-D-N-2024' },
+        { id: '2', name: 'Juan Perez', cuit: '20-11223344-5', phone: '11-2233-4455', address: 'Calle Falsa 123', balance: 15000, limit: 50000, points: 450, portalEnabled: false }
+      ];
   });
 
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_clients', JSON.stringify(clients));
-  }, [clients]);
+  const companyConfig: CompanyConfig = useMemo(() => {
+    const saved = localStorage.getItem('company_config');
+    return saved ? JSON.parse(saved) : { loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 } };
+  }, []);
 
-  // Mock Movements for the selected client
-  const [movements, setMovements] = useState<CurrentAccountMovement[]>([
-      { id: '1', date: '2023-10-01', voucherType: 'FC A 0001-00004500', description: 'Compra Materiales Obra 1', debit: 200000, credit: 0, balance: 200000 },
-      { id: '2', date: '2023-10-05', voucherType: 'REC X 0001-00000100', description: 'Pago a cuenta transferencia', debit: 0, credit: 50000, balance: 150000 },
-      { id: '3', date: '2023-10-10', voucherType: 'FC A 0001-00004522', description: 'Compra Herramientas', debit: 390000, credit: 0, balance: 540000 },
-  ]);
+  const [movements, setMovements] = useState<CurrentAccountMovement[]>(() => {
+      const saved = localStorage.getItem('ferrecloud_movements');
+      return saved ? JSON.parse(saved) : [];
+  });
 
-  // Mock Unpaid Invoices for Linking
-  const unpaidInvoices = [
-      { id: 'FC-4500', label: 'FC A 0001-00004500 ($150,000 saldo)', amount: 150000 },
-      { id: 'FC-4522', label: 'FC A 0001-00004522 ($390,000 saldo)', amount: 390000 },
-  ];
-  
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [clientForm, setClientForm] = useState<Partial<Client>>({
+      id: '', name: '', cuit: '', phone: '', balance: 0, limit: 100000, points: 0, address: '', email: '', portalEnabled: true
+  });
 
-  const handleOpenAccount = (client: Client) => {
-      setSelectedClient(client);
-      setViewMode('ACCOUNT');
-  };
+  useEffect(() => { localStorage.setItem('ferrecloud_clients', JSON.stringify(clients)); }, [clients]);
+  useEffect(() => { localStorage.setItem('ferrecloud_movements', JSON.stringify(movements)); }, [movements]);
 
-  const handleToggleInvoice = (id: string, amount: number) => {
-      if (selectedInvoices.includes(id)) {
-          setSelectedInvoices(prev => prev.filter(i => i !== id));
-          setPaymentAmount(prev => Math.max(0, prev - amount));
-      } else {
-          setSelectedInvoices(prev => [...prev, id]);
-          setPaymentAmount(prev => prev + amount);
-      }
-  };
-
-  const handleRegisterPayment = () => {
-      if (!selectedClient) return;
-      const newMovement: CurrentAccountMovement = {
-          id: Date.now().toString(),
-          date: new Date().toISOString().split('T')[0],
-          voucherType: `REC X 0001-${Math.floor(Math.random()*10000)}`,
-          description: `Cobro Recibo (Imputa: ${selectedInvoices.join(', ')})`,
-          debit: 0,
-          credit: paymentAmount,
-          balance: selectedClient.balance - paymentAmount
-      };
-      setMovements([...movements, newMovement]);
-      // Update client balance
-      const updatedClient = { ...selectedClient, balance: selectedClient.balance - paymentAmount };
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
-      setSelectedClient(updatedClient); // Update selected client view
-      setShowPaymentModal(false);
-      setPaymentAmount(0);
-      setSelectedInvoices([]);
-  };
-
-  // --- CLIENT FORM HANDLERS ---
-  const handleOpenClientModal = (client?: Client) => {
-      if (client) {
-          setClientFormData(client);
-      } else {
-          setClientFormData({
-              id: Date.now().toString(),
-              name: '',
-              cuit: '',
-              phone: '',
-              address: '',
-              balance: 0,
-              limit: 0,
-              email: ''
-          });
-      }
-      setIsClientModalOpen(true);
-  };
-
-  const handleSearchCuit = () => {
-      if (!clientFormData.cuit || clientFormData.cuit.length < 11) {
-          alert("Por favor ingrese un CUIT válido (11 dígitos sin guiones ni espacios preferentemente).");
-          return;
-      }
-      
+  const handleSearchCuit = async () => {
+      if (!clientForm.cuit || clientForm.cuit.length < 8) return;
       setIsSearchingCuit(true);
-      // Simulate API Call to AFIP Padron
-      setTimeout(() => {
-          setIsSearchingCuit(false);
-          // Mock data response based on random chance or static
-          setClientFormData(prev => ({
-              ...prev,
-              name: 'RAZON SOCIAL IMPORTADA DESDE AFIP S.A.',
-              address: 'Av. Fiscal 555, Piso 1, CABA',
-              phone: '11-4000-9999'
-          }));
-          alert("Datos obtenidos del Padrón AFIP correctamente.");
-      }, 1500);
+      try {
+          const data = await fetchCompanyByCuit(clientForm.cuit);
+          if (data) setClientForm(prev => ({ ...prev, name: data.name || data.razonSocial, address: data.address || data.domicilio || '' }));
+      } catch (err) { console.error(err); } finally { setIsSearchingCuit(false); }
   };
 
   const handleSaveClient = () => {
-      if (!clientFormData.name) return;
+      if (!clientForm.name || !clientForm.cuit) return;
       setClients(prev => {
-          const exists = prev.find(c => c.id === clientFormData.id);
-          if (exists) return prev.map(c => c.id === clientFormData.id ? clientFormData : c);
-          return [...prev, clientFormData];
+          if (isEditing && clientForm.id) {
+              return prev.map(c => c.id === clientForm.id ? { ...c, ...clientForm } as Client : c);
+          } else {
+              return [{...clientForm as Client, id: Date.now().toString(), balance: 0, points: 0, portalHash: `p-${Math.random().toString(36).substr(2, 5)}`}, ...prev];
+          }
       });
-      setIsClientModalOpen(false);
+      setIsNewClientModalOpen(false);
   };
 
-  // --- PORTAL MANAGEMENT HANDLERS ---
-  const handleOpenPortalManager = (client: Client) => {
-      setPortalClient(client);
-      setGeneratedHash(client.portalHash || '');
-      setIsPortalModalOpen(true);
-  };
-
-  const handleTogglePortal = () => {
-      if (!portalClient) return;
-      
-      const newStatus = !portalClient.portalEnabled;
-      const newHash = newStatus && !portalClient.portalHash ? `HASH-${Math.random().toString(36).substring(7)}` : portalClient.portalHash;
-
-      // Update local state and main list
-      const updatedClient = { ...portalClient, portalEnabled: newStatus, portalHash: newHash };
-      setPortalClient(updatedClient);
-      setGeneratedHash(newHash || '');
-      
-      setClients(prev => prev.map(c => c.id === portalClient.id ? updatedClient : c));
-  };
-
-  const handleRenewHash = () => {
-      if (!portalClient) return;
-      const newHash = `SUDw${Math.random().toString(36).substring(2,10)}_${Date.now()}`;
-      setGeneratedHash(newHash);
-      const updatedClient = { ...portalClient, portalHash: newHash };
-      setPortalClient(updatedClient);
-      setClients(prev => prev.map(c => c.id === portalClient.id ? updatedClient : c));
-  };
-
-  const handleSendEmail = () => {
-      if (!portalClient?.email) {
-          alert('El cliente no tiene un email configurado.');
-          return;
-      }
-      alert(`Invitación al Portal de Clientes enviada a ${portalClient.email}.`);
-  };
-
-  // --- IMPORT / EXPORT LOGIC FIXED ---
-  const handleExport = () => {
-      // 1. Headers con caracteres legibles
-      const headers = ['ID', 'Nombre / Razón Social', 'CUIT', 'Teléfono', 'Dirección', 'Saldo Actual', 'Límite Crédito'];
-      const separator = ';'; // Importante para Excel en español
-
-      // 2. Construcción de filas con manejo de comillas y formato
-      const rows = clients.map(c => {
-          return [
-              c.id,
-              `"${c.name}"`, // Entrecomillar textos que pueden tener comas
-              `"${c.cuit}"`, // Forzar texto para CUITs
-              c.phone,
-              `"${c.address}"`,
-              c.balance.toString().replace('.', ','), // Formato decimal local
-              c.limit.toString().replace('.', ',')
-          ].join(separator);
-      });
-
-      // 3. Añadir BOM (Byte Order Mark) para UTF-8 (\uFEFF)
-      const csvContent = '\uFEFF' + [headers.join(separator), ...rows].join('\n');
-      
-      // 4. Crear Blob y descargar
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `clientes_ferrecloud_${new Date().toISOString().split('T')[0]}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-  };
-
-  const handleDownloadTemplate = () => {
-      const headers = ['Nombre/RazonSocial', 'CUIT', 'Telefono', 'Direccion', 'LimiteCredito'];
-      const example = ['Cliente Ejemplo SA', '30-99999999-9', '11-1234-5678', 'Av. Siempre Viva 742', '500000'];
-      const separator = ';';
-      const csvContent = '\uFEFF' + [headers.join(separator), example.join(separator)].join('\n');
-      
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", "plantilla_importacion_clientes.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          setImportFile(e.target.files[0]);
-          setImportStep('PREVIEW');
-      }
-  };
-
-  const handleConfirmImport = () => {
-      // Mock Import logic: Add fake clients
-      const newClients: Client[] = [
-          { id: `NEW-${Date.now()}`, name: 'Empresa Importada SRL', cuit: '30-55555555-5', phone: '11-0000-0000', address: 'Calle Importada 1', balance: 0, limit: 100000, portalEnabled: false, email: '' },
-          { id: `NEW-${Date.now()+1}`, name: 'Consumidor Importado', cuit: '20-44444444-4', phone: '11-1111-1111', address: 'Calle Importada 2', balance: 0, limit: 50000, portalEnabled: false, email: '' },
-      ];
-      setClients(prev => [...prev, ...newClients]);
-      setIsImportModalOpen(false);
-      setImportFile(null);
-      setImportStep('UPLOAD');
-      alert('Se han importado 2 clientes correctamente.');
-  };
+  const filteredClients = useMemo(() => {
+    return clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.cuit.includes(searchTerm));
+  }, [clients, searchTerm]);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
-       
-      {viewMode === 'LIST' && (
-          <>
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                <h2 className="text-2xl font-bold text-gray-800">Clientes</h2>
-                <div className="flex items-center gap-2 mt-1">
-                    <p className="text-gray-500 text-sm">Gestión de cuentas corrientes.</p>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
-                        <CheckCircle size={10}/> Guardado Local Activo
-                    </span>
-                </div>
-                </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium">
-                        <Upload size={16} /> Importar
-                    </button>
-                    <button 
-                        onClick={handleExport}
-                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium">
-                        <Download size={16} /> Exportar Excel
-                    </button>
-                    <button 
-                        onClick={() => handleOpenClientModal()}
-                        className="bg-ferre-orange text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-orange-600 transition-colors shadow-sm text-sm font-medium">
-                        <Plus size={16} /> Nuevo Cliente
-                    </button>
+    <div className="p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in">
+        <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm">
+            <div>
+                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Fichero de Clientes</h2>
+                <div className="relative mt-4 w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                    <input type="text" placeholder="Buscar..." className="w-full pl-10 p-2 bg-slate-50 rounded-xl text-xs font-bold outline-none border border-transparent focus:border-indigo-500" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
             </div>
+            <button onClick={() => { setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', limit: 100000, points: 0, portalEnabled: true}); setIsNewClientModalOpen(true); }} className="bg-ferre-orange text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-orange-100 hover:bg-orange-600 transition-all uppercase text-xs tracking-widest">
+                <Plus size={18} /> Nuevo Cliente
+            </button>
+        </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
-                <div className="p-4 border-b border-gray-200 bg-gray-50 flex gap-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-                        <input type="text" placeholder="Buscar cliente por nombre o CUIT..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-ferre-orange outline-none" />
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left">
+                    <thead className="bg-slate-900 text-[10px] text-slate-300 uppercase font-black tracking-widest sticky top-0 z-10">
+                        <tr>
+                            <th className="px-8 py-5">Razón Social / CUIT</th>
+                            <th className="px-8 py-5 text-right">Saldo Actual</th>
+                            <th className="px-8 py-5 text-right">Puntos</th>
+                            <th className="px-8 py-5 text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {filteredClients.map(client => (
+                            <tr key={client.id} className="hover:bg-slate-50 transition-colors group">
+                                <td className="px-8 py-5">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400">{client.name.charAt(0)}</div>
+                                        <div>
+                                            <div className="font-black text-slate-800 text-sm uppercase tracking-tight">{client.name}</div>
+                                            <div className="text-[10px] text-gray-400 font-mono">{client.cuit}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className={`px-8 py-5 text-right font-black text-lg ${client.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    ${client.balance.toLocaleString('es-AR')}
+                                </td>
+                                <td className="px-8 py-5 text-right font-black text-indigo-600">
+                                    {client.points || 0} PTS
+                                </td>
+                                <td className="px-8 py-5">
+                                    <div className="flex justify-center gap-2">
+                                        <button onClick={() => { setSelectedClient(client); setIsHistoryOpen(true); }} className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all"><History size={16}/></button>
+                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setIsNewClientModalOpen(true); }} className="p-2.5 bg-slate-100 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Pencil size={16}/></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {isNewClientModalOpen && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col">
+                    <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                        <h3 className="text-xl font-black uppercase tracking-tighter">{isEditing ? 'Editar Ficha' : 'Nueva Alta de Cliente'}</h3>
+                        <button onClick={() => setIsNewClientModalOpen(false)}><X size={28}/></button>
+                    </div>
+                    <div className="p-10 space-y-6 bg-slate-50/50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-1">
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">CUIT / DNI</label>
+                                <div className="flex gap-2">
+                                    <input type="text" className="flex-1 p-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-bold" value={clientForm.cuit} onChange={e => setClientForm({...clientForm, cuit: e.target.value})} />
+                                    <button onClick={handleSearchCuit} className="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-all">
+                                        {isSearchingCuit ? <RefreshCw className="animate-spin" size={16}/> : <Zap size={16}/>}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="md:col-span-1">
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Razón Social</label>
+                                <input type="text" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-bold uppercase" value={clientForm.name} onChange={e => setClientForm({...clientForm, name: e.target.value.toUpperCase()})} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Domicilio</label>
+                                <input type="text" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-bold" value={clientForm.address} onChange={e => setClientForm({...clientForm, address: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Límite de Crédito ($)</label>
+                                <input type="number" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:border-indigo-500 outline-none font-black text-indigo-600" value={clientForm.limit} onChange={e => setClientForm({...clientForm, limit: parseFloat(e.target.value) || 0})} />
+                            </div>
+                            <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl">
+                                <div onClick={() => setClientForm({...clientForm, portalEnabled: !clientForm.portalEnabled})} className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${clientForm.portalEnabled ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${clientForm.portalEnabled ? 'right-1' : 'left-1'}`}></div>
+                                </div>
+                                <span className="text-[9px] font-black text-slate-500 uppercase">Habilitar Portal QR</span>
+                            </div>
+                        </div>
+                        <button onClick={handleSaveClient} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+                            <Save size={18}/> {isEditing ? 'Guardar Cambios' : 'Registrar Cliente'}
+                        </button>
                     </div>
                 </div>
-
-                <div className="flex-1 overflow-y-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
-                            <tr>
-                                <th className="px-6 py-4">Cliente</th>
-                                <th className="px-6 py-4">Contacto</th>
-                                <th className="px-6 py-4 text-center">Portal</th>
-                                <th className="px-6 py-4 text-right">Saldo Deudor</th>
-                                <th className="px-6 py-4 text-center">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {clients.map(client => (
-                                <tr key={client.id} className="hover:bg-gray-50 group">
-                                    <td className="px-6 py-4 cursor-pointer" onClick={() => handleOpenClientModal(client)}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold">
-                                                {client.name.substring(0,2).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-gray-800 text-sm group-hover:text-ferre-orange transition-colors">{client.name}</div>
-                                                <div className="text-xs text-gray-500 font-mono">{client.cuit}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600 space-y-1">
-                                        <div className="flex items-center gap-2"><Phone size={12}/> {client.phone}</div>
-                                        <div className="flex items-center gap-2"><MapPin size={12}/> {client.address}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        {client.portalEnabled ? (
-                                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">
-                                                <CheckCircle size={12}/> Activo
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-bold px-2 py-1 rounded-full">
-                                                Inactivo
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className={`px-6 py-4 text-right font-bold ${client.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                        ${client.balance.toLocaleString('es-AR')}
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <div className="flex justify-center gap-2">
-                                            <button 
-                                                onClick={() => handleOpenAccount(client)}
-                                                className="text-gray-500 hover:text-blue-600 p-2 rounded hover:bg-blue-50 transition-colors"
-                                                title="Ver Cuenta Corriente">
-                                                <FileText size={18}/>
-                                            </button>
-                                            <button 
-                                                onClick={() => handleOpenPortalManager(client)}
-                                                className={`p-2 rounded transition-colors ${client.portalEnabled ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-green-600 hover:bg-gray-100'}`}
-                                                title="Gestión Portal Clientes">
-                                                <Key size={18}/>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
             </div>
-          </>
-      )}
-
-      {/* ... (Rest of component remains unchanged) ... */}
-      {viewMode === 'ACCOUNT' && selectedClient && (
-          <div className="flex flex-col h-full animate-fade-in">
-              <div className="flex items-center gap-4 mb-4">
-                  <button onClick={() => setViewMode('LIST')} className="p-2 rounded-full hover:bg-gray-200 text-gray-600">
-                      <ArrowLeft size={24}/>
-                  </button>
-                  <div>
-                      <h2 className="text-2xl font-bold text-gray-800">{selectedClient.name}</h2>
-                      <p className="text-gray-500 text-sm flex items-center gap-2">
-                          <span className="font-mono">{selectedClient.cuit}</span> • 
-                          <span className="text-green-600">Límite Crédito: ${selectedClient.limit.toLocaleString('es-AR')}</span>
-                      </p>
-                  </div>
-                  <div className="ml-auto flex gap-3">
-                      <div className="text-right mr-4">
-                          <p className="text-xs text-gray-500 uppercase font-bold">Saldo Actual</p>
-                          <p className={`text-3xl font-bold ${selectedClient.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              ${selectedClient.balance.toLocaleString('es-AR')}
-                          </p>
-                      </div>
-                      <button 
-                        onClick={() => setShowPaymentModal(true)}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 shadow-md flex items-center gap-2 font-bold">
-                          <ArrowDownLeft size={20}/> Registrar Cobro
-                      </button>
-                  </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
-                  <div className="p-4 bg-gray-50 border-b border-gray-200 font-bold text-gray-700 flex justify-between">
-                      <span>Movimientos Históricos</span>
-                      <button className="text-blue-600 text-sm hover:underline flex items-center gap-1"><Printer size={14}/> Imprimir Resumen</button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto">
-                      <table className="w-full text-left">
-                          <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 z-10">
-                              <tr>
-                                  <th className="px-6 py-3">Fecha</th>
-                                  <th className="px-6 py-3">Comprobante</th>
-                                  <th className="px-6 py-3">Concepto / Detalle</th>
-                                  <th className="px-6 py-3 text-right">Debe</th>
-                                  <th className="px-6 py-3 text-right">Haber</th>
-                                  <th className="px-6 py-3 text-right">Saldo</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                              {movements.map((mov) => (
-                                  <tr key={mov.id} className="hover:bg-gray-50">
-                                      <td className="px-6 py-4 text-sm text-gray-600">{mov.date}</td>
-                                      <td className="px-6 py-4 text-sm font-bold text-gray-800">{mov.voucherType}</td>
-                                      <td className="px-6 py-4 text-sm text-gray-600">{mov.description}</td>
-                                      <td className="px-6 py-4 text-right text-red-600 font-medium">{mov.debit > 0 ? `$${mov.debit.toLocaleString('es-AR')}` : '-'}</td>
-                                      <td className="px-6 py-4 text-right text-green-600 font-medium">{mov.credit > 0 ? `$${mov.credit.toLocaleString('es-AR')}` : '-'}</td>
-                                      <td className="px-6 py-4 text-right font-bold text-gray-900">${mov.balance.toLocaleString('es-AR')}</td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* MODAL COBRO */}
-      {showPaymentModal && selectedClient && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl h-auto flex flex-col max-h-[90vh]">
-                  <div className="p-5 border-b border-gray-200 bg-green-600 text-white rounded-t-xl flex justify-between items-center">
-                      <div>
-                          <h3 className="font-bold text-lg flex items-center gap-2"><Wallet/> Nuevo Recibo de Cobro</h3>
-                          <p className="text-sm opacity-90">Cliente: {selectedClient.name}</p>
-                      </div>
-                      <button onClick={() => setShowPaymentModal(false)}><X className="hover:text-green-200"/></button>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-xs font-bold text-gray-600 mb-1">Monto a Cobrar ($)</label>
-                              <div className="relative">
-                                  <DollarSign className="absolute left-3 top-3 text-gray-400" size={16}/>
-                                  <input 
-                                    type="number" 
-                                    className="w-full pl-9 p-2 border border-gray-300 rounded focus:ring-1 focus:ring-green-500 outline-none font-bold text-lg"
-                                    value={paymentAmount}
-                                    onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                                  />
-                              </div>
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-gray-600 mb-1">Medio de Pago</label>
-                              <select className="w-full p-2.5 border border-gray-300 rounded bg-white">
-                                  <option>Efectivo</option>
-                                  <option>Transferencia Bancaria</option>
-                                  <option>Cheque Terceros</option>
-                              </select>
-                          </div>
-                      </div>
-
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                          <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><CheckCircle size={16}/> Imputar a Comprobantes Pendientes</h4>
-                          <div className="space-y-2 max-h-40 overflow-y-auto">
-                              {unpaidInvoices.map(inv => (
-                                  <label key={inv.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded cursor-pointer hover:border-green-400 transition-colors">
-                                      <div className="flex items-center gap-3">
-                                          <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
-                                            checked={selectedInvoices.includes(inv.id)}
-                                            onChange={() => handleToggleInvoice(inv.id, inv.amount)}
-                                          />
-                                          <span className="text-sm font-medium text-gray-700">{inv.label}</span>
-                                      </div>
-                                      <span className="font-bold text-gray-900">${inv.amount.toLocaleString('es-AR')}</span>
-                                  </label>
-                              ))}
-                          </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center bg-gray-100 p-3 rounded">
-                           <span className="text-sm text-gray-600">Saldo restante tras imputación:</span>
-                           <span className="font-bold text-lg text-gray-800">${(selectedClient.balance - paymentAmount).toLocaleString('es-AR')}</span>
-                      </div>
-                  </div>
-
-                  <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-                      <button onClick={() => setShowPaymentModal(false)} className="px-6 py-2 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">Cancelar</button>
-                      <button onClick={handleRegisterPayment} className="px-6 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 shadow-md">
-                          Generar Recibo
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* MODAL PORTAL CLIENTES (Existing code kept) */}
-      {isPortalModalOpen && portalClient && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden">
-                  {/* ... Portal content ... */}
-                  <div className="p-5 border-b border-gray-200 bg-slate-900 text-white flex justify-between items-center">
-                      <div>
-                          <h3 className="font-bold text-lg flex items-center gap-2"><Key size={20}/> Gestión Portal Clientes</h3>
-                          <p className="text-sm opacity-80">{portalClient.name}</p>
-                      </div>
-                      <button onClick={() => setIsPortalModalOpen(false)}><X className="hover:text-gray-300"/></button>
-                  </div>
-                  {/* ... Portal Body ... */}
-                  <div className="p-6 space-y-6">
-                      <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border border-gray-200">
-                          <div>
-                              <h4 className="font-bold text-gray-700">Estado del Portal</h4>
-                              <p className="text-sm text-gray-500">{portalClient.portalEnabled ? 'Habilitado' : 'Deshabilitado'}</p>
-                          </div>
-                          <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                              <input type="checkbox" className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked={portalClient.portalEnabled} onChange={handleTogglePortal}/>
-                              <label className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${portalClient.portalEnabled ? 'bg-green-500' : 'bg-gray-300'}`}></label>
-                          </div>
-                      </div>
-                      {/* ... rest of portal details ... */}
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* MODAL CLIENTE (ADD/EDIT) (Existing code kept) */}
-      {isClientModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-                  {/* ... Client Form Content ... */}
-                  <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-xl">
-                      <h3 className="font-bold text-gray-800">Cliente</h3>
-                      <button onClick={() => setIsClientModalOpen(false)}><X size={20}/></button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                      {/* ... Inputs ... */}
-                      <div><label className="block text-xs font-bold text-gray-500 mb-1">Nombre</label><input type="text" className="w-full p-2 border rounded" value={clientFormData.name} onChange={e => setClientFormData({...clientFormData, name: e.target.value})} /></div>
-                      <div className="flex justify-end gap-2 pt-4"><button onClick={handleSaveClient} className="px-4 py-2 bg-ferre-orange text-white rounded">Guardar</button></div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* MODAL IMPORTACION CLIENTES (Existing code kept) */}
-      {isImportModalOpen && (
-          <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all`}>
-              <div className={`bg-white rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${importStep === 'PREVIEW' ? 'max-w-4xl' : 'max-w-lg'}`}>
-                  {/* ... Import content ... */}
-                  <div className="p-4 border-b border-gray-200 bg-gray-50 rounded-t-xl flex justify-between items-center">
-                      <h3 className="font-bold text-gray-800">Importar</h3>
-                      <button onClick={() => setIsImportModalOpen(false)}><X size={20}/></button>
-                  </div>
-                  {importStep === 'UPLOAD' && (
-                      <div className="p-8 flex flex-col items-center gap-6">
-                          <button onClick={handleDownloadTemplate} className="text-ferre-orange hover:underline text-sm font-bold">Descargar Plantilla</button>
-                          <input type="file" onChange={handleFileUpload} />
-                      </div>
-                  )}
-                  {importStep === 'PREVIEW' && (
-                      <div className="flex-1 flex flex-col p-6">
-                          <div className="flex-1 overflow-auto border rounded"><table className="w-full"><tbody>{MOCK_PREVIEW_ROWS.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j} className="p-2 border">{c}</td>)}</tr>)}</tbody></table></div>
-                          <div className="flex gap-2 justify-end mt-4"><button onClick={handleConfirmImport} className="px-4 py-2 bg-green-600 text-white rounded">Confirmar</button></div>
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
+        )}
     </div>
   );
 };

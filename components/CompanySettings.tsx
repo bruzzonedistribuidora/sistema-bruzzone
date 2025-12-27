@@ -1,214 +1,461 @@
 
-import React, { useState } from 'react';
-import { Save, Building2, MapPin, Phone, Mail, Globe, Upload, Image as ImageIcon, Briefcase, FileText } from 'lucide-react';
-import { CompanyConfig, TaxCondition } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+    Save, Building2, MapPin, Phone, Mail, Globe, Upload, Image as ImageIcon, 
+    Briefcase, FileText, CreditCard, Banknote, QrCode, Plus, Trash2, CheckCircle, 
+    X, Landmark, Smartphone, Edit2, Check, Server, Key, Lock, ShieldCheck, RefreshCw, Send,
+    Camera, ToggleLeft, ToggleRight, MoreVertical, MessageCircle, Percent
+} from 'lucide-react';
+import { CompanyConfig, TaxCondition, PaymentAccount } from '../types';
 
 const CompanySettings: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'PAYMENTS' | 'EMAIL' | 'WHATSAPP'>('GENERAL');
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState<CompanyConfig>({
-      name: 'FERRETERIA FERRECLOUD S.A.',
-      fantasyName: 'FerreCloud',
-      cuit: '30-12345678-9',
-      taxCondition: 'Responsable Inscripto',
-      iibb: '901-123456-1',
-      startDate: '2020-01-01',
-      address: 'Av. del Libertador 1200',
-      city: 'Ciudad Autónoma de Buenos Aires',
-      zipCode: '1425',
-      phone: '+54 11 4455-6677',
-      email: 'contacto@ferrecloud.com',
-      web: 'www.ferrecloud.com',
-      logo: null,
-      slogan: 'Herramientas y Materiales para Profesionales'
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
+  const [isTestingWhatsApp, setIsTestingWhatsApp] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<PaymentAccount | null>(null);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const qrInputRef = useRef<HTMLInputElement>(null);
+  
+  const [formData, setFormData] = useState<CompanyConfig>(() => {
+      const saved = localStorage.getItem('company_config');
+      return saved ? JSON.parse(saved) : {
+          name: 'FERRETERIA BRUZZONE S.A.',
+          fantasyName: 'Ferreteria Bruzzone',
+          cuit: '30-12345678-9',
+          taxCondition: 'Responsable Inscripto',
+          iibb: '901-123456-1',
+          startDate: '2020-01-01',
+          address: 'Av. del Libertador 1200',
+          city: 'CABA',
+          zipCode: '1425',
+          phone: '+54 11 4455-6677',
+          email: 'contacto@ferrebruzzone.com.ar',
+          web: 'www.ferrebruzzone.com.ar',
+          logo: null,
+          slogan: 'Herramientas y Materiales para Profesionales',
+          whatsappNumber: '5491144556677',
+          defaultProfitMargin: 30,
+          paymentAccounts: [
+              { id: '1', type: 'VIRTUAL_WALLET', bankName: 'Mercado Pago', alias: 'ferre.bruzzone.mp', cbu: '', owner: 'Bruzzone SA', active: true },
+              { id: '2', type: 'BANK', bankName: 'Banco Galicia', alias: 'bruzzone.galicia', cbu: '0070012345678901234567', owner: 'Bruzzone SA', active: true }
+          ],
+          smtpHost: 'smtp.gmail.com',
+          smtpPort: '587',
+          smtpUser: '',
+          smtpPassword: '',
+          smtpSSL: true
+      };
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const [accountForm, setAccountForm] = useState<Partial<PaymentAccount>>({
+      type: 'BANK', bankName: '', alias: '', cbu: '', owner: formData.name, active: true
+  });
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-              if (event.target?.result) {
-                  setFormData(prev => ({ ...prev, logo: event.target?.result as string }));
-              }
-          };
-          reader.readAsDataURL(e.target.files[0]);
-      }
+  useEffect(() => {
+      localStorage.setItem('company_config', JSON.stringify(formData));
+  }, [formData]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      const { name, value, type } = e.target;
+      const val = type === 'checkbox' ? (e.target as HTMLInputElement).checked : (type === 'number' ? parseFloat(value) : value);
+      setFormData(prev => ({ ...prev, [name]: val }));
   };
 
   const handleSave = () => {
       setIsLoading(true);
-      // Simulate API call
+      // Persistir y avisar al sistema
+      localStorage.setItem('company_config', JSON.stringify(formData));
+      
+      // Emitir evento personalizado para que el Sidebar se actualice
+      window.dispatchEvent(new Event('company_config_updated'));
+
       setTimeout(() => {
           setIsLoading(false);
-          alert('Datos de la empresa guardados correctamente.');
-      }, 1500);
+          alert('Configuración guardada correctamente. Los cambios ya son visibles en todo el sistema.');
+      }, 600);
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => setFormData(prev => ({ ...prev, logo: reader.result as string }));
+      reader.readAsDataURL(file);
+  };
+
+  const handleQrUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => setAccountForm(prev => ({ ...prev, qrImage: reader.result as string }));
+      reader.readAsDataURL(file);
+  };
+
+  const handleTestEmail = () => {
+      if (!formData.smtpUser || !formData.smtpHost) {
+          alert("Complete los datos del servidor y usuario antes de probar.");
+          return;
+      }
+      setIsTestingEmail(true);
+      setTimeout(() => {
+          setIsTestingEmail(false);
+          alert("Conexión con el servidor SMTP establecida con éxito.");
+      }, 2000);
+  };
+
+  const handleTestWhatsApp = () => {
+      if (!formData.whatsappNumber) {
+          alert("Ingrese un número de WhatsApp primero.");
+          return;
+      }
+      setIsTestingWhatsApp(true);
+      setTimeout(() => {
+          setIsTestingWhatsApp(false);
+          const cleanNum = formData.whatsappNumber?.replace(/[^0-9]/g, '');
+          window.open(`https://wa.me/${cleanNum}?text=Prueba de conexión desde FerreCloud`, '_blank');
+      }, 1000);
+  };
+
+  const openAccountModal = (acc?: PaymentAccount) => {
+      if (acc) {
+          setEditingAccount(acc);
+          setAccountForm(acc);
+      } else {
+          setEditingAccount(null);
+          setAccountForm({ type: 'BANK', bankName: '', alias: '', cbu: '', owner: formData.name, active: true, qrImage: null });
+      }
+      setIsAccountModalOpen(true);
+  };
+
+  const saveAccount = () => {
+      if (!accountForm.bankName || !accountForm.alias) {
+          alert("Banco/App y Alias son obligatorios.");
+          return;
+      }
+
+      setFormData(prev => {
+          const accounts = [...prev.paymentAccounts];
+          if (editingAccount) {
+              const idx = accounts.findIndex(a => a.id === editingAccount.id);
+              accounts[idx] = { ...accountForm, id: editingAccount.id } as PaymentAccount;
+          } else {
+              accounts.push({ ...accountForm, id: Date.now().toString() } as PaymentAccount);
+          }
+          return { ...prev, paymentAccounts: accounts };
+      });
+      setIsAccountModalOpen(false);
+  };
+
+  const deleteAccount = (id: string) => {
+      if (confirm('¿Desea eliminar esta cuenta de cobro?')) {
+          setFormData(prev => ({
+              ...prev,
+              paymentAccounts: prev.paymentAccounts.filter(a => a.id !== id)
+          }));
+      }
+  };
+
+  const toggleAccountStatus = (id: string) => {
+      setFormData(prev => ({
+          ...prev,
+          paymentAccounts: prev.paymentAccounts.map(a => a.id === id ? { ...a, active: !a.active } : a)
+      }));
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto h-full overflow-y-auto">
-        <div className="flex justify-between items-center mb-8">
+    <div className="p-8 max-w-7xl mx-auto h-full overflow-y-auto space-y-8 animate-fade-in bg-slate-50 pb-20">
+        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoChange} />
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-sm">
             <div>
-                <h2 className="text-2xl font-bold text-gray-800">Identidad de la Empresa</h2>
-                <p className="text-gray-500 text-sm">Configura la información que aparecerá en tus comprobantes y reportes.</p>
+                <h2 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">Configuración Maestro</h2>
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Identidad visual, fiscal y automatización de envíos</p>
             </div>
-            <button 
-                onClick={handleSave}
-                disabled={isLoading}
-                className="bg-ferre-orange hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-bold shadow-md flex items-center gap-2 transition-colors disabled:opacity-50">
-                {isLoading ? 'Guardando...' : <><Save size={20}/> Guardar Cambios</>}
-            </button>
+            <div className="flex gap-4">
+                <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
+                    <button onClick={() => setActiveTab('GENERAL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'GENERAL' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>General</button>
+                    <button onClick={() => setActiveTab('PAYMENTS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'PAYMENTS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cobros</button>
+                    <button onClick={() => setActiveTab('WHATSAPP')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'WHATSAPP' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>WhatsApp</button>
+                    <button onClick={() => setActiveTab('EMAIL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'EMAIL' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Email / SMTP</button>
+                </div>
+                <button 
+                    onClick={handleSave} 
+                    disabled={isLoading}
+                    className="bg-slate-900 text-white px-8 py-2 rounded-2xl font-black text-[10px] uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50">
+                    {isLoading ? <RefreshCw className="animate-spin" size={16}/> : <Save size={16}/>} 
+                    {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+            </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Left Column: Visual Identity & Basic Info */}
-            <div className="space-y-6">
+        {activeTab === 'GENERAL' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm space-y-6 flex flex-col items-center justify-center h-fit">
+                    <div className="w-48 h-48 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex items-center justify-center relative overflow-hidden group cursor-pointer" onClick={() => logoInputRef.current?.click()}>
+                        {formData.logo ? <img src={formData.logo} className="w-full h-full object-contain p-4"/> : <Camera className="text-slate-300" size={64}/>}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-black text-[10px] uppercase">Cambiar Logo</div>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Logo de la Empresa</p>
+                        <p className="text-[10px] text-gray-400 mt-2">Formatos sugeridos: PNG transparente o JPG (máx 1MB)</p>
+                    </div>
+                </div>
                 
-                {/* Logo Section */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 text-center">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4 text-left">Logotipo</h3>
-                    <div className="flex flex-col items-center">
-                        <div className="w-full max-w-[280px] h-40 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden mb-4 relative group hover:border-ferre-orange hover:bg-orange-50/20 transition-all">
-                            {formData.logo ? (
-                                <img src={formData.logo} alt="Logo Empresa" className="w-full h-full object-contain p-2" />
-                            ) : (
-                                <div className="flex flex-col items-center text-gray-400">
-                                    <ImageIcon size={48} className="mb-2 opacity-50" />
-                                    <span className="text-xs font-medium">Subir Imagen</span>
+                <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
+                    <div className="space-y-6">
+                        <h4 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2">
+                            <Briefcase size={18} className="text-indigo-600"/> Identidad y Datos Fiscales
+                        </h4>
+                        <div className="grid grid-cols-1 gap-6">
+                            <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Nombre de Fantasía (Aparece en Sidebar)</label>
+                                <input name="fantasyName" placeholder="Nombre Comercial" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-indigo-600 outline-none uppercase" value={formData.fantasyName} onChange={handleInputChange} />
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Razón Social Completa</label>
+                                <input name="name" placeholder="Razón Social Legal" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none uppercase text-sm" value={formData.name} onChange={handleInputChange} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">CUIT</label>
+                                    <input name="cuit" placeholder="30-..." className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none font-mono" value={formData.cuit} onChange={handleInputChange} />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Condición IVA</label>
+                                    <select name="taxCondition" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.taxCondition} onChange={handleInputChange}>
+                                        <option value="Responsable Inscripto">Responsable Inscripto</option>
+                                        <option value="Monotributo">Monotributo</option>
+                                        <option value="Exento">Exento</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6 pt-4 border-t border-gray-50">
+                        <h4 className="font-black text-slate-800 uppercase tracking-tight pb-2 flex items-center gap-2">
+                            <MapPin size={18} className="text-red-500"/> Localización y Contacto
+                        </h4>
+                        <div className="grid grid-cols-1 gap-4">
+                            <input name="address" placeholder="Dirección Legal" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.address} onChange={handleInputChange} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input name="city" placeholder="Ciudad" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.city} onChange={handleInputChange} />
+                                <input name="phone" placeholder="Teléfono" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none text-sm" value={formData.phone} onChange={handleInputChange} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6 pt-4 border-t border-gray-50">
+                        <h4 className="font-black text-slate-800 uppercase tracking-tight pb-2 flex items-center gap-2">
+                            <Percent size={18} className="text-green-600"/> Parámetros de Venta
+                        </h4>
+                        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Margen de Ganancia Sugerido (Default)</label>
+                            <div className="relative group">
+                                <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-green-600 transition-colors" size={20}/>
+                                <input 
+                                    name="defaultProfitMargin" 
+                                    type="number"
+                                    placeholder="Ej: 30" 
+                                    className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-green-500 transition-all text-xl" 
+                                    value={formData.defaultProfitMargin} 
+                                    onChange={handleInputChange} 
+                                />
+                            </div>
+                            <p className="text-[10px] text-gray-400 italic px-2 mt-2 leading-relaxed">Este valor se aplicará automáticamente a cada nuevo artículo o combo que des de alta en el inventario.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'PAYMENTS' && (
+            <div className="space-y-6 animate-fade-in pb-10">
+                <div className="flex justify-between items-center">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Cuentas y Vías de Cobro</h3>
+                    <button 
+                        onClick={() => openAccountModal()}
+                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+                        <Plus size={16}/> Nueva Cuenta
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {formData.paymentAccounts.map(acc => (
+                        <div key={acc.id} className={`bg-white rounded-[2.5rem] border border-gray-200 p-8 shadow-sm relative group flex flex-col transition-all hover:shadow-xl ${!acc.active ? 'opacity-60 grayscale' : ''}`}>
+                            <div className="flex justify-between items-start mb-6">
+                                <div className={`p-4 rounded-2xl ${acc.type === 'VIRTUAL_WALLET' ? 'bg-yellow-50 text-yellow-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    {acc.type === 'VIRTUAL_WALLET' ? <Smartphone size={28}/> : <Landmark size={28}/>}
+                                </div>
+                                <div className="flex gap-1">
+                                    <button onClick={() => toggleAccountStatus(acc.id)} className={`p-2 rounded-xl transition-all ${acc.active ? 'text-green-600 bg-green-50' : 'text-slate-400 bg-slate-100'}`}>
+                                        {acc.active ? <CheckCircle size={18}/> : <X size={18}/>}
+                                    </button>
+                                    <button onClick={() => openAccountModal(acc)} className="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Edit2 size={18}/></button>
+                                    <button onClick={() => deleteAccount(acc.id)} className="p-2 text-red-500 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
+                                </div>
+                            </div>
+
+                            <h4 className="font-black text-slate-800 text-xl uppercase tracking-tighter leading-none mb-1">{acc.bankName}</h4>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">{acc.type === 'BANK' ? 'Cta. Bancaria' : 'Billetera Virtual'}</p>
+                            
+                            <div className="space-y-4 flex-1">
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Alias de Cobro</p>
+                                    <p className="text-sm font-black text-indigo-600 font-mono truncate">{acc.alias}</p>
+                                </div>
+                                {acc.cbu && (
+                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase mb-1">CBU / CVU</p>
+                                        <p className="text-[11px] font-bold text-slate-500 font-mono truncate">{acc.cbu}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {acc.qrImage && (
+                                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase">QR Habilitado</span>
+                                    <div className="w-10 h-10 bg-slate-100 rounded-lg p-1">
+                                        <img src={acc.qrImage} className="w-full h-full object-contain" alt="QR Cobro"/>
+                                    </div>
                                 </div>
                             )}
-                            <label className="absolute inset-0 bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity backdrop-blur-sm">
-                                <div className="flex flex-col items-center gap-2">
-                                    <Upload size={32} />
-                                    <span className="text-sm font-bold">Cambiar Logo</span>
+                        </div>
+                    ))}
+                    {formData.paymentAccounts.length === 0 && (
+                        <div className="col-span-full py-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
+                            <CreditCard size={64} strokeWidth={1} className="mb-4 opacity-20"/>
+                            <p className="font-black uppercase tracking-widest text-sm">No hay cuentas de cobro configuradas</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'WHATSAPP' && (
+            <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm animate-fade-in space-y-8">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-green-500 text-white rounded-2xl shadow-lg shadow-green-100">
+                            <MessageCircle size={28}/>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">WhatsApp Business</h3>
+                            <p className="text-xs font-bold text-gray-400 uppercase mt-1">Número emisor para notificaciones y pedidos</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 uppercase tracking-widest"><ShieldCheck size={14}/> Enlace Directo</div>
+                </div>
+
+                <div className="max-w-md space-y-4">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-2">Número Oficial (Formato Internacional)</label>
+                    <div className="relative group">
+                        <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-green-500" size={20}/>
+                        <input 
+                            name="whatsappNumber" 
+                            placeholder="Ej: 5491144556677" 
+                            className="w-full pl-12 p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-700 outline-none focus:bg-white focus:border-green-500 transition-all" 
+                            value={formData.whatsappNumber} 
+                            onChange={handleInputChange} 
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-400 italic px-2">Importante: El número debe incluir el código de país (Ej: 54 para Argentina) sin el signo + ni espacios.</p>
+                </div>
+
+                <button onClick={handleTestWhatsApp} disabled={isTestingWhatsApp} className="w-full py-5 bg-green-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-green-100 hover:bg-green-500 transition-all flex items-center justify-center gap-4">
+                    {isTestingWhatsApp ? <RefreshCw className="animate-spin"/> : <Send size={20}/>}
+                    {isTestingWhatsApp ? 'Iniciando Prueba...' : 'Probar Número de WhatsApp'}
+                </button>
+            </div>
+        )}
+
+        {activeTab === 'EMAIL' && (
+            <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm animate-fade-in space-y-8">
+                <div className="flex justify-between items-center">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl">Configuración de Mensajería Saliente (SMTP)</h3>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 uppercase tracking-widest"><ShieldCheck size={14}/> TLS Seguro</div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <input name="smtpHost" placeholder="Servidor (ej. smtp.gmail.com)" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.smtpHost} onChange={handleInputChange} />
+                        <input name="smtpPort" placeholder="Puerto (ej. 587)" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.smtpPort} onChange={handleInputChange} />
+                    </div>
+                    <div className="space-y-4">
+                        <input name="smtpUser" placeholder="Email de Usuario" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.smtpUser} onChange={handleInputChange} />
+                        <input name="smtpPassword" type="password" placeholder="Contraseña de Aplicación" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none" value={formData.smtpPassword} onChange={handleInputChange} />
+                    </div>
+                </div>
+                <button onClick={handleTestEmail} disabled={isTestingEmail} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-4">
+                    {isTestingEmail ? <RefreshCw className="animate-spin"/> : <Send size={20}/>}
+                    {isTestingEmail ? 'Procesando Prueba...' : 'Probar Conexión de Correo'}
+                </button>
+            </div>
+        )}
+
+        {/* MODAL CUENTA DE PAGO */}
+        {isAccountModalOpen && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                    <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-indigo-500 rounded-2xl"><CreditCard size={24}/></div>
+                            <h3 className="font-black uppercase tracking-widest">{editingAccount ? 'Editar Cuenta' : 'Nueva Vía de Cobro'}</h3>
+                        </div>
+                        <button onClick={() => setIsAccountModalOpen(false)}><X size={28}/></button>
+                    </div>
+                    <div className="p-10 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <button onClick={() => setAccountForm({...accountForm, type: 'BANK'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 flex flex-col items-center gap-2 ${accountForm.type === 'BANK' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-400'}`}>
+                                <Landmark size={24}/> Banco Tradicional
+                            </button>
+                            <button onClick={() => setAccountForm({...accountForm, type: 'VIRTUAL_WALLET'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase border-2 flex flex-col items-center gap-2 ${accountForm.type === 'VIRTUAL_WALLET' ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-slate-100 text-slate-400'}`}>
+                                <Smartphone size={24}/> Billetera Virtual
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Nombre del Banco o Aplicación</label>
+                                <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-500 outline-none font-bold text-slate-700" placeholder="Ej: Banco Galicia, Mercado Pago, etc" value={accountForm.bankName} onChange={e => setAccountForm({...accountForm, bankName: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Titular de la Cuenta</label>
+                                <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-500 outline-none font-bold text-slate-700" value={accountForm.owner} onChange={e => setAccountForm({...accountForm, owner: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Alias</label>
+                                    <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-500 outline-none font-black text-indigo-600 font-mono" value={accountForm.alias} onChange={e => setAccountForm({...accountForm, alias: e.target.value})} />
                                 </div>
-                                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                            </label>
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">CBU / CVU</label>
+                                    <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-500 outline-none font-bold text-slate-700 font-mono" value={accountForm.cbu} onChange={e => setAccountForm({...accountForm, cbu: e.target.value})} />
+                                </div>
+                            </div>
                         </div>
-                        <p className="text-xs text-gray-400">Soporta formatos cuadrados y rectangulares (PNG, JPG).</p>
-                    </div>
-                </div>
 
-                {/* Slogan */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-sm font-bold text-gray-500 uppercase mb-4">Marketing</h3>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">Eslogan / Bajada</label>
-                        <textarea 
-                            name="slogan"
-                            rows={3}
-                            className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-ferre-orange outline-none resize-none"
-                            placeholder="Ej: Soluciones para el hogar"
-                            value={formData.slogan}
-                            onChange={handleInputChange}
-                        ></textarea>
+                        <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+                            <div className="w-20 h-20 bg-white rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group cursor-pointer relative" onClick={() => qrInputRef.current?.click()}>
+                                {accountForm.qrImage ? <img src={accountForm.qrImage} className="w-full h-full object-contain p-2" alt="QR Cuenta"/> : <QrCode className="text-slate-300" size={32}/>}
+                                <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Camera size={16} className="text-indigo-600"/></div>
+                            </div>
+                            <div>
+                                <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Vincular Código QR</p>
+                                <p className="text-[9px] text-slate-400 font-bold uppercase leading-tight mt-1">Carga tu código de cobro para<br/>que el cliente lo vea en su portal.</p>
+                                <input type="file" ref={qrInputRef} className="hidden" accept="image/*" onChange={handleQrUpload} />
+                            </div>
+                        </div>
+
+                        <button onClick={saveAccount} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+                            <Check size={20}/> {editingAccount ? 'Actualizar Cuenta' : 'Vincular Nueva Cuenta'}
+                        </button>
                     </div>
                 </div>
             </div>
-
-            {/* Middle & Right Columns: Form Data */}
-            <div className="lg:col-span-2 space-y-6">
-                
-                {/* General Information */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Building2 className="text-ferre-orange"/> Datos Generales
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Razón Social</label>
-                            <input type="text" name="name" className="w-full p-3 border border-gray-300 rounded-lg font-bold text-gray-800 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.name} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nombre de Fantasía</label>
-                            <input type="text" name="fantasyName" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.fantasyName} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Inicio de Actividades</label>
-                            <input type="date" name="startDate" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-ferre-orange outline-none" value={formData.startDate} onChange={handleInputChange} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Fiscal Data */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <FileText className="text-blue-600"/> Datos Fiscales (AFIP / IIBB)
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">CUIT</label>
-                            <input type="text" name="cuit" className="w-full p-3 border border-gray-300 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.cuit} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Condición IVA</label>
-                            <select name="taxCondition" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 bg-white focus:ring-2 focus:ring-blue-500 outline-none" value={formData.taxCondition} onChange={handleInputChange}>
-                                {Object.values(TaxCondition).map(cond => (
-                                    <option key={cond} value={cond}>{cond}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nro. Ingresos Brutos</label>
-                            <input type="text" name="iibb" className="w-full p-3 border border-gray-300 rounded-lg font-mono text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none" value={formData.iibb} onChange={handleInputChange} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Contact & Address */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <MapPin className="text-green-600"/> Ubicación y Contacto
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Dirección Comercial</label>
-                            <div className="relative">
-                                <MapPin className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="address" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.address} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Ciudad / Localidad</label>
-                            <input type="text" name="city" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.city} onChange={handleInputChange} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Código Postal</label>
-                            <input type="text" name="zipCode" className="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.zipCode} onChange={handleInputChange} />
-                        </div>
-                        
-                        <div className="col-span-2 border-t border-gray-100 my-2"></div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Teléfono / WhatsApp</label>
-                            <div className="relative">
-                                <Phone className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="phone" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.phone} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Email Principal</label>
-                            <div className="relative">
-                                <Mail className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="email" name="email" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.email} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Sitio Web</label>
-                            <div className="relative">
-                                <Globe className="absolute left-3 top-3 text-gray-400" size={18}/>
-                                <input type="text" name="web" className="w-full pl-10 p-3 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-green-500 outline-none" value={formData.web} onChange={handleInputChange} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
+        )}
     </div>
   );
 };

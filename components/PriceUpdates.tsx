@@ -1,538 +1,566 @@
 
-import React, { useState } from 'react';
-import { FileUp, FileSpreadsheet, ArrowRight, Settings, CheckCircle, AlertTriangle, ChevronRight, Save, LayoutTemplate, Database, X, List, Plus, Trash2, Edit2 } from 'lucide-react';
-import { Provider, PriceList } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    FileUp, FileSpreadsheet, ArrowRight, Settings, CheckCircle, 
+    AlertTriangle, ChevronRight, Save, LayoutTemplate, Database, 
+    X, List, Plus, Trash2, Edit2, Bookmark, BookmarkPlus, 
+    RefreshCw, Layers, TrendingUp, TrendingDown, PackagePlus, 
+    PackageMinus, Calculator, Search, ChevronLeft, Building2, Tag, Percent,
+    Truck, FileText, AlertOctagon
+} from 'lucide-react';
+import { Provider, PriceList, Product } from '../types';
 
 interface ColumnMapping {
     code: number | null;
+    providerCode: number | null;
     description: number | null;
     cost: number | null;
+    brand: number | null;
+    category: number | null;
+    provider: number | null;
+    profit: number | null;
     ignored: number[];
 }
 
-interface MockRow {
-    cols: string[];
+interface MappingTemplate {
+    id: string;
+    name: string;
+    providerId?: string;
+    mode: 'UPDATE' | 'INITIAL';
+    mapping: ColumnMapping;
+}
+
+interface AnalysisResult {
+    totalExcel: number;
+    matched: number;
+    newItems: number;
+    discontinued: number;
+    avgVariation: number;
+    impactDetails: {
+        code: string;
+        desc: string;
+        oldCost: number;
+        newCost: number;
+        variation: number;
+        brand: string;
+        category: string;
+        provider: string;
+        status: 'UPDATE' | 'NEW' | 'DISCONTINUED';
+    }[];
 }
 
 const PriceUpdates: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'LISTS' | 'MASS_UPDATE'>('LISTS');
+    const [activeTab, setActiveTab] = useState<'LISTS' | 'MASS_UPDATE'>('LISTS');
 
-  // --- PRICE LISTS STATE ---
-  const [priceLists, setPriceLists] = useState<PriceList[]>([
-      { id: '1', name: 'Lista Base (Público)', type: 'BASE', active: true },
-      { id: '2', name: 'Gremio / Instalador', type: 'CUSTOM', fixedMargin: 25, active: true },
-      { id: '3', name: 'Mayorista', type: 'CUSTOM', fixedMargin: 15, active: true },
-  ]);
-  
-  // List Form State
-  const [newListOpen, setNewListOpen] = useState(false);
-  const [editingListId, setEditingListId] = useState<string | null>(null); // Track ID for editing
-  const [newListName, setNewListName] = useState('');
-  const [newListMargin, setNewListMargin] = useState(30);
+    // --- DATOS DEL SISTEMA ---
+    const [products, setProducts] = useState<Product[]>(() => {
+        const saved = localStorage.getItem('ferrecloud_products');
+        return saved ? JSON.parse(saved) : [];
+    });
 
-  // --- MASS UPDATE STATE ---
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [selectedProvider, setSelectedProvider] = useState<string>('');
-  const [fileName, setFileName] = useState<string>('');
-  
-  // Mock Data for Providers
-  const providers: Provider[] = [
-    { id: 'P1', name: 'Herramientas Global SA', cuit: '30-11223344-5', contact: '', balance: 0, defaultDiscounts: [10,5,0] },
-    { id: 'P2', name: 'Pinturas del Centro', cuit: '30-55667788-9', contact: '', balance: 0, defaultDiscounts: [25,0,0] },
-    { id: 'P3', name: 'Bulonera Industrial', cuit: '30-99887766-1', contact: '', balance: 0, defaultDiscounts: [0,0,0] },
-  ];
+    const [providers] = useState<Provider[]>(() => {
+        const saved = localStorage.getItem('ferrecloud_providers');
+        return saved ? JSON.parse(saved) : [];
+    });
 
-  // State for Mapping Template
-  const [mapping, setMapping] = useState<ColumnMapping>({ code: 0, description: 1, cost: 2, ignored: [] });
-  const [rawPreview, setRawPreview] = useState<MockRow[]>([
-      { cols: ['TOR-001', 'Tornillo T1 Autoperforante', '150.00', 'UNIDAD'] },
-      { cols: ['TAL-022', 'Taladro Percutor 750w', '85000.00', 'UNIDAD'] },
-      { cols: ['LIJ-180', 'Lija al agua 180', '450.00', 'HOJA'] },
-      { cols: ['DIS-NEW', 'Producto Nuevo Ejemplo', '1200.00', 'UNIDAD'] }
-  ]);
+    const [priceLists] = useState<PriceList[]>([
+        { id: '1', name: 'Lista Base (Público)', type: 'BASE', active: true },
+        { id: '2', name: 'Gremio / Instalador', type: 'CUSTOM', fixedMargin: 25, active: true },
+        { id: '3', name: 'Mayorista', type: 'CUSTOM', fixedMargin: 15, active: true },
+    ]);
 
-  // Stats State
-  const [stats, setStats] = useState({
-      totalInFile: 1540,
-      matched: 1250,
-      newItems: 290,
-      discontinued: 45 // Items in DB but not in File
-  });
+    // --- MASS UPDATE WIZARD STATE ---
+    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [selectedProviderId, setSelectedProviderId] = useState<string>('');
+    const [importMode, setImportMode] = useState<'UPDATE' | 'INITIAL'>('UPDATE');
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('manual');
+    const [fileName, setFileName] = useState<string>('');
+    const [mapping, setMapping] = useState<ColumnMapping>({ 
+        code: null, providerCode: null, description: null, cost: null, 
+        brand: null, category: null, provider: null, profit: null, ignored: [] 
+    });
+    const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-  // Impact Preview Data
-  const [impactData, setImpactData] = useState([
-      { code: 'TOR-001', desc: 'Tornillo T1 Autoperforante', oldCost: 120, newCost: 150, variation: 25 },
-      { code: 'TAL-022', desc: 'Taladro Percutor 750w', oldCost: 82000, newCost: 85000, variation: 3.65 },
-      { code: 'LIJ-180', desc: 'Lija al agua 180', oldCost: 450, newCost: 450, variation: 0 },
-  ]);
+    const [templates, setTemplates] = useState<MappingTemplate[]>(() => {
+        const saved = localStorage.getItem('ferrecloud_price_templates');
+        return saved ? JSON.parse(saved) : [];
+    });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-          setFileName(file.name);
-          // Simulate loading...
-      }
-  };
+    useEffect(() => {
+        localStorage.setItem('ferrecloud_price_templates', JSON.stringify(templates));
+    }, [templates]);
 
-  const handleColumnAssign = (colIndex: number, type: 'code' | 'description' | 'cost' | 'ignore') => {
-      const newMapping = { ...mapping };
-      // Clear previous assignment if exists
-      if (newMapping.code === colIndex) newMapping.code = null;
-      if (newMapping.description === colIndex) newMapping.description = null;
-      if (newMapping.cost === colIndex) newMapping.cost = null;
+    const [rawExcelRows] = useState([
+        ['SKU-001', 'PROV-11', 'MARTILLO GALPONERO 20OZ', 'BOSCH', 'HERRAMIENTAS', 'PROVEEDOR A', '4500.00', '35'],
+        ['SKU-002', 'PROV-22', 'TALADRO 13MM 600W', 'DEWALT', 'ELECTRICAS', 'PROVEEDOR B', '85000.00', '40'],
+        ['SKU-NEW', 'PROV-99', 'NUEVO ARTICULO TEST', 'GENERICO', 'VARIOS', 'PROVEEDOR C', '1250.00', '30'],
+        ['SKU-003', 'PROV-33', 'PINZA UNIVERSAL 8', 'STANLEY', 'MANO', 'PROVEEDOR A', '7200.00', '35'],
+    ]);
 
-      if (type === 'code') newMapping.code = colIndex;
-      if (type === 'description') newMapping.description = colIndex;
-      if (type === 'cost') newMapping.cost = colIndex;
-      
-      setMapping(newMapping);
-  };
+    const availableTemplates = templates.filter(t => 
+        t.mode === importMode && (importMode === 'INITIAL' || t.providerId === selectedProviderId)
+    );
 
-  const getColType = (index: number) => {
-      if (mapping.code === index) return { label: 'CÓDIGO', color: 'bg-blue-100 text-blue-700 border-blue-300' };
-      if (mapping.description === index) return { label: 'DESCRIPCIÓN', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' };
-      if (mapping.cost === index) return { label: 'COSTO', color: 'bg-green-100 text-green-700 border-green-300' };
-      return { label: 'IGNORAR', color: 'bg-gray-100 text-gray-400 border-gray-200' };
-  };
-
-  const saveUpdates = () => {
-      alert("Precios actualizados correctamente. Se ha generado un historial de cambios.");
-      setStep(1);
-      setFileName('');
-      setSelectedProvider('');
-  };
-
-  // --- LIST ACTIONS ---
-
-  const openCreateModal = () => {
-      setEditingListId(null);
-      setNewListName('');
-      setNewListMargin(30);
-      setNewListOpen(true);
-  };
-
-  const openEditModal = (list: PriceList) => {
-      setEditingListId(list.id);
-      setNewListName(list.name);
-      setNewListMargin(list.fixedMargin || 0);
-      setNewListOpen(true);
-  };
-
-  const handleSaveList = () => {
-      if (!newListName) return;
-
-      if (editingListId) {
-          // Update existing list
-          setPriceLists(prev => prev.map(list => 
-              list.id === editingListId 
-              ? { ...list, name: newListName, fixedMargin: newListMargin }
-              : list
-          ));
-      } else {
-          // Create new list
-          setPriceLists([...priceLists, { 
-              id: Date.now().toString(), 
-              name: newListName, 
-              type: 'CUSTOM', 
-              fixedMargin: newListMargin, 
-              active: true 
-          }]);
-      }
-      
-      setNewListOpen(false);
-      setNewListName('');
-      setNewListMargin(30);
-      setEditingListId(null);
-  };
-
-  const handleDeleteList = (id: string) => {
-      const listToDelete = priceLists.find(l => l.id === id);
-      if (!listToDelete) return;
-
-      if (listToDelete.type === 'BASE') {
-          alert("No se puede eliminar la Lista Base.");
-          return;
-      }
-
-      if (confirm(`¿Estás seguro de eliminar la lista "${listToDelete.name}"?`)) {
-          setPriceLists(priceLists.filter(l => l.id !== id));
-      }
-  };
-
-  return (
-    <div className="p-8 max-w-7xl mx-auto flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">Gestión de Precios</h2>
-          <p className="text-gray-500 text-sm">Administra tus listas de venta y actualiza costos masivamente.</p>
-        </div>
+    const runAnalysis = () => {
+        setIsProcessing(true);
+        const selectedProvider = providers.find(p => p.id === selectedProviderId);
         
-        <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-            <button 
-                onClick={() => setActiveTab('LISTS')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'LISTS' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-                Listas de Precios
-            </button>
-            <button 
-                onClick={() => setActiveTab('MASS_UPDATE')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'MASS_UPDATE' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-                Actualización Masiva (Excel)
-            </button>
-        </div>
-      </div>
+        setTimeout(() => {
+            const impact: AnalysisResult['impactDetails'] = [];
+            let totalVariation = 0;
+            let matchedCount = 0;
 
-      {/* --- PRICE LISTS TAB --- */}
-      {activeTab === 'LISTS' && (
-          <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col animate-fade-in">
-              <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                  <div>
-                      <h3 className="font-bold text-gray-800 flex items-center gap-2"><List size={20}/> Mis Listas de Precios</h3>
-                      <p className="text-sm text-gray-500">Configura diferentes márgenes de ganancia para distintos tipos de clientes.</p>
-                  </div>
-                  <button 
-                    onClick={openCreateModal}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm">
-                      <Plus size={18}/> Nueva Lista
-                  </button>
-              </div>
+            rawExcelRows.forEach(row => {
+                const code = row[mapping.code ?? 0];
+                const newCost = parseFloat(row[mapping.cost ?? 6]) || 0;
+                const brand = mapping.brand !== null ? row[mapping.brand] : 'GENERICO';
+                const category = mapping.category !== null ? row[mapping.category] : 'GENERAL';
+                const providerName = mapping.provider !== null ? row[mapping.provider] : (selectedProvider?.name || 'DESCONOCIDO');
 
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {priceLists.map(list => (
-                      <div key={list.id} className={`border rounded-xl p-6 hover:shadow-md transition-shadow relative bg-white group ${list.type === 'BASE' ? 'border-blue-200 bg-blue-50/20' : 'border-gray-200'}`}>
-                          <div className="flex justify-between items-start mb-4">
-                              <h4 className="font-bold text-lg text-gray-800">{list.name}</h4>
-                              {list.type === 'BASE' ? (
-                                  <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">BASE</span>
-                              ) : (
-                                  <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded font-bold">CUSTOM</span>
-                              )}
-                          </div>
-                          
-                          <div className="mb-6">
-                              <p className="text-sm text-gray-500 mb-1">Estrategia de Precio</p>
-                              {list.type === 'BASE' ? (
-                                  <div className="text-2xl font-bold text-gray-700">Variable</div>
-                              ) : (
-                                  <div className="text-3xl font-bold text-green-600">+{list.fixedMargin}% <span className="text-sm font-normal text-gray-400">sobre Costo</span></div>
-                              )}
-                              <p className="text-xs text-gray-400 mt-1">
-                                  {list.type === 'BASE' 
-                                    ? 'Utiliza el margen individual definido en cada producto.' 
-                                    : 'Aplica un margen fijo sobre el costo real del producto.'}
-                              </p>
-                          </div>
+                // Fix: Updated matching logic to use internalCodes array property
+                const existing = products.find(p => p.internalCodes.includes(code) || p.barcodes.includes(code));
 
-                          <div className="border-t border-gray-100 pt-4 flex justify-end gap-2">
-                              {list.type === 'BASE' ? (
-                                  <span className="text-xs text-gray-400 italic py-2">Lista predeterminada del sistema</span>
-                              ) : (
-                                  <>
-                                    <button 
-                                        onClick={() => openEditModal(list)} 
-                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                        title="Editar Lista"
-                                    >
-                                        <Edit2 size={16}/>
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDeleteList(list.id)} 
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        title="Eliminar Lista"
-                                    >
-                                        <Trash2 size={16}/>
-                                    </button>
-                                  </>
-                              )}
-                          </div>
-                      </div>
-                  ))}
-              </div>
+                if (existing) {
+                    matchedCount++;
+                    const oldCost = existing.costAfterDiscounts || existing.listCost;
+                    const variation = oldCost > 0 ? ((newCost - oldCost) / oldCost) * 100 : 0;
+                    totalVariation += variation;
+                    impact.push({ 
+                        code, desc: existing.name, oldCost, newCost, variation, 
+                        brand: existing.brand, category: existing.category, provider: existing.provider,
+                        status: 'UPDATE' 
+                    });
+                } else {
+                    impact.push({ 
+                        code, desc: row[mapping.description ?? 2] || 'SIN DESCRIPCION', oldCost: 0, newCost, variation: 0, 
+                        brand, category, provider: providerName,
+                        status: 'NEW' 
+                    });
+                }
+            });
 
-              {/* Create/Edit List Modal */}
-              {newListOpen && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-                          <h3 className="font-bold text-lg mb-4">{editingListId ? 'Editar Lista de Precios' : 'Crear Nueva Lista de Precios'}</h3>
-                          <div className="space-y-4">
-                              <div>
-                                  <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Lista</label>
-                                  <input 
-                                    type="text" 
-                                    className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none" 
-                                    placeholder="Ej: Mayorista, Gremio..."
-                                    value={newListName}
-                                    onChange={(e) => setNewListName(e.target.value)}
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-sm font-bold text-gray-700 mb-1">Margen de Ganancia (%)</label>
-                                  <div className="flex items-center gap-2">
-                                      <input 
-                                        type="number" 
-                                        className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-bold text-lg" 
-                                        value={newListMargin}
-                                        onChange={(e) => setNewListMargin(parseFloat(e.target.value))}
-                                      />
-                                      <span className="text-gray-500 font-bold">%</span>
-                                  </div>
-                                  <p className="text-xs text-gray-500 mt-1">Este porcentaje se sumará al costo del producto para calcular el precio de venta en esta lista.</p>
-                              </div>
-                          </div>
-                          <div className="flex justify-end gap-3 mt-6">
-                              <button onClick={() => setNewListOpen(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancelar</button>
-                              <button onClick={handleSaveList} className="px-4 py-2 bg-indigo-600 text-white rounded font-bold hover:bg-indigo-700">
-                                  {editingListId ? 'Guardar Cambios' : 'Crear Lista'}
-                              </button>
-                          </div>
-                      </div>
-                  </div>
-              )}
-          </div>
-      )}
+            let discontinuedCount = 0;
+            if (importMode === 'UPDATE' && selectedProvider) {
+                const providerProducts = products.filter(p => p.provider === selectedProvider.name);
+                const excelCodes = rawExcelRows.map(r => r[mapping.code ?? 0]);
+                // Fix: Updated discontinued logic to use internalCodes array property
+                const discontinued = providerProducts.filter(p => !p.internalCodes.some(c => excelCodes.includes(c)));
+                discontinuedCount = discontinued.length;
+                discontinued.forEach(p => {
+                    impact.push({ 
+                        code: p.internalCodes[0], desc: p.name, oldCost: p.costAfterDiscounts, newCost: 0, variation: 0, 
+                        brand: p.brand, category: p.category, provider: p.provider,
+                        status: 'DISCONTINUED' 
+                    });
+                });
+            }
 
-      {/* --- MASS UPDATE TAB --- */}
-      {activeTab === 'MASS_UPDATE' && (
-      <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col overflow-hidden animate-fade-in">
-          
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between relative">
-                <div className={`flex flex-col items-center gap-2 bg-white px-4 py-2 rounded border ${step >= 1 ? 'border-ferre-orange' : 'border-gray-200'}`}>
-                    <span className="text-xs font-bold text-gray-600">1. Carga</span>
+            setAnalysis({
+                totalExcel: rawExcelRows.length,
+                matched: matchedCount,
+                newItems: impact.filter(i => i.status === 'NEW').length,
+                discontinued: discontinuedCount,
+                avgVariation: matchedCount > 0 ? totalVariation / matchedCount : 0,
+                impactDetails: impact
+            });
+
+            setIsProcessing(false);
+            setStep(3);
+        }, 1200);
+    };
+
+    const handleSaveTemplate = () => {
+        if (!mapping.code || !mapping.cost) {
+            alert("Debe mapear al menos el Código y el Costo para guardar una plantilla.");
+            return;
+        }
+        const name = prompt("Nombre para esta plantilla:");
+        if (!name) return;
+        
+        const newTmpl: MappingTemplate = {
+            id: `tmpl-${Date.now()}`,
+            name,
+            providerId: importMode === 'UPDATE' ? selectedProviderId : undefined,
+            mode: importMode,
+            mapping: { ...mapping }
+        };
+        
+        setTemplates(prev => {
+            const updated = [...prev, newTmpl];
+            localStorage.setItem('ferrecloud_price_templates', JSON.stringify(updated));
+            return updated;
+        });
+        
+        setSelectedTemplateId(newTmpl.id);
+        alert(`Plantilla "${name}" guardada con éxito.`);
+    };
+
+    const finalizeUpdate = () => {
+        if (!analysis) return;
+        setIsProcessing(true);
+
+        setTimeout(() => {
+            let updateCount = 0;
+            let insertCount = 0;
+
+            const updatedProducts = products.map(p => {
+                // Fix: Updated update logic to use internalCodes array property
+                const match = analysis.impactDetails.find(i => p.internalCodes.includes(i.code) && i.status === 'UPDATE');
+                if (match) {
+                    updateCount++;
+                    const priceNeto = match.newCost * (1 + (p.profitMargin / 100));
+                    const priceFinal = priceNeto * (1 + (p.vatRate / 100));
+                    return { 
+                        ...p, 
+                        listCost: match.newCost, 
+                        costAfterDiscounts: match.newCost,
+                        priceNeto: parseFloat(priceNeto.toFixed(2)),
+                        priceFinal: parseFloat(priceFinal.toFixed(2))
+                    };
+                }
+                return p;
+            });
+
+            let finalProductList = [...updatedProducts];
+
+            // SI ES CARGA INICIAL, AGREGAMOS LOS NUEVOS
+            if (importMode === 'INITIAL') {
+                const newProductsToAdd = analysis.impactDetails.filter(i => i.status === 'NEW').map(item => {
+                    insertCount++;
+                    const profitMargin = 30; // Default
+                    const vatRate = 21; // Default
+                    const priceNeto = item.newCost * (1 + (profitMargin / 100));
+                    const priceFinal = priceNeto * (1 + (vatRate / 100));
+
+                    // Fix: Updated new product object literal to use internalCodes array instead of internalCode string
+                    return {
+                        id: `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                        internalCodes: [item.code],
+                        barcodes: [],
+                        providerCodes: [],
+                        name: item.desc,
+                        brand: item.brand,
+                        provider: item.provider,
+                        description: '',
+                        category: item.category,
+                        measureUnitSale: 'Unidad',
+                        measureUnitPurchase: 'Unidad',
+                        conversionFactor: 1,
+                        purchaseCurrency: 'ARS',
+                        saleCurrency: 'ARS',
+                        vatRate: vatRate as any,
+                        listCost: item.newCost,
+                        discounts: [0, 0, 0, 0] as [number, number, number, number],
+                        costAfterDiscounts: item.newCost,
+                        profitMargin: profitMargin,
+                        priceNeto: parseFloat(priceNeto.toFixed(2)),
+                        priceFinal: parseFloat(priceFinal.toFixed(2)),
+                        stock: 0,
+                        stockDetails: [],
+                        minStock: 0,
+                        desiredStock: 0,
+                        reorderPoint: 0,
+                        location: '',
+                        ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
+                    } as Product;
+                });
+                finalProductList = [...finalProductList, ...newProductsToAdd];
+            }
+
+            setProducts(finalProductList);
+            localStorage.setItem('ferrecloud_products', JSON.stringify(finalProductList));
+            
+            alert(`Sincronización Exitosa.\n- Actualizados: ${updateCount}\n- Nuevos incorporados: ${insertCount}`);
+            
+            setStep(1);
+            setAnalysis(null);
+            setIsProcessing(false);
+            setFileName('');
+        }, 2000);
+    };
+
+    const MAP_FIELDS = [
+        { key: 'code', label: 'Cód. Interno (SKU)', icon: Tag, color: 'bg-blue-600' },
+        { key: 'providerCode', label: 'Cód. Proveedor', icon: Truck, color: 'bg-slate-600' },
+        { key: 'description', label: 'Descripción / Nombre', icon: FileText, color: 'bg-yellow-500' },
+        { key: 'brand', label: 'Marca', icon: Bookmark, color: 'bg-purple-600' },
+        { key: 'category', label: 'Categoría', icon: Layers, color: 'bg-indigo-600' },
+        { key: 'provider', label: 'Proveedor', icon: Building2, color: 'bg-teal-600' },
+        { key: 'cost', label: 'Costo Neto', icon: Calculator, color: 'bg-green-600' },
+        { key: 'profit', label: '% Ganancia', icon: Percent, color: 'bg-orange-500' },
+    ];
+
+    return (
+        <div className="p-4 h-full flex flex-col space-y-3 bg-slate-50 overflow-hidden">
+            {/* Header Profesional Compacto */}
+            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                <div>
+                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                        <Calculator size={18} className="text-indigo-600"/> Gestión de Listas y Costos
+                    </h2>
                 </div>
-                <div className="h-px bg-gray-300 flex-1 mx-2"></div>
-                <div className={`flex flex-col items-center gap-2 bg-white px-4 py-2 rounded border ${step >= 2 ? 'border-ferre-orange' : 'border-gray-200'}`}>
-                    <span className="text-xs font-bold text-gray-600">2. Mapeo</span>
-                </div>
-                <div className="h-px bg-gray-300 flex-1 mx-2"></div>
-                <div className={`flex flex-col items-center gap-2 bg-white px-4 py-2 rounded border ${step >= 3 ? 'border-ferre-orange' : 'border-gray-200'}`}>
-                    <span className="text-xs font-bold text-gray-600">3. Análisis</span>
-                </div>
-                <div className="h-px bg-gray-300 flex-1 mx-2"></div>
-                <div className={`flex flex-col items-center gap-2 bg-white px-4 py-2 rounded border ${step >= 4 ? 'border-ferre-orange' : 'border-gray-200'}`}>
-                    <span className="text-xs font-bold text-gray-600">4. Confirmar</span>
+                <div className="flex bg-slate-100 rounded-lg p-1">
+                    <button onClick={() => setActiveTab('LISTS')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'LISTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Venta Público</button>
+                    <button onClick={() => setActiveTab('MASS_UPDATE')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'MASS_UPDATE' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Importación Masiva</button>
                 </div>
             </div>
-          </div>
 
-          {/* STEP 1: UPLOAD */}
-          {step === 1 && (
-              <div className="p-12 flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
-                  <div className="w-full max-w-md space-y-4">
-                      <label className="block text-sm font-bold text-gray-700">Seleccionar Proveedor</label>
-                      <select 
-                        className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-ferre-orange outline-none"
-                        value={selectedProvider}
-                        onChange={(e) => setSelectedProvider(e.target.value)}
-                      >
-                          <option value="">-- Elegir Proveedor --</option>
-                          {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                  </div>
+            {activeTab === 'LISTS' && (
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in overflow-y-auto">
+                    {priceLists.map(list => (
+                        <div key={list.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group h-fit">
+                            <div>
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="font-black text-slate-800 uppercase tracking-tight">{list.name}</h3>
+                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${list.type === 'BASE' ? 'bg-indigo-100 text-indigo-700' : 'bg-green-100 text-green-700'}`}>
+                                        {list.type === 'BASE' ? 'Automática' : 'Custom'}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Margen Aplicado</p>
+                                <div className="text-3xl font-black text-slate-900 tracking-tighter">
+                                    {list.type === 'BASE' ? 'S/ ARTÍCULO' : `+${list.fixedMargin}%`}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
-                  <div className={`w-full max-w-md border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors ${fileName ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-ferre-orange bg-gray-50'}`}>
-                      {fileName ? (
-                          <>
-                            <FileSpreadsheet size={48} className="text-green-600 mb-4" />
-                            <p className="font-bold text-green-800">{fileName}</p>
-                            <button onClick={() => setFileName('')} className="text-xs text-red-500 hover:underline mt-2">Eliminar y cambiar</button>
-                          </>
-                      ) : (
-                          <>
-                            <FileUp size={48} className="text-gray-400 mb-4" />
-                            <p className="font-bold text-gray-600">Arrastra tu archivo Excel aquí</p>
-                            <p className="text-sm text-gray-400 mt-1">o haz click para buscar (.xlsx, .csv)</p>
-                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileUpload} />
-                          </>
-                      )}
-                  </div>
+            {activeTab === 'MASS_UPDATE' && (
+                <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in min-h-0">
+                    {/* Stepper Fijo */}
+                    <div className="bg-slate-900 px-6 py-3 flex items-center justify-between border-b border-slate-800 shrink-0">
+                        <div className="flex gap-8">
+                            {[
+                                { n: 1, label: 'Parámetros' },
+                                { n: 2, label: 'Mapeo Columnas' },
+                                { n: 3, label: 'Análisis Impacto' }
+                            ].map(s => (
+                                <div key={s.n} className={`flex items-center gap-2 transition-all ${step === s.n ? 'opacity-100' : 'opacity-40'}`}>
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${step >= s.n ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400'}`}>{s.n}</span>
+                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">{s.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {fileName && <span className="text-[9px] font-mono text-indigo-400 font-bold uppercase">{fileName}</span>}
+                    </div>
 
-                  <button 
-                    disabled={!selectedProvider || !fileName}
-                    onClick={() => setStep(2)}
-                    className="bg-ferre-orange text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                      Siguiente Paso <ArrowRight size={20}/>
-                  </button>
-              </div>
-          )}
+                    <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50 overflow-hidden">
+                        {step === 1 && (
+                            <div className="flex-1 flex flex-col min-h-0 max-w-2xl mx-auto w-full p-6 animate-fade-in overflow-hidden">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6">
+                                    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">Modo de carga</label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <button onClick={() => setImportMode('UPDATE')} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${importMode === 'UPDATE' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 text-slate-400'}`}>
+                                                    <RefreshCw size={20}/>
+                                                    <span className="font-black text-[10px] uppercase tracking-tighter">Actualizar Existentes</span>
+                                                </button>
+                                                <button onClick={() => setImportMode('INITIAL')} className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${importMode === 'INITIAL' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-100 text-slate-400'}`}>
+                                                    <PackagePlus size={20}/>
+                                                    <span className="font-black text-[10px] uppercase tracking-tighter">Carga Inicial</span>
+                                                </button>
+                                            </div>
+                                        </div>
 
-          {/* STEP 2: TEMPLATE MAPPING */}
-          {step === 2 && (
-              <div className="flex flex-col h-full animate-fade-in">
-                  <div className="p-6 border-b border-gray-200 bg-slate-50 flex justify-between items-center">
-                      <div>
-                          <h3 className="font-bold text-gray-800 flex items-center gap-2"><LayoutTemplate size={20}/> Configurar Plantilla de Importación</h3>
-                          <p className="text-sm text-gray-500">Indica qué representa cada columna del archivo Excel.</p>
-                      </div>
-                      <button className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1">
-                          <Settings size={14}/> Guardar configuración para este proveedor
-                      </button>
-                  </div>
+                                        {importMode === 'UPDATE' && (
+                                            <div className="animate-fade-in space-y-3 pt-4 border-t border-slate-100">
+                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block ml-1">Proveedor Responsable</label>
+                                                <select className="w-full p-3 bg-slate-50 border border-gray-100 rounded-xl text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" value={selectedProviderId} onChange={e => {setSelectedProviderId(e.target.value); setSelectedTemplateId('manual');}}>
+                                                    <option value="">-- Seleccione Proveedor --</option>
+                                                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                </select>
+                                            </div>
+                                        )}
 
-                  <div className="flex-1 overflow-auto p-6">
-                      <div className="border border-gray-300 rounded-lg overflow-hidden">
-                          <div className="grid grid-cols-4 divide-x divide-gray-300 bg-gray-100 border-b border-gray-300">
-                              {[0,1,2,3].map(i => {
-                                  const status = getColType(i);
-                                  return (
-                                      <div key={i} className="p-2 flex flex-col gap-2">
-                                          <div className={`text-center text-xs font-bold py-1 px-2 rounded border ${status.color}`}>
-                                              {status.label}
-                                          </div>
-                                          <select 
-                                            className="text-xs p-1 border rounded w-full"
-                                            onChange={(e) => handleColumnAssign(i, e.target.value as any)}
-                                            defaultValue="ignore"
-                                          >
-                                              <option value="ignore">Ignorar Columna</option>
-                                              <option value="code">Es CÓDIGO</option>
-                                              <option value="description">Es DESCRIPCIÓN</option>
-                                              <option value="cost">Es COSTO</option>
-                                          </select>
-                                      </div>
-                                  );
-                              })}
-                          </div>
-                          {/* Preview Rows */}
-                          {rawPreview.map((row, idx) => (
-                              <div key={idx} className="grid grid-cols-4 divide-x divide-gray-200 border-b border-gray-100 hover:bg-gray-50">
-                                  {row.cols.map((col, cIdx) => (
-                                      <div key={cIdx} className="p-3 text-sm text-gray-700 font-mono truncate">
-                                          {col}
-                                      </div>
-                                  ))}
-                              </div>
-                          ))}
-                      </div>
-                  </div>
+                                        <div className="pt-4 border-t border-slate-100">
+                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2 ml-1">Plantilla de Columnas</label>
+                                            <select className="w-full p-3 bg-slate-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" value={selectedTemplateId} onChange={e => {
+                                                setSelectedTemplateId(e.target.value);
+                                                if (e.target.value !== 'manual') {
+                                                    const t = templates.find(x => x.id === e.target.value);
+                                                    if (t) setMapping(t.mapping);
+                                                } else {
+                                                    setMapping({ code: null, providerCode: null, description: null, cost: null, brand: null, category: null, provider: null, profit: null, ignored: [] });
+                                                }
+                                            }}>
+                                                <option value="manual">Mapeo Manual</option>
+                                                {availableTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                            </select>
+                                        </div>
 
-                  <div className="p-4 border-t border-gray-200 flex justify-end gap-3 bg-white">
-                      <button onClick={() => setStep(1)} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-600">Atrás</button>
-                      <button 
-                        onClick={() => setStep(3)}
-                        disabled={mapping.code === null || mapping.cost === null}
-                        className="bg-ferre-orange text-white px-6 py-2 rounded-lg font-bold hover:bg-orange-600 disabled:opacity-50">
-                        Analizar Archivo
-                      </button>
-                  </div>
-              </div>
-          )}
+                                        <div className="relative group">
+                                            <div className={`border-2 border-dashed rounded-[2rem] p-8 flex flex-col items-center justify-center transition-all ${fileName ? 'border-green-400 bg-green-50/10' : 'border-slate-200 hover:border-indigo-400 bg-slate-50'}`}>
+                                                <FileSpreadsheet size={48} className={`mb-3 ${fileName ? 'text-green-500' : 'text-slate-300'}`}/>
+                                                <p className="text-[11px] font-black text-slate-500 uppercase tracking-tighter text-center">{fileName || 'Haga clic o arrastre el archivo de listas'}</p>
+                                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => e.target.files && setFileName(e.target.files[0].name)} accept=".xlsx,.xls,.csv" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="pt-4 shrink-0">
+                                    <button onClick={() => setStep(2)} disabled={fileName === '' || (importMode === 'UPDATE' && !selectedProviderId)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl disabled:opacity-20 active:scale-95 transition-all">Siguiente: Mapear Columnas</button>
+                                </div>
+                            </div>
+                        )}
 
-          {/* STEP 3: STATISTICS */}
-          {step === 3 && (
-              <div className="p-12 flex flex-col items-center justify-center h-full space-y-8 animate-fade-in">
-                  <h3 className="text-2xl font-bold text-gray-800">Resultado del Análisis</h3>
-                  
-                  <div className="grid grid-cols-3 gap-6 w-full max-w-4xl">
-                      <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-500">
-                          <div className="text-gray-500 text-sm font-bold uppercase mb-2">Artículos en Archivo</div>
-                          <div className="text-4xl font-bold text-gray-800">{stats.totalInFile}</div>
-                          <p className="text-xs text-gray-400 mt-2">Total de filas leídas</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-green-500">
-                          <div className="text-gray-500 text-sm font-bold uppercase mb-2">Vinculados (En Sistema)</div>
-                          <div className="text-4xl font-bold text-green-600">{stats.matched}</div>
-                          <p className="text-xs text-gray-400 mt-2">Productos que actualizarán precio</p>
-                      </div>
-                      <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-red-500">
-                          <div className="text-gray-500 text-sm font-bold uppercase mb-2 flex items-center gap-2">
-                              <AlertTriangle size={16}/> Discontinuados
-                          </div>
-                          <div className="text-4xl font-bold text-red-600">{stats.discontinued}</div>
-                          <p className="text-xs text-gray-400 mt-2">En sistema pero NO en archivo</p>
-                      </div>
-                  </div>
+                        {step === 2 && (
+                            <div className="flex-1 flex flex-col min-h-0 animate-fade-in overflow-hidden">
+                                <div className="p-4 bg-white border-b border-gray-100 flex justify-between items-center shadow-sm shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><LayoutTemplate size={18}/></div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asigne el contenido de cada columna</p>
+                                    </div>
+                                    <button onClick={handleSaveTemplate} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-all flex items-center gap-2">
+                                        <BookmarkPlus size={14}/> Guardar Plantilla
+                                    </button>
+                                </div>
+                                <div className="flex-1 overflow-auto p-4 md:p-6 custom-scrollbar">
+                                    <div className="border border-gray-200 rounded-[2rem] overflow-hidden bg-white shadow-xl min-w-[1200px]">
+                                        <div className="grid grid-cols-8 bg-slate-900 p-4 gap-4 sticky top-0 z-20">
+                                            {[0,1,2,3,4,5,6,7].map(i => (
+                                                <div key={i} className="space-y-2">
+                                                    <div className={`text-[8px] font-black py-1 px-2 rounded-full text-center border uppercase tracking-tighter flex items-center justify-center gap-1.5 h-6 ${
+                                                        Object.entries(mapping).find(([_, val]) => val === i) 
+                                                        ? `${MAP_FIELDS.find(f => f.key === Object.entries(mapping).find(([_, val]) => val === i)?.[0])?.color} text-white border-white/20` 
+                                                        : 'bg-slate-800 text-slate-500 border-slate-700'
+                                                    }`}>
+                                                        {Object.entries(mapping).find(([_, val]) => val === i) ? (
+                                                            <>
+                                                                {React.createElement(MAP_FIELDS.find(f => f.key === Object.entries(mapping).find(([_, val]) => val === i)?.[0])?.icon || X, { size: 10 })}
+                                                                {MAP_FIELDS.find(f => f.key === Object.entries(mapping).find(([_, val]) => val === i)?.[0])?.label.split(' ')[0]}
+                                                            </>
+                                                        ) : '---'}
+                                                    </div>
+                                                    <select className="w-full text-[10px] font-black bg-slate-800 text-white border-none rounded-lg p-2 outline-none cursor-pointer hover:bg-slate-700 transition-colors" value={Object.entries(mapping).find(([_, val]) => val === i)?.[0] || 'none'} onChange={e => {
+                                                            const val = e.target.value;
+                                                            const newM = {...mapping} as any;
+                                                            Object.keys(newM).forEach(key => { if (newM[key] === i) newM[key] = null; });
+                                                            if (val !== 'none') newM[val] = i;
+                                                            setMapping(newM);
+                                                        }}>
+                                                        <option value="none">Ignorar</option>
+                                                        {MAP_FIELDS.map(f => ( <option key={f.key} value={f.key}>{f.label}</option> ))}
+                                                    </select>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="divide-y divide-gray-100">
+                                            {rawExcelRows.map((row, rIdx) => (
+                                                <div key={rIdx} className="grid grid-cols-8 hover:bg-slate-50 transition-colors">
+                                                    {row.map((cell, cIdx) => (
+                                                        <div key={cIdx} className="p-4 text-[10px] font-mono text-slate-500 truncate border-r last:border-r-0 border-gray-100">{cell}</div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-white border-t border-gray-100 flex justify-between shrink-0">
+                                    <button onClick={() => setStep(1)} className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-8 hover:text-slate-800 transition-colors">Volver</button>
+                                    <button onClick={runAnalysis} disabled={mapping.code === null || mapping.cost === null} className="bg-slate-900 text-white px-12 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl disabled:opacity-20 flex items-center gap-2 active:scale-95 transition-all">
+                                        Analizar Impacto <ChevronRight size={16}/>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
-                  <div className="w-full max-w-4xl bg-yellow-50 border border-yellow-200 p-4 rounded-lg flex gap-4 items-start">
-                      <AlertTriangle className="text-yellow-600 shrink-0 mt-1" />
-                      <div>
-                          <h4 className="font-bold text-yellow-800">Atención: Productos Discontinuados</h4>
-                          <p className="text-sm text-yellow-700">Se detectaron {stats.discontinued} artículos que pertenecen a este proveedor en tu sistema, pero no figuran en la lista nueva. Puedes optar por marcarlos como "Inactivos" o mantenerlos.</p>
-                      </div>
-                  </div>
+                        {step === 3 && analysis && (
+                            <div className="flex-1 flex flex-col min-h-0 overflow-hidden animate-fade-in p-4 md:p-6 space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+                                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Layers size={20}/></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Excel</p>
+                                            <p className="text-xl font-black text-slate-800 leading-none">{analysis.totalExcel}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+                                        <div className="p-3 bg-green-50 text-green-600 rounded-xl"><PackagePlus size={20}/></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Nuevos</p>
+                                            <p className="text-xl font-black text-green-600 leading-none">{analysis.newItems}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+                                        <div className={`p-3 rounded-xl ${analysis.avgVariation > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                            {analysis.avgVariation > 0 ? <TrendingUp size={20}/> : <TrendingDown size={20}/>}
+                                        </div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Variación</p>
+                                            <p className={`text-xl font-black leading-none ${analysis.avgVariation > 0 ? 'text-red-600' : 'text-green-600'}`}>{analysis.avgVariation.toFixed(2)}%</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm flex items-center gap-4">
+                                        <div className="p-3 bg-orange-50 text-orange-600 rounded-xl"><PackageMinus size={20}/></div>
+                                        <div>
+                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Inactivos</p>
+                                            <p className="text-xl font-black text-orange-600 leading-none">{analysis.discontinued}</p>
+                                        </div>
+                                    </div>
+                                </div>
 
-                  <div className="flex gap-3">
-                      <button onClick={() => setStep(2)} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-600">Atrás</button>
-                      <button 
-                        onClick={() => setStep(4)}
-                        className="bg-ferre-orange text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-orange-600 flex items-center gap-2">
-                        Ver Vista Previa <ArrowRight size={20}/>
-                      </button>
-                  </div>
-              </div>
-          )}
+                                {importMode === 'UPDATE' && analysis.newItems > 0 && (
+                                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-700 shrink-0">
+                                        <AlertOctagon size={20}/>
+                                        <p className="text-[10px] font-black uppercase tracking-tight">Atención: Hay {analysis.newItems} artículos nuevos en el Excel que serán IGNORADOS porque el modo está en "Solo Actualizar Existentes".</p>
+                                    </div>
+                                )}
 
-           {/* STEP 4: PREVIEW & COMMIT */}
-           {step === 4 && (
-              <div className="flex flex-col h-full animate-fade-in">
-                  <div className="p-6 border-b border-gray-200 bg-slate-50 flex justify-between items-center">
-                      <div>
-                          <h3 className="font-bold text-gray-800 flex items-center gap-2"><Database size={20}/> Vista Previa de Impacto</h3>
-                          <p className="text-sm text-gray-500">Revisa los cambios de costos antes de confirmar.</p>
-                      </div>
-                      <div className="text-right">
-                          <div className="text-xs font-bold text-gray-500 uppercase">Total a actualizar</div>
-                          <div className="text-xl font-bold text-ferre-orange">{stats.matched} Artículos</div>
-                      </div>
-                  </div>
+                                <div className="flex-1 bg-white rounded-[2rem] border border-gray-200 shadow-xl overflow-hidden flex flex-col min-h-0">
+                                    <div className="p-3 bg-slate-50 border-b border-gray-100 text-[9px] font-black text-slate-500 uppercase tracking-widest px-6 shrink-0">Validación Pre-Carga</div>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-slate-900 sticky top-0 z-10 text-[8px] font-black text-slate-300 uppercase tracking-widest">
+                                                <tr>
+                                                    <th className="px-6 py-3">Artículo / SKU</th>
+                                                    <th className="px-6 py-3 text-right">Anterior</th>
+                                                    <th className="px-6 py-3 text-right">Nuevo</th>
+                                                    <th className="px-6 py-3 text-center">Impacto</th>
+                                                    <th className="px-6 py-3 text-center">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100 text-[10px]">
+                                                {analysis.impactDetails.map((item, idx) => (
+                                                    <tr key={idx} className={`hover:bg-slate-50/50 transition-colors ${item.status === 'NEW' && importMode === 'UPDATE' ? 'opacity-40 grayscale' : ''}`}>
+                                                        <td className="px-6 py-4">
+                                                            <p className="font-black text-slate-800 uppercase leading-none mb-1 truncate max-w-[200px]">{item.desc}</p>
+                                                            <p className="text-[8px] font-mono font-bold text-indigo-500 uppercase">{item.code}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-bold text-gray-400">{item.oldCost > 0 ? `$${item.oldCost.toLocaleString('es-AR')}` : '-'}</td>
+                                                        <td className="px-6 py-4 text-right font-black text-slate-900">$ {item.newCost.toLocaleString('es-AR')}</td>
+                                                        <td className={`px-6 py-4 text-center font-black ${item.variation > 0 ? 'text-red-500' : item.variation < 0 ? 'text-green-500' : 'text-gray-300'}`}>{item.variation !== 0 ? `${item.variation > 0 ? '▲' : '▼'} ${Math.abs(item.variation).toFixed(1)}%` : '0%'}</td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter border ${
+                                                                item.status === 'UPDATE' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                                                                item.status === 'NEW' ? 'bg-green-50 text-green-600 border-green-100' : 
+                                                                'bg-red-50 text-red-600 border-red-100'
+                                                            }`}>
+                                                                {item.status === 'NEW' && importMode === 'UPDATE' ? 'DESCARTADO' : item.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
 
-                  <div className="flex-1 overflow-auto p-6">
-                      <table className="w-full text-left border-collapse">
-                          <thead className="bg-white sticky top-0 z-10 shadow-sm text-xs text-gray-500 uppercase">
-                              <tr>
-                                  <th className="px-4 py-3 border-b">Código</th>
-                                  <th className="px-4 py-3 border-b">Descripción</th>
-                                  <th className="px-4 py-3 border-b text-right">Costo Anterior</th>
-                                  <th className="px-4 py-3 border-b text-right">Costo Nuevo</th>
-                                  <th className="px-4 py-3 border-b text-center">Variación %</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 text-sm">
-                              {impactData.map((row, idx) => (
-                                  <tr key={idx} className="hover:bg-gray-50">
-                                      <td className="px-4 py-3 font-mono text-gray-600">{row.code}</td>
-                                      <td className="px-4 py-3 text-gray-800">{row.desc}</td>
-                                      <td className="px-4 py-3 text-right text-gray-500">${row.oldCost.toLocaleString('es-AR')}</td>
-                                      <td className="px-4 py-3 text-right font-bold text-gray-800">${row.newCost.toLocaleString('es-AR')}</td>
-                                      <td className="px-4 py-3 text-center">
-                                          <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                              row.variation > 0 ? 'bg-red-100 text-red-700' : 
-                                              row.variation < 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                          }`}>
-                                              {row.variation > 0 ? '+' : ''}{row.variation}%
-                                          </span>
-                                      </td>
-                                  </tr>
-                              ))}
-                              {/* Filler rows for demo */}
-                              {Array.from({length: 10}).map((_, i) => (
-                                   <tr key={`fill-${i}`} className="hover:bg-gray-50">
-                                      <td className="px-4 py-3 font-mono text-gray-600">COD-GEN-{i}</td>
-                                      <td className="px-4 py-3 text-gray-800">Artículo Genérico Ejemplo {i}</td>
-                                      <td className="px-4 py-3 text-right text-gray-500">$1,000.00</td>
-                                      <td className="px-4 py-3 text-right font-bold text-gray-800">$1,100.00</td>
-                                      <td className="px-4 py-3 text-center">
-                                          <span className="px-2 py-1 rounded text-xs font-bold bg-red-100 text-red-700">+10%</span>
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
-                  </div>
-
-                  <div className="p-4 border-t border-gray-200 flex justify-end gap-3 bg-white">
-                      <button onClick={() => setStep(3)} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-600">Atrás</button>
-                      <button 
-                        onClick={saveUpdates}
-                        className="bg-green-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:bg-green-700 flex items-center gap-2">
-                        <Save size={20}/> Confirmar y Actualizar Precios
-                      </button>
-                  </div>
-              </div>
-          )}
-      </div>
-      )}
-    </div>
-  );
+                                <div className="flex justify-between items-center shrink-0 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                    <button onClick={() => setStep(2)} className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-6 py-2 hover:text-slate-800 transition-colors">Volver</button>
+                                    <button onClick={finalizeUpdate} className="bg-indigo-600 text-white px-10 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 flex items-center gap-3 active:scale-95 transition-all">
+                                        <CheckCircle size={18}/> Actualizar Base de Datos
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default PriceUpdates;
