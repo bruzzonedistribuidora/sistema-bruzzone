@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     User, Plus, Search, FileText, Globe, X, Copy, MessageCircle, Key, 
     ExternalLink, History, Eye, ChevronRight, ShoppingBag, Receipt, 
@@ -7,7 +7,7 @@ import {
     CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
     ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
     Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil, ArrowLeft,
-    UserCheck, Phone, QrCode, Banknote, FileCheck
+    UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp
 } from 'lucide-react';
 import { Client, CurrentAccountMovement, CompanyConfig } from '../types';
 import { fetchCompanyByCuit } from '../services/geminiService';
@@ -25,6 +25,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [clients, setClients] = useState<Client[]>(() => {
       const saved = localStorage.getItem('ferrecloud_clients');
@@ -74,6 +75,51 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   useEffect(() => {
       localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
   }, [movements]);
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
+        
+        const currentCuits = new Set(clients.map(c => c.cuit.replace(/[^0-9]/g, '')));
+        const newClients: Client[] = [];
+
+        lines.forEach(line => {
+            // Formato esperado: Nombre, CUIT, Telefono, Direccion
+            const [name, cuit, phone, address] = line.split(',').map(s => s?.trim());
+            const cleanCuit = cuit?.replace(/[^0-9]/g, '');
+
+            if (name && cleanCuit && !currentCuits.has(cleanCuit)) {
+                newClients.push({
+                    id: `cli-${Date.now()}-${Math.random()}`,
+                    name: name.toUpperCase(),
+                    cuit: cuit,
+                    phone: phone || '',
+                    address: address || '',
+                    balance: 0,
+                    limit: 100000,
+                    points: 0,
+                    portalEnabled: true,
+                    portalHash: `p-${Math.random().toString(36).substr(2, 6)}`
+                });
+                currentCuits.add(cleanCuit);
+            }
+        });
+
+        if (newClients.length > 0) {
+            setClients([...newClients, ...clients]);
+            alert(`Importación finalizada. Se agregaron ${newClients.length} clientes nuevos.`);
+        } else {
+            alert("No se encontraron clientes nuevos para importar.");
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const handleSearchCuit = async () => {
       if (!clientForm.cuit || clientForm.cuit.length < 8) return;
@@ -136,6 +182,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden">
+        <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleImportFile} />
         
         {/* CABECERA PRINCIPAL */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm gap-4 shrink-0">
@@ -154,11 +201,18 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                     />
                 </div>
             </div>
-            <button 
-                onClick={() => { setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', limit: 100000, points: 0, portalEnabled: true}); setIsNewClientModalOpen(true); }} 
-                className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
-                <Plus size={20} /> Registrar Nuevo
-            </button>
+            <div className="flex gap-3">
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest active:scale-95">
+                    <FileSpreadsheet size={20} /> Importar CSV
+                </button>
+                <button 
+                    onClick={() => { setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', limit: 100000, points: 0, portalEnabled: true}); setIsNewClientModalOpen(true); }} 
+                    className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
+                    <Plus size={20} /> Registrar Nuevo
+                </button>
+            </div>
         </div>
 
         {/* TABLA DE CLIENTES */}
