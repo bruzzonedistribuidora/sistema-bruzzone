@@ -40,44 +40,18 @@ export enum ViewState {
   PUBLIC_PORTAL = 'PUBLIC_PORTAL'
 }
 
-export interface CreditNote {
+export interface CreditInstallment {
   id: string;
-  type: 'SALES' | 'PURCHASE';
-  targetId: string; // ClientId o ProviderId
-  targetName: string;
-  relatedVoucherId: string;
-  date: string;
-  items: InvoiceItem[];
-  total: number;
-  reason: 'DEVOLUCION' | 'ERROR_PRECIO' | 'BONIFICACION' | 'OTROS';
-  returnToStock: boolean;
+  installments: number;
+  surcharge: number; // Porcentaje de recargo
+  label: string;
 }
 
-export interface PriceHistoryEntry {
-  date: string;
-  oldCost: number;
-  newCost: number;
-  oldPrice: number;
-  newPrice: number;
-  reason: string;
-}
-
-export interface User {
+export interface PaymentSystem {
   id: string;
-  name: string;
-  email: string;
-  password?: string;
-  roleId: string;
-  active: boolean;
-  lastLogin: string;
-  branchId: string;
-}
-
-export interface Role {
-  id: string;
-  name: string;
-  color: string;
-  permissions: string[];
+  name: string; // Ej: Mercado Pago, Galicia Nave, Fiserv
+  debitSurcharge: number;
+  creditInstallments: CreditInstallment[];
 }
 
 export interface CompanyConfig {
@@ -98,17 +72,78 @@ export interface CompanyConfig {
   whatsappNumber: string;
   defaultProfitMargin: number;
   paymentAccounts: PaymentAccount[];
-  paymentMethods?: string[]; // Nuevas modalidades de pago personalizadas
+  paymentMethods?: string[]; 
   currencies?: CurrencyQuote[];
   loyalty?: LoyaltyConfig;
-  smtpHost?: string;
-  smtpPort?: string;
-  smtpUser?: string;
-  smtpPassword?: string;
-  smtpSSL?: boolean;
+  paymentSystems?: PaymentSystem[]; // Lista de sistemas con sus cuotas
 }
 
 export type TaxCondition = 'Responsable Inscripto' | 'Monotributo' | 'Exento';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  roleId: string;
+  active: boolean;
+  lastLogin: string;
+  branchId: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  permissions: string[];
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface ComboItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+}
+
+export interface Check {
+  id: string;
+  number: string;
+  bank: string;
+  amount: number;
+  dueDate: string;
+  status: 'PENDING' | 'DEPOSITED' | 'REJECTED';
+}
+
+export interface Purchase {
+  id: string;
+  providerId: string;
+  providerName: string;
+  date: string;
+  type: string;
+  items: number;
+  total: number;
+  status: 'PENDING' | 'PAID';
+}
+
+export interface PurchaseItem {
+  productId?: string;
+  descripcion: string;
+  cantidad: number;
+  costoUnitarioNeto: number;
+  bonificacion: number;
+  subtotal: number;
+  matched: boolean;
+}
 
 export interface ProductProviderHistory {
   id: string;
@@ -117,6 +152,7 @@ export interface ProductProviderHistory {
   price: number;
 }
 
+// Fixed Product interface adding missing members used in Inventory.tsx and Purchases.tsx
 export interface Product {
   id: string;
   internalCodes: string[];
@@ -150,195 +186,26 @@ export interface Product {
     tiendaNube?: boolean;
     webPropia?: boolean;
   };
-  isCombo?: boolean;
-  comboItems?: ComboItem[];
   lastProviders?: ProductProviderHistory[];
+  isCombo: boolean;
+  comboItems: ComboItem[];
 }
 
-export interface ProductStock {
-  branchId: string;
-  branchName: string;
-  quantity: number;
-}
-
-export interface Brand {
-  id: string;
-  name: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-}
-
-export interface ComboItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitCost: number;
-}
-
-export interface Provider {
-  id: string;
-  name: string;
-  cuit: string;
-  contact: string;
-  balance: number;
-  defaultDiscounts: [number, number, number];
-  orderPhone?: string;
-  orderEmail?: string;
-  address?: string;
-  currencyQuoteId?: string;
-}
-
-export interface Branch {
-  id: string;
-  code: string;
-  name: string;
-  address: string;
-  phone: string;
-  manager: string;
-  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
-  active: boolean;
-}
-
-export interface InvoiceItem {
-  product: Product;
-  quantity: number;
-  appliedPrice: number;
-  subtotal: number;
-  priceListId?: string;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  cuit: string;
-  phone: string;
-  address: string;
-  balance: number;
-  limit: number;
-  points: number;
-  portalEnabled?: boolean;
-  portalHash?: string;
-  authorizedPersonnel?: string[];
-  email?: string;
-}
-
-export interface PriceList {
-  id: string;
-  name: string;
-  type: 'BASE' | 'CUSTOM';
-  fixedMargin?: number;
-  active: boolean;
-}
-
-export interface Budget {
-  id: string;
-  clientName: string;
-  date: string;
-  validUntil: string;
-  items: InvoiceItem[];
-  total: number;
-  status: 'OPEN' | 'CLOSED' | 'EXPIRED';
-}
-
-export interface Remito {
-  id: string;
-  clientId: string;
-  clientName: string;
-  items: RemitoItem[];
-  date: string;
-  status: 'PENDING' | 'BILLED';
-  relatedInvoice?: string;
-}
-
-export interface RemitoItem {
-  product: Product;
-  quantity: number;
-  historicalPrice: number;
-}
-
-export interface CashRegister {
-  id: string;
-  name: string;
-  balance: number;
-  isOpen: boolean;
-}
-
-export interface Check {
-  id: string;
-  bank: string;
-  number: string;
-  dueDate: string;
-  issuerCuit: string;
-  amount: number;
-  status: 'IN_PORTFOLIO' | 'DEPOSITED' | 'CLEARED' | 'REJECTED';
-  date: string;
-}
-
-export interface TreasuryMovement {
-  id: string;
-  date: string;
-  type: 'INCOME' | 'EXPENSE';
-  subtype: string;
-  paymentMethod: string;
-  amount: number;
-  description: string;
-  cashRegisterId: string;
-}
-
-export interface Purchase {
-  id: string;
-  providerId: string;
-  providerName: string;
-  date: string;
-  type: string;
-  items: number;
-  total: number;
-  status: 'PENDING' | 'PAID';
-}
-
-export interface PurchaseItem {
-  descripcion: string;
-  cantidad: number;
-  costoUnitarioNeto: number;
-  bonificacion: number;
-  subtotal: number;
-  productId?: string;
-  matched: boolean;
-  currentCost?: number;
-}
-
-export interface CurrencyQuote {
-  id: string;
-  name: string;
-  code: string;
-  value: number;
-  lastUpdate: string;
-}
-
-export interface CurrentAccountMovement {
-  id: string;
-  clientId: string;
-  date: string;
-  voucherType: string;
-  description: string;
-  debit: number;
-  credit: number;
-  balance: number;
-}
-
-export interface PaymentAccount {
-  id: string;
-  type: 'BANK' | 'VIRTUAL_WALLET';
-  bankName: string;
-  alias: string;
-  cbu: string;
-  owner: string;
-  active: boolean;
-  qrImage?: string | null;
-}
+export interface ProductStock { branchId: string; branchName: string; quantity: number; }
+export interface Provider { id: string; name: string; cuit: string; contact: string; balance: number; defaultDiscounts: [number, number, number]; orderPhone?: string; orderEmail?: string; address?: string; currencyQuoteId?: string; }
+export interface Branch { id: string; code: string; name: string; address: string; phone: string; manager: string; type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL'; active: boolean; }
+export interface InvoiceItem { product: Product; quantity: number; appliedPrice: number; subtotal: number; priceListId?: string; }
+export interface Client { id: string; name: string; cuit: string; phone: string; address: string; balance: number; limit: number; points: number; email?: string; portalHash?: string; portalEnabled?: boolean; nickname?: string; dni?: string; }
+export interface PriceList { id: string; name: string; type: 'BASE' | 'CUSTOM'; fixedMargin?: number; active: boolean; }
+export interface Budget { id: string; clientName: string; date: string; validUntil: string; items: InvoiceItem[]; total: number; status: 'OPEN' | 'CLOSED' | 'EXPIRED'; }
+export interface Remito { id: string; clientId: string; clientName: string; items: RemitoItem[]; date: string; status: 'PENDING' | 'BILLED'; }
+export interface RemitoItem { product: Product; quantity: number; historicalPrice: number; }
+export interface CashRegister { id: string; name: string; balance: number; isOpen: boolean; }
+export interface TreasuryMovement { id: string; date: string; type: 'INCOME' | 'EXPENSE'; subtype: string; paymentMethod: string; amount: number; description: string; cashRegisterId: string; }
+export interface CurrencyQuote { id: string; name: string; code: string; value: number; lastUpdate: string; }
+export interface CurrentAccountMovement { id: string; clientId: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
+export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; bankName: string; alias: string; cbu: string; owner: string; active: boolean; qrImage?: string | null; }
+export interface LoyaltyConfig { enabled: boolean; pointsPerPeso: number; minPointsToRedeem: number; valuePerPoint: number; }
 
 export interface ReplenishmentItem {
   product: Product;
@@ -372,13 +239,20 @@ export interface SalesOrder {
   total: number;
 }
 
-export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
+export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
 
 export interface Position {
   x: number;
   y: number;
   visible: boolean;
+}
+
+export interface TableColumnConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+  width: number;
 }
 
 export interface PrintTemplate {
@@ -393,18 +267,19 @@ export interface PrintTemplate {
   subHeaderText: string;
   footerText: string;
   totalsLabel: string;
+  voucherPointOfSale: string;
+  voucherNumber: string;
+  voucherCuitEmisor: string;
+  voucherIIBBEmisor: string;
+  showPrices: boolean;
+  showSkus: boolean;
+  showBrands: boolean;
+  showIvaColumn: boolean;
   positions: Record<string, Position>;
 }
 
-export interface TableColumnConfig {
-  id: string;
-  label: string;
-  visible: boolean;
-  width: number;
-}
-
-export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WOOCOMMERCE';
+export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 export interface OnlineOrder {
   id: string;
@@ -441,6 +316,15 @@ export interface DailyExpense {
   cashRegisterId: string;
 }
 
+export interface EmployeeMovement {
+  id: string;
+  type: 'ADVANCE' | 'BONUS' | 'DEDUCTION' | 'SALARY';
+  amount: number;
+  description: string;
+  month: string;
+  date: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -452,13 +336,10 @@ export interface Employee {
   movements: EmployeeMovement[];
 }
 
-export interface EmployeeMovement {
-  id: string;
-  type: 'ADVANCE' | 'SALARY' | 'BONUS' | 'DEDUCTION';
-  amount: number;
-  description: string;
-  month: string;
-  date: string;
+export interface StockTransferItem {
+  productId: string;
+  productName: string;
+  quantity: number;
 }
 
 export interface StockTransfer {
@@ -470,13 +351,7 @@ export interface StockTransfer {
   destBranchName: string;
   items: StockTransferItem[];
   notes: string;
-  status: 'COMPLETED' | 'CANCELLED';
-}
-
-export interface StockTransferItem {
-  productId: string;
-  productName: string;
-  quantity: number;
+  status: 'COMPLETED' | 'PENDING';
 }
 
 export interface Coupon {
@@ -485,7 +360,6 @@ export interface Coupon {
   description: string;
   discountType: 'PERCENT' | 'FIXED';
   value: number;
-  minPurchase?: number;
   validUntil: string;
   usedCount: number;
   active: boolean;
@@ -494,16 +368,22 @@ export interface Coupon {
 export interface MarketingCampaign {
   id: string;
   name: string;
-  targetSegment: 'ALL' | 'VIP' | 'OCCASIONAL' | 'INACTIVE';
+  targetSegment: 'ALL' | 'VIP' | 'INACTIVE';
   channel: 'WHATSAPP' | 'EMAIL';
   message: string;
-  sentDate?: string;
-  reach?: number;
+  sentDate: string;
+  reach: number;
 }
 
-export interface LoyaltyConfig {
-  enabled: boolean;
-  pointsPerPeso: number;
-  minPointsToRedeem: number;
-  valuePerPoint: number;
+export interface CreditNote {
+  id: string;
+  type: 'SALES' | 'PURCHASE';
+  targetId: string;
+  targetName: string;
+  relatedVoucherId?: string;
+  date: string;
+  items: InvoiceItem[];
+  reason: 'DEVOLUCION' | 'ERROR_PRECIO' | 'BONIFICACION' | 'OTROS';
+  returnToStock: boolean;
+  total: number;
 }
