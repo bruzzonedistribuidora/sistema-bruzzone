@@ -52,7 +52,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [paymentMethod, setPaymentMethod] = useState<string>('EFECTIVO');
     const [discountPerc, setDiscountPerc] = useState<number>(0);
 
-    // LÓGICA DE SISTEMAS DE COBRO
     const [selectedSystemId, setSelectedSystemId] = useState<string>('');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
 
@@ -62,10 +61,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
 
     const cardInterest = useMemo(() => {
         if (paymentMethod !== 'TARJETA' || !currentSystem) return 0;
-        
-        // Asumimos que si no hay cuota elegida es débito
         if (!selectedCuotaId) return currentSystem.debitSurcharge;
-        
         const plan = currentSystem.creditInstallments.find(p => p.id === selectedCuotaId);
         return plan ? plan.surcharge : 0;
     }, [paymentMethod, currentSystem, selectedCuotaId]);
@@ -79,8 +75,8 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             total: baseTotal + interestAmount, 
             discountAmount, 
             grossTotal, 
-            interestAmount,
-            baseTotal
+            interestAmount, 
+            baseTotal 
         };
     }, [cart, discountPerc, cardInterest]);
 
@@ -182,7 +178,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
 
                         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <table className="w-full text-left">
+                                <table className="w-full text-left border-collapse">
                                     <thead className="bg-slate-900 text-white sticky top-0 z-10 text-[10px] font-black uppercase tracking-widest">
                                         <tr>
                                             <th className="px-6 py-4">Producto</th>
@@ -207,7 +203,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                 </td>
                                                 <td className="px-6 py-4 text-right font-black text-slate-900">${item.subtotal.toLocaleString('es-AR')}</td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -219,17 +215,22 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
 
                     <div className="flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
                         <div className="bg-white border border-gray-200 rounded-[2rem] shadow-sm p-6 space-y-4 flex flex-col">
-                            <h3 className="font-black text-[10px] uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Resumen de Venta</h3>
+                            <h3 className="font-black text-[10px] uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Checkout Inteligente</h3>
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase">Subtotal</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase">Subtotal Neto</span>
                                     <span className="text-lg font-black text-slate-700">${totals.baseTotal.toLocaleString('es-AR')}</span>
                                 </div>
                                 <div className="pt-4 border-t border-dashed border-slate-200">
-                                    <label className="text-[9px] font-black text-gray-400 uppercase mb-3 block tracking-widest">Modalidad de Cobro</label>
+                                    <label className="text-[9px] font-black text-gray-400 uppercase mb-3 block tracking-widest">Modalidad</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {companyConfig.paymentMethods?.map(m => (
-                                            <button key={m} onClick={() => setPaymentMethod(m)} className={`py-3 rounded-xl font-black text-[9px] uppercase border-2 transition-all ${paymentMethod === m ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-50 text-gray-400 hover:bg-gray-100'}`}>{m}</button>
+                                            <button 
+                                                key={m} 
+                                                onClick={() => setPaymentMethod(m)} 
+                                                className={`py-3 rounded-xl font-black text-[9px] uppercase border-2 transition-all ${paymentMethod === m ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                                                {m}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -237,23 +238,23 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 {paymentMethod === 'TARJETA' && (
                                     <div className="space-y-4 animate-fade-in">
                                         <div className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100 space-y-3">
-                                            <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block">Sistema de Cobro</label>
+                                            <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block">Canal de Cobro</label>
                                             <select 
                                                 className="w-full p-3 bg-white border border-indigo-100 rounded-xl font-black text-[10px] uppercase outline-none focus:ring-2 focus:ring-indigo-500"
                                                 value={selectedSystemId}
                                                 onChange={e => { setSelectedSystemId(e.target.value); setSelectedCuotaId(''); }}
                                             >
-                                                <option value="">-- SELECCIONE SISTEMA --</option>
+                                                <option value="">-- SELECCIONE PLATAFORMA --</option>
                                                 {companyConfig.paymentSystems?.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                             </select>
                                         </div>
 
                                         {currentSystem && (
                                             <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Planes / Cuotas</label>
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Plan Seleccionado (CFT Inc.)</label>
                                                 <button 
                                                     onClick={() => setSelectedCuotaId('')}
-                                                    className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${!selectedCuotaId ? 'bg-green-600 border-green-700 text-white' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                                    className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${!selectedCuotaId ? 'bg-green-600 border-green-700 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600'}`}>
                                                     <span className="text-[10px] font-black uppercase">Débito</span>
                                                     <span className="text-[9px] font-bold">+{currentSystem.debitSurcharge}%</span>
                                                 </button>
@@ -261,7 +262,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                     <button 
                                                         key={plan.id}
                                                         onClick={() => setSelectedCuotaId(plan.id)}
-                                                        className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${selectedCuotaId === plan.id ? 'bg-indigo-600 border-indigo-700 text-white' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                                        className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${selectedCuotaId === plan.id ? 'bg-indigo-600 border-indigo-700 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600'}`}>
                                                         <span className="text-[10px] font-black uppercase">{plan.label}</span>
                                                         <span className="text-[9px] font-bold">+{plan.surcharge}%</span>
                                                     </button>
@@ -272,27 +273,27 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 )}
 
                                 <div className="pt-4 border-t border-slate-200">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Final</p>
-                                    <p className={`text-4xl font-black tracking-tighter ${totals.interestAmount > 0 ? 'text-indigo-600' : 'text-slate-900'}`}>${totals.total.toLocaleString('es-AR')}</p>
-                                    {totals.interestAmount > 0 && <p className="text-[10px] font-bold text-indigo-400 mt-1 uppercase">Incluye recargos: ${totals.interestAmount.toLocaleString('es-AR')}</p>}
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Final a Cobrar</p>
+                                    <p className={`text-4xl font-black tracking-tighter ${totals.interestAmount > 0 ? 'text-indigo-600 animate-pulse' : 'text-slate-900'}`}>${totals.total.toLocaleString('es-AR')}</p>
+                                    {totals.interestAmount > 0 && <p className="text-[9px] font-bold text-indigo-400 mt-1 uppercase">Incluye Financiamiento Final: ${totals.interestAmount.toLocaleString('es-AR')}</p>}
                                 </div>
                             </div>
-                            <button onClick={handleCheckout} disabled={cart.length === 0 || isProcessing} className="w-full py-5 rounded-[1.8rem] font-black uppercase tracking-widest text-xs shadow-2xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3">
-                                {isProcessing ? <RefreshCw className="animate-spin" /> : 'FINALIZAR COBRO'}
+                            <button onClick={handleCheckout} disabled={cart.length === 0 || isProcessing} className="w-full py-5 rounded-[1.8rem] font-black uppercase tracking-widest text-xs shadow-2xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={18}/> FINALIZAR COBRO</>}
                             </button>
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden">
+                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                    <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                         <table className="w-full text-left">
-                            <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+                            <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest sticky top-0">
                                 <tr>
                                     <th className="px-6 py-4">ID</th>
                                     <th className="px-6 py-4">Fecha</th>
                                     <th className="px-6 py-4">Cliente</th>
-                                    <th className="px-6 py-4">Medio / Sistema</th>
+                                    <th className="px-6 py-4">Medio / Plataforma</th>
                                     <th className="px-6 py-4 text-right">Total</th>
                                 </tr>
                             </thead>
@@ -312,19 +313,18 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 </div>
             )}
 
-            {/* Modal de éxito omitido por brevedad, se asume igual al anterior pero con datos dinámicos... */}
             {showSuccessModal && lastSale && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in print:bg-white print:p-0 print:block">
                     <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col print:shadow-none print:rounded-none print:max-h-none print:w-full">
                         <div className="p-8 bg-green-600 text-white flex justify-between items-center shrink-0 print:hidden">
                             <div className="flex items-center gap-4">
                                 <CheckCircle size={32}/>
-                                <h3 className="text-2xl font-black uppercase tracking-tighter">¡Venta Exitosa!</h3>
+                                <h3 className="text-2xl font-black uppercase tracking-tighter">Venta Confirmada</h3>
                             </div>
                             <button onClick={() => setShowSuccessModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={32}/></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-10 bg-white">
-                            <div className="border border-slate-100 p-8 rounded-[2rem] shadow-sm print:border-none">
+                        <div className="flex-1 overflow-y-auto p-10 bg-white print:p-0">
+                            <div className="border border-slate-100 p-8 rounded-[2rem] shadow-sm print:border-none print:p-0">
                                 <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-6">
                                     <div>
                                         <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">{companyConfig.fantasyName}</h1>
@@ -353,6 +353,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         ))}
                                     </tbody>
                                 </table>
+                                {lastSale.interest > 0 && (
+                                    <div className="flex justify-end pt-4 mb-4">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Recargo por Financiación: ${lastSale.interest.toLocaleString('es-AR')}</p>
+                                    </div>
+                                )}
                                 <div className="flex justify-end pt-6 border-t-2 border-dashed border-slate-200">
                                     <div className="text-right">
                                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Abonado</p>
@@ -362,8 +367,8 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             </div>
                         </div>
                         <div className="p-8 bg-slate-50 border-t flex justify-end gap-3 print:hidden">
-                            <button onClick={() => setShowSuccessModal(false)} className="px-8 py-4 text-gray-400 font-black text-[10px] uppercase">Volver</button>
-                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-12 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center justify-center gap-3"><Printer size={20}/> Imprimir Ticket</button>
+                            <button onClick={() => setShowSuccessModal(false)} className="px-8 py-4 text-gray-400 font-black text-[10px] uppercase">Cerrar</button>
+                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-12 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"><Printer size={20}/> Imprimir Ticket</button>
                         </div>
                     </div>
                 </div>
