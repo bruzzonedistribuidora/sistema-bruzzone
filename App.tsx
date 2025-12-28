@@ -13,6 +13,7 @@ import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
+import ProviderBalances from './components/ProviderBalances';
 import Accounting from './components/Accounting';
 import Statistics from './components/Statistics';
 import Backup from './components/Backup';
@@ -39,7 +40,7 @@ import Marketing from './components/Marketing';
 import PriceAudit from './components/PriceAudit';
 import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
-import { ViewState, User, Role, Client, InvoiceItem } from './types';
+import { ViewState, User, Role, Client, InvoiceItem, Provider } from './types';
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
@@ -52,6 +53,7 @@ const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
   
   const [targetClientId, setTargetClientId] = useState<string | undefined>(undefined);
+  const [targetProviderId, setTargetProviderId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
   
   // Estados de transferencia de datos entre módulos
@@ -146,7 +148,16 @@ const App: React.FC = () => {
       );
       case ViewState.TREASURY: return <Treasury />;
       case ViewState.PURCHASES: return <Purchases defaultTab="PURCHASES" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
-      case ViewState.PROVIDERS: return <Purchases defaultTab="PROVIDERS" onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
+      case ViewState.PROVIDERS: return (
+        <Purchases 
+            defaultTab="PROVIDERS" 
+            onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} 
+            onViewHistory={(provider) => {
+                setTargetProviderId(provider.id);
+                handleNavigate(ViewState.PROVIDER_BALANCES);
+            }}
+        />
+      );
       case ViewState.PRICE_UPDATES: return <PriceUpdates />;
       case ViewState.PRICE_AUDIT: return <PriceAudit />;
       case ViewState.CREDIT_NOTES: return <CreditNotes />;
@@ -166,6 +177,14 @@ const App: React.FC = () => {
             onNavigateToHistory={(client) => {
                 setTargetClientId(client.id);
                 handleNavigate(ViewState.CLIENTS);
+            }} 
+        />
+      );
+      case ViewState.PROVIDER_BALANCES: return (
+        <ProviderBalances 
+            onNavigateToHistory={(provider) => {
+                setTargetProviderId(provider.id);
+                handleNavigate(ViewState.PROVIDERS);
             }} 
         />
       );
