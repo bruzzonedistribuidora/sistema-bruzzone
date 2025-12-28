@@ -4,7 +4,7 @@ import {
     ShoppingCart, Printer, Trash2, Search, CheckCircle, 
     Plus, Minus, X, RefreshCw, Landmark,
     PlusCircle, Receipt, Truck, FileSpreadsheet,
-    CreditCard as CardIcon, Info, ChevronDown
+    CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
 
@@ -35,12 +35,15 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     
     const [lastSale, setLastSale] = useState<any>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    
+    // Estado para Ítem Manual
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
     const [products, setProducts] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
-    // Escuchar cambios globales en la configuración para actualizar intereses en tiempo real
     useEffect(() => {
         const handleSync = () => setSyncKey(k => k + 1);
         window.addEventListener('company_config_updated', handleSync);
@@ -113,6 +116,48 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         setShowProductResults(false);
     };
 
+    const handleAddManualItem = () => {
+        if (!manualItemForm.name || !manualItemForm.price) return;
+        
+        const priceNum = parseFloat(manualItemForm.price);
+        const mockProduct: Product = {
+            id: `manual-${Date.now()}`,
+            internalCodes: ['VARIO'],
+            barcodes: [],
+            providerCodes: [],
+            name: manualItemForm.name.toUpperCase(),
+            brand: 'GENERICO',
+            provider: '',
+            description: 'Ingreso manual desde POS',
+            category: 'VARIOS',
+            measureUnitSale: 'Unidad',
+            measureUnitPurchase: 'Unidad',
+            conversionFactor: 1,
+            purchaseCurrency: 'ARS',
+            saleCurrency: 'ARS',
+            vatRate: 21.0,
+            listCost: priceNum * 0.7,
+            discounts: [0,0,0,0],
+            costAfterDiscounts: priceNum * 0.7,
+            profitMargin: 30,
+            priceNeto: priceNum / 1.21,
+            priceFinal: priceNum,
+            stock: 0,
+            stockDetails: [],
+            minStock: 0,
+            desiredStock: 0,
+            reorderPoint: 0,
+            location: '',
+            ecommerce: {},
+            isCombo: false,
+            comboItems: []
+        };
+
+        addToCart(mockProduct);
+        setIsManualModalOpen(false);
+        setManualItemForm({ name: '', price: '' });
+    };
+
     const handleCheckout = () => {
         if (cart.length === 0) return;
         setIsProcessing(true);
@@ -153,28 +198,36 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 <div className="flex flex-1 overflow-hidden p-4 gap-4 print:p-0">
                     <div className="flex-[3] flex flex-col gap-4 overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
-                            <div className="md:col-span-8 relative">
-                                <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500">
-                                    <Search className="text-gray-300 mr-3" size={20} />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Buscar descripción o SKU..." 
-                                        className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 uppercase" 
-                                        value={productSearch}
-                                        onFocus={() => setShowProductResults(true)}
-                                        onChange={(e) => setProductSearch(e.target.value)}
-                                    />
-                                </div>
-                                {showProductResults && productSearch.length > 0 && (
-                                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden">
-                                        {products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0,8).map(p => (
-                                            <div key={p.id} onClick={() => addToCart(p)} className="p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer">
-                                                <div><p className="font-black text-slate-800 uppercase text-xs">{p.name}</p><p className="text-[10px] text-gray-400 font-bold uppercase">{p.internalCodes[0]}</p></div>
-                                                <p className="font-black text-indigo-600 text-sm">${p.priceFinal.toLocaleString('es-AR')}</p>
-                                            </div>
-                                        ))}
+                            <div className="md:col-span-8 flex gap-2">
+                                <div className="relative flex-1">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500">
+                                        <Search className="text-gray-300 mr-3" size={20} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Buscar descripción o SKU..." 
+                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 uppercase" 
+                                            value={productSearch}
+                                            onFocus={() => setShowProductResults(true)}
+                                            onChange={(e) => setProductSearch(e.target.value)}
+                                        />
                                     </div>
-                                )}
+                                    {showProductResults && productSearch.length > 0 && (
+                                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden">
+                                            {products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).slice(0,8).map(p => (
+                                                <div key={p.id} onClick={() => addToCart(p)} className="p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer">
+                                                    <div><p className="font-black text-slate-800 uppercase text-xs">{p.name}</p><p className="text-[10px] text-gray-400 font-bold uppercase">{p.internalCodes[0]}</p></div>
+                                                    <p className="font-black text-indigo-600 text-sm">${p.priceFinal.toLocaleString('es-AR')}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button 
+                                    onClick={() => setIsManualModalOpen(true)}
+                                    className="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-2xl border border-indigo-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm"
+                                    title="Agregar producto no listado">
+                                    <PackagePlus size={18}/> <span className="hidden xl:inline">Ítem Manual</span>
+                                </button>
                             </div>
                             <div className="md:col-span-4">
                                 <select 
@@ -200,11 +253,26 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {cart.map(item => (
+                                        {cart.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest italic opacity-50">
+                                                    Escanee o busque productos para iniciar
+                                                </td>
+                                            </tr>
+                                        ) : cart.map(item => (
                                             <tr key={item.product.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4">
-                                                    <p className="font-black text-slate-800 text-xs uppercase leading-none mb-1">{item.product.name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{item.product.internalCodes[0]}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div>
+                                                            <p className="font-black text-slate-800 text-xs uppercase leading-none mb-1">{item.product.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{item.product.internalCodes[0]}</p>
+                                                                {item.product.id.startsWith('manual-') && (
+                                                                    <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">Manual</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-xl p-1 w-fit mx-auto border border-slate-100">
@@ -321,6 +389,59 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: AGREGAR ÍTEM MANUAL */}
+            {isManualModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><PackagePlus size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Venta Libre</h3>
+                                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Artículo o Servicio no listado</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                        </div>
+                        <div className="p-10 space-y-8 bg-slate-50/50">
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Descripción del Ítem</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase shadow-sm" 
+                                        placeholder="Ej: Servicio de Corte, Artículo varios..."
+                                        value={manualItemForm.name}
+                                        onChange={e => setManualItemForm({...manualItemForm, name: e.target.value})}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Precio Final ($)</label>
+                                    <div className="relative group">
+                                        {/* Fix: Added missing DollarSign icon in the input field */}
+                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={24}/>
+                                        <input 
+                                            type="number" 
+                                            className="w-full pl-12 p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-indigo-600 outline-none font-black text-5xl text-indigo-700 shadow-sm" 
+                                            placeholder="0.00"
+                                            value={manualItemForm.price}
+                                            onChange={e => setManualItemForm({...manualItemForm, price: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleAddManualItem}
+                                className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                            >
+                                <Save size={24}/> Agregar al Carrito
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
