@@ -193,6 +193,12 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     setIsProviderModalOpen(false);
   };
 
+  const deleteProvider = (id: string) => {
+    if (confirm('¿Está seguro de eliminar este proveedor permanentemente? Se perderá todo su historial de deudas.')) {
+        setProviders(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
   const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.cuit.includes(searchTerm));
 
   return (
@@ -253,7 +259,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                         <td className={`px-8 py-5 text-right font-black text-xl tracking-tighter ${prov.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>${prov.balance.toLocaleString('es-AR')}</td>
                                         <td className="px-8 py-5">
                                             <div className="flex justify-center gap-2">
-                                                <button onClick={() => { setIsEditingProvider(true); setProviderForm(prov); setModalTab('GENERAL'); setIsProviderModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all"><Pencil size={18}/></button>
+                                                <button onClick={() => { /* Navegar a historial */ }} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-sm active:scale-90" title="Ver Cuenta Corriente"><History size={18}/></button>
+                                                <button onClick={() => { setIsEditingProvider(true); setProviderForm(prov); setModalTab('GENERAL'); setIsProviderModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90" title="Editar Proveedor"><Pencil size={18}/></button>
+                                                <button onClick={() => deleteProvider(prov.id)} className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-90" title="Eliminar Proveedor"><Trash2 size={18}/></button>
                                             </div>
                                         </td>
                                     </tr>
