@@ -137,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
                 <DropdownItem view={ViewState.CREDIT_NOTES} label="Notas de Crédito" icon={RotateCcw} perm="POS_ACCESS" />
                 <DropdownItem view={ViewState.ONLINE_SALES} label="Ventas Online" icon={Globe} perm="POS_ACCESS" />
                 <DropdownItem view={ViewState.REMITOS} label="Remitos / Cta Cte" icon={ClipboardList} perm="REMITOS_VIEW" />
-                <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos" icon={Landmark} perm="CLIENTS_VIEW" />
+                <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos Clientes" icon={Landmark} perm="CLIENTS_VIEW" />
                 <DropdownItem view={ViewState.CLIENTS} label="Fichero Clientes" icon={Users} perm="CLIENTS_VIEW" />
                 <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} perm="POS_ACCESS" />
             </NavDropdown>
@@ -145,7 +145,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
             <NavDropdown id="compras" label="Compras" icon={Truck}>
                 <DropdownItem view={ViewState.PURCHASES} label="Cargar Compras" icon={Truck} perm="PURCHASES_VIEW" />
                 <DropdownItem view={ViewState.PRICE_UPDATES} label="Listas de Precios" icon={Layers} perm="STOCK_EDIT" />
-                <DropdownItem view={ViewState.PROVIDERS} label="Proveedores" icon={Users} perm="PURCHASES_VIEW" />
+                <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Prov." icon={Landmark} perm="PURCHASES_VIEW" />
+                <DropdownItem view={ViewState.PROVIDERS} label="Fichero Prov." icon={Users} perm="PURCHASES_VIEW" />
                 <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos" icon={ShoppingCart} perm="PURCHASES_VIEW" />
                 <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} perm="STOCK_VIEW" />
             </NavDropdown>
