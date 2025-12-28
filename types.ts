@@ -52,6 +52,7 @@ export interface PaymentSystem {
   name: string; // Ej: Mercado Pago, Galicia Nave, Fiserv
   debitSurcharge: number;
   creditInstallments: CreditInstallment[];
+  ratesUrl?: string; // URL opcional para que la IA lea las tasas
 }
 
 export interface CompanyConfig {
