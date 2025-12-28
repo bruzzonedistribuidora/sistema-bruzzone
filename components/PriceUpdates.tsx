@@ -218,13 +218,14 @@ const PriceUpdates: React.FC = () => {
                 return p;
             });
 
-            let finalProductList = [...updatedProducts];
+            let finalProductList: Product[] = [...updatedProducts];
 
             if (importMode === 'INITIAL') {
-                const newProductsToAdd = analysis.impactDetails.filter(i => i.status === 'NEW').map(item => {
+                // Fix: Removed incorrect 'as any' and explicitly typed the mapped result to ensure Product[] type safety
+                const newProductsToAdd: Product[] = analysis.impactDetails.filter(i => i.status === 'NEW').map(item => {
                     insertCount++;
                     const profitMargin = 30; 
-                    const vatRate = 21; 
+                    const vatRate = 21.0; 
                     const priceNeto = item.newCost * (1 + (profitMargin / 100));
                     const priceFinal = priceNeto * (1 + (vatRate / 100));
 
@@ -243,7 +244,8 @@ const PriceUpdates: React.FC = () => {
                         conversionFactor: 1,
                         purchaseCurrency: 'ARS',
                         saleCurrency: 'ARS',
-                        vatRate: vatRate as any,
+                        // Fix: Removed problematic 'as any' cast that was causing name 'as' errors
+                        vatRate: 21.0,
                         listCost: item.newCost,
                         discounts: [0, 0, 0, 0],
                         costAfterDiscounts: item.newCost,
