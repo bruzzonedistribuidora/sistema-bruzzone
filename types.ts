@@ -121,9 +121,11 @@ export interface Check {
   id: string;
   number: string;
   bank: string;
+  issuer: string;
   amount: number;
   dueDate: string;
-  status: 'PENDING' | 'DEPOSITED' | 'REJECTED';
+  type: 'FISICO' | 'ECHEQ';
+  status: 'PENDING' | 'DEPOSITED' | 'REJECTED' | 'USED';
 }
 
 export interface Purchase {
