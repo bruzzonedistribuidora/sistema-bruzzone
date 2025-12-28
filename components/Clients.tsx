@@ -156,6 +156,12 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       setIsNewClientModalOpen(false);
   };
 
+  const deleteClient = (id: string) => {
+    if (confirm('¿Desea eliminar este cliente permanentemente? Se borrará todo su historial de deudas.')) {
+        setClients(prev => prev.filter(c => c.id !== id));
+    }
+  };
+
   const handleRegisterReceipt = () => {
     if (!selectedClient || receiptForm.amount <= 0) return;
     const newBalance = selectedClient.balance - receiptForm.amount;
@@ -239,8 +245,9 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 </td>
                                 <td className="px-8 py-5 text-center">
                                     <div className="flex justify-center gap-2">
-                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setModalTab('GENERAL'); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90"><Pencil size={18}/></button>
-                                        <button onClick={() => onOpenPortal?.(client)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all active:scale-90"><Globe size={18}/></button>
+                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setModalTab('GENERAL'); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90" title="Editar Ficha"><Pencil size={18}/></button>
+                                        <button onClick={() => onOpenPortal?.(client)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all active:scale-90" title="Ver Portal Cliente"><Globe size={18}/></button>
+                                        <button onClick={() => deleteClient(client.id)} className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90" title="Eliminar Cliente"><Trash2 size={18}/></button>
                                     </div>
                                 </td>
                             </tr>
@@ -295,7 +302,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CUIT / DNI</label>
                                         <div className="flex gap-2">
                                             <input type="text" className="flex-1 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold tracking-widest" value={clientForm.cuit} onChange={e => setClientForm({...clientForm, cuit: e.target.value})} placeholder="30-..." />
-                                            <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg" disabled={isSearchingCuit}>
+                                            <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg" disabled={isSearchingCuit}>
                                                 {isSearchingCuit ? <RefreshCw className="animate-spin" size={20}/> : <Zap size={20}/>}
                                             </button>
                                         </div>
@@ -350,7 +357,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">Descuento Especial (%)</label>
                                             <div className="relative">
-                                                {/* Fix: Added missing Percent icon in the input field */}
                                                 <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
                                                 <input type="number" className="w-full pl-11 p-4 bg-indigo-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-xl text-indigo-700" value={clientForm.specialDiscount} onChange={e => setClientForm({...clientForm, specialDiscount: parseFloat(e.target.value) || 0})} />
                                             </div>
