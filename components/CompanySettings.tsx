@@ -4,7 +4,7 @@ import {
     Save, Building2, CreditCard, Plus, Trash2, CheckCircle, 
     X, Edit2, RefreshCw, Camera,
     Percent, CreditCard as CardIcon, Zap, ChevronRight, Info,
-    Calculator, Smartphone, Landmark, Globe, Search, Link2
+    Calculator, Smartphone, Landmark, Globe, Search, Link2, ExternalLink
 } from 'lucide-react';
 import { CompanyConfig, PaymentSystem, CreditInstallment } from '../types';
 import { fetchLatestFinancingRates } from '../services/geminiService';
@@ -53,7 +53,8 @@ const CompanySettings: React.FC = () => {
 
       setIsAiSearching(true);
       try {
-          const result = await fetchLatestFinancingRates(system.name);
+          // Se envía el nombre de la plataforma y la URL (si existe)
+          const result = await fetchLatestFinancingRates(system.name, system.ratesUrl);
           setFormData(prev => ({
               ...prev,
               paymentSystems: prev.paymentSystems?.map(s => {
@@ -66,7 +67,7 @@ const CompanySettings: React.FC = () => {
           setLastSources(result.sources);
           alert(`Sincronización exitosa para ${system.name}. Se han cargado ${result.installments.length} planes de cuotas.`);
       } catch (error) {
-          alert("Error al buscar las tasas en la web. Inténtelo manualmente.");
+          alert("Error al buscar las tasas en la web. Verifique la URL ingresada o inténtelo manualmente.");
       } finally {
           setIsAiSearching(false);
       }
@@ -79,6 +80,7 @@ const CompanySettings: React.FC = () => {
           id: `sys-${Date.now()}`,
           name: name.toUpperCase().trim(),
           debitSurcharge: 0,
+          ratesUrl: '',
           creditInstallments: [{ id: `inst-${Date.now()}`, installments: 1, surcharge: 0, label: '1 Pago' }]
       };
       setFormData(prev => ({ ...prev, paymentSystems: [...(prev.paymentSystems || []), newSystem] }));
@@ -144,9 +146,9 @@ const CompanySettings: React.FC = () => {
                                     disabled={isAiSearching}
                                     className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
                                     {isAiSearching ? <RefreshCw className="animate-spin" size={16}/> : <Globe size={16}/>}
-                                    {isAiSearching ? 'Buscando Tasas Oficiales...' : `Sincronizar ${currentSystem.name} con IA`}
+                                    {isAiSearching ? 'Navegando Tasas Oficiales...' : `Sincronizar ${currentSystem.name} con IA`}
                                 </button>
-                                <p className="text-[8px] text-slate-400 text-center font-medium px-4">Utiliza Google Search para encontrar los coeficientes vigentes de esta plataforma.</p>
+                                <p className="text-[8px] text-slate-400 text-center font-medium px-4">Utiliza Google Search o la URL provista para extraer coeficientes vigentes.</p>
                             </div>
                         )}
                     </div>
@@ -161,6 +163,34 @@ const CompanySettings: React.FC = () => {
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Esquema de Cuotas e Intereses</p>
                                 </div>
                                 <button onClick={() => deleteSystem(currentSystem.id)} className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={20}/></button>
+                            </div>
+
+                            {/* NUEVO CAMPO: LINK DE TASAS OFICIALES */}
+                            <div className="space-y-3">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">
+                                    <Link2 size={12} className="text-indigo-600"/> Link de Tasas Oficiales (Opcional)
+                                </label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Pegar URL aquí (ej: https://galicianave.com.ar/tasas...)"
+                                        className="flex-1 p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold text-slate-700 text-xs"
+                                        value={currentSystem.ratesUrl || ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                paymentSystems: prev.paymentSystems?.map(s => s.id === currentSystem.id ? {...s, ratesUrl: val} : s)
+                                            }));
+                                        }}
+                                    />
+                                    {currentSystem.ratesUrl && (
+                                        <a href={currentSystem.ratesUrl} target="_blank" rel="noreferrer" className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+                                            <ExternalLink size={20}/>
+                                        </a>
+                                    )}
+                                </div>
+                                <p className="text-[8px] text-slate-400 px-2 italic uppercase font-bold">Si pegas un link, la IA entrará directamente ahí para buscar los recargos.</p>
                             </div>
 
                             {lastSources.length > 0 && (
