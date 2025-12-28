@@ -150,7 +150,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
           if (isEditing && clientForm.id) {
               return prev.map(c => c.id === clientForm.id ? { ...c, ...clientForm } as Client : c);
           } else {
-              return [{...clientForm as Client, id: Date.now().toString(), balance: 0, points: 0, portalHash: `p-${Math.random().toString(36).substr(2, 5)}`}, ...prev];
+              return [{...clientForm as Client, id: Date.now().toString(), portalHash: `p-${Math.random().toString(36).substr(2, 5)}`}, ...prev];
           }
       });
       setIsNewClientModalOpen(false);
@@ -208,7 +208,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest active:scale-95">
                     <FileUp size={20} /> Importar
                 </button>
-                <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', limit: 100000, points: 0, portalEnabled: true, taxCondition: 'Consumidor Final', currency: 'ARS'}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
+                <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', balance: 0, limit: 100000, points: 0, portalEnabled: true, taxCondition: 'Consumidor Final', currency: 'ARS'}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
                     <Plus size={20} /> Nuevo Cliente
                 </button>
             </div>
@@ -369,18 +369,28 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                             </select>
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-red-600 uppercase tracking-widest ml-1">Saldo Anterior / Inicial ($)</label>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                                                <input type="number" className="w-full pl-11 p-4 bg-red-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-xl text-red-700" value={clientForm.balance} onChange={e => setClientForm({...clientForm, balance: parseFloat(e.target.value) || 0})} />
+                                            </div>
+                                            <p className="text-[8px] text-gray-400 italic px-2">Use este campo para cargar deudas previas al sistema.</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Límite de Crédito ($)</label>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                                                <input type="number" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-black text-xl" value={clientForm.limit} onChange={e => setClientForm({...clientForm, limit: parseFloat(e.target.value) || 0})} />
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contacto del Cliente / Autorizado</label>
                                         <div className="relative">
                                             <Notebook className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={clientForm.contactName} onChange={e => setClientForm({...clientForm, contactName: e.target.value})} placeholder="Nombre de la persona de contacto..." />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Límite de Crédito ($)</label>
-                                        <div className="relative">
-                                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="number" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none font-black text-xl" value={clientForm.limit} onChange={e => setClientForm({...clientForm, limit: parseFloat(e.target.value) || 0})} />
+                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.contactName} onChange={e => setClientForm({...clientForm, contactName: e.target.value})} placeholder="Nombre de la persona de contacto..." />
                                         </div>
                                     </div>
                                 </div>
