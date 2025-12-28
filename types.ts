@@ -9,6 +9,7 @@ export enum ViewState {
   PRESUPUESTOS = 'PRESUPUESTOS',
   CLIENTS = 'CLIENTS',
   CLIENT_BALANCES = 'CLIENT_BALANCES',
+  PROVIDER_BALANCES = 'PROVIDER_BALANCES',
   PURCHASES = 'PURCHASES',
   PROVIDERS = 'PROVIDERS',
   TREASURY = 'TREASURY',
@@ -249,7 +250,7 @@ export interface RemitoItem { product: Product; quantity: number; historicalPric
 export interface CashRegister { id: string; name: string; balance: number; isOpen: boolean; }
 export interface TreasuryMovement { id: string; date: string; type: 'INCOME' | 'EXPENSE'; subtype: string; paymentMethod: string; amount: number; description: string; cashRegisterId: string; }
 export interface CurrencyQuote { id: string; name: string; code: string; value: number; lastUpdate: string; }
-export interface CurrentAccountMovement { id: string; clientId: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
+export interface CurrentAccountMovement { id: string; clientId?: string; providerId?: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
 export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; bankName: string; alias: string; cbu: string; owner: string; active: boolean; qrImage?: string | null; }
 export interface LoyaltyConfig { enabled: boolean; pointsPerPeso: number; minPointsToRedeem: number; valuePerPoint: number; }
 
