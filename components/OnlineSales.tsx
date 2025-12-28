@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     Globe, ShoppingBag, Truck, Package, Printer, FileText, CheckCircle, X, 
     ExternalLink, MapPin, User, Search, Filter, AlertCircle, RefreshCw, 
     Settings, Link2, Zap, ShieldCheck, Database, Layout, ArrowRight, Save,
-    ShoppingCart, Key, Lock, Terminal, Radio, Info, DollarSign, Smartphone, ChevronRight, Eye,
-    Server, Activity, FileKey, Copy, Check, Tag, Receipt
+    ShoppingCart, Key, Lock, Radio, Info, DollarSign, Smartphone, ChevronRight, Eye,
+    Activity, Tag, Receipt
 } from 'lucide-react';
 import { OnlineOrder, OnlinePlatform, OnlineOrderStatus, Product, InvoiceItem } from '../types';
 
@@ -31,7 +30,9 @@ const createMockItem = (desc: string, qty: number, price: number): InvoiceItem =
         measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
         vatRate: 21, listCost: price * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: price * 0.6, profitMargin: 40,
         priceNeto: price / 1.21, priceFinal: price, stock: 10, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
-        location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
+        location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+        isCombo: false,
+        comboItems: []
     } as Product,
     quantity: qty,
     subtotal: qty * price,
@@ -81,7 +82,6 @@ const OnlineSales: React.FC = () => {
       }
   ]);
 
-  // Fix: Defined updateStatus function to handle order status updates
   const updateStatus = (id: string, status: OnlineOrderStatus) => {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
   };
@@ -154,7 +154,6 @@ const OnlineSales: React.FC = () => {
       {activeTab === 'CONFIG' ? (
           <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in">
-                  {/* Mercado Libre Card */}
                   <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-2xl hover:-translate-y-1">
                       <div className="p-8 bg-[#FFF159] flex justify-between items-center">
                           <div className="flex items-center gap-4">
@@ -175,57 +174,9 @@ const OnlineSales: React.FC = () => {
                                         <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${meliConfig.autoSyncStock ? 'right-1' : 'left-1'}`}></div>
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase">Sincronización Precios</span>
-                                    <div onClick={() => setMeliConfig({...meliConfig, autoSyncPrices: !meliConfig.autoSyncPrices})} className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${meliConfig.autoSyncPrices ? 'bg-green-50' : 'bg-slate-300'}`}>
-                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${meliConfig.autoSyncPrices ? 'right-1' : 'left-1'}`}></div>
-                                    </div>
-                                </div>
                           </div>
                       </div>
                       <button onClick={() => setConfigModal('MERCADOLIBRE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-colors">VINCULAR CREDENCIALES</button>
-                  </div>
-
-                  {/* Tienda Nube Card */}
-                  <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-2xl hover:-translate-y-1">
-                      <div className="p-8 bg-[#00AEEF] flex justify-between items-center text-white">
-                          <div className="flex items-center gap-4">
-                              <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm"><Globe size={28}/></div>
-                              <h3 className="font-black text-xl tracking-tighter uppercase">Tienda Nube</h3>
-                          </div>
-                          <div className="px-3 py-1 rounded-full text-[10px] font-black bg-white text-[#00AEEF] uppercase tracking-widest">Activa</div>
-                      </div>
-                      <div className="p-10 space-y-8 flex-1">
-                          <p className="text-sm text-slate-500 font-medium leading-relaxed">Conexión con el carrito de compras propio. Actualización masiva de categorías y promociones.</p>
-                          <div className="space-y-4">
-                                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase">Stock Automático</span>
-                                    <div onClick={() => setNubeConfig({...nubeConfig, autoSyncStock: !nubeConfig.autoSyncStock})} className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${nubeConfig.autoSyncStock ? 'bg-green-50' : 'bg-slate-300'}`}>
-                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${nubeConfig.autoSyncStock ? 'right-1' : 'left-1'}`}></div>
-                                    </div>
-                                </div>
-                          </div>
-                      </div>
-                      <button onClick={() => setConfigModal('TIENDANUBE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-colors">CONFIGURAR TIENDA</button>
-                  </div>
-
-                  {/* WooCommerce / Web Propia Card */}
-                  <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-2xl hover:-translate-y-1">
-                      <div className="p-8 bg-[#96588A] flex justify-between items-center text-white">
-                          <div className="flex items-center gap-4">
-                              <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm"><Layout size={28}/></div>
-                              <h3 className="font-black text-xl tracking-tighter uppercase">API Web</h3>
-                          </div>
-                          <div className="px-3 py-1 rounded-full text-[10px] font-black bg-white/10 border border-white/20 uppercase tracking-widest">Manual</div>
-                      </div>
-                      <div className="p-10 space-y-8 flex-1">
-                          <p className="text-sm text-slate-500 font-medium leading-relaxed">Gestión vía API Rest para sitios WordPress, WooCommerce o desarrollos personalizados.</p>
-                          <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100">
-                              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Última Sincronización</p>
-                              <p className="text-xs font-bold text-slate-600">Nunca realizada</p>
-                          </div>
-                      </div>
-                      <button onClick={() => setConfigModal('WOOCOMMERCE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-800 transition-colors">CONFIGURAR ENDPOINT</button>
                   </div>
               </div>
           </div>
@@ -288,117 +239,6 @@ const OnlineSales: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL DE VINCULACIÓN / CONFIGURACIÓN DE CANAL */}
-      {configModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className={`p-8 flex justify-between items-center shrink-0 text-white ${
-                      configModal === 'MERCADOLIBRE' ? 'bg-[#333333]' : 
-                      configModal === 'TIENDANUBE' ? 'bg-[#00AEEF]' : 'bg-[#96588A]'
-                  }`}>
-                      <div className="flex items-center gap-4">
-                          <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md">
-                              {configModal === 'MERCADOLIBRE' ? <ShoppingCart size={28}/> : 
-                               configModal === 'TIENDANUBE' ? <Globe size={28}/> : <Layout size={28}/>}
-                          </div>
-                          <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Vincular {configModal.replace('MERCADOLIBRE', 'Mercado Libre').replace('TIENDANUBE', 'Tienda Nube')}</h3>
-                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Configuración de API y Tokens</p>
-                          </div>
-                      </div>
-                      <button onClick={() => setConfigModal(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
-                      <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex items-start gap-4">
-                          <AlertCircle className="text-amber-600 shrink-0 mt-1" size={20}/>
-                          <p className="text-xs text-amber-900 font-medium leading-relaxed">
-                              Importante: Para obtener estas credenciales debe acceder al portal de desarrolladores de {configModal === 'MERCADOLIBRE' ? 'Mercado Libre' : 'Tienda Nube'} y crear una aplicación vinculada a esta sucursal.
-                          </p>
-                      </div>
-
-                      <div className="space-y-6">
-                          {configModal === 'MERCADOLIBRE' && (
-                              <>
-                                  <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">App ID</label>
-                                      <div className="relative group">
-                                          <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
-                                          <input type="text" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-600 transition-all shadow-sm" placeholder="ID de Aplicación" value={meliConfig.appId}/>
-                                      </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Client Secret</label>
-                                      <div className="relative group">
-                                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
-                                          {/* Fix: Corrected invalid 'password' attribute to 'placeholder' */}
-                                          <input type="password" placeholder="••••••••••••" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-600 transition-all shadow-sm" />
-                                      </div>
-                                  </div>
-                              </>
-                          )}
-
-                          {configModal === 'TIENDANUBE' && (
-                              <>
-                                  <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Access Token (API Key)</label>
-                                      <div className="relative group">
-                                          <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500" size={18}/>
-                                          <input type="text" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm" placeholder="shpat_..." value={nubeConfig.apiKey}/>
-                                      </div>
-                                  </div>
-                                  <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Store ID (User ID)</label>
-                                      <div className="relative group">
-                                          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-blue-500" size={18}/>
-                                          <input type="text" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-blue-500 transition-all shadow-sm" placeholder="ID de la Tienda"/>
-                                      </div>
-                                  </div>
-                              </>
-                          )}
-
-                          {configModal === 'WOOCOMMERCE' && (
-                              <>
-                                  <div className="space-y-2">
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">API Endpoint URL</label>
-                                      <div className="relative group">
-                                          <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-purple-600" size={18}/>
-                                          <input type="text" className="w-full pl-12 p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-purple-600 transition-all shadow-sm" placeholder="https://tusitio.com/wp-json/wc/v3" value={webConfig.endpoint}/>
-                                      </div>
-                                  </div>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Consumer Key</label>
-                                          <input type="text" className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-purple-600 transition-all shadow-sm" placeholder="ck_..."/>
-                                      </div>
-                                      <div className="space-y-2">
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Consumer Secret</label>
-                                          {/* Fix: Corrected invalid 'password' attribute to 'placeholder' */}
-                                          <input type="password" placeholder="cs_..." className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-purple-600 transition-all shadow-sm" />
-                                      </div>
-                                  </div>
-                              </>
-                          )}
-                      </div>
-
-                      <div className="pt-6 space-y-4">
-                          <button onClick={handleTestConnection} disabled={isTestingConn} className="w-full py-4 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
-                              {isTestingConn ? <RefreshCw className="animate-spin" size={16}/> : <Activity size={16}/>}
-                              {isTestingConn ? 'Validando con Servidor...' : 'Probar Credenciales'}
-                          </button>
-                      </div>
-                  </div>
-
-                  <div className="p-8 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
-                      <button onClick={() => setConfigModal(null)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-colors">Descartar</button>
-                      <button onClick={() => { alert("Configuración guardada."); setConfigModal(null); }} className="bg-indigo-600 text-white px-10 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex items-center gap-2">
-                          <Save size={18}/> Guardar Cambios
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
-
       {selectedOrder && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -423,11 +263,6 @@ const OnlineSales: React.FC = () => {
                                   <p className="text-xs font-black text-slate-600">DNI: {selectedOrder.customer.dni}</p>
                                   <p className="text-xs font-black text-slate-600">TEL: {selectedOrder.customer.phone}</p>
                               </div>
-                          </div>
-                          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
-                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2"><MapPin size={14}/> Dirección de Envío</h4>
-                              <p className="text-sm font-black text-slate-700 uppercase leading-relaxed">{selectedOrder.customer.address}</p>
-                              <p className="text-xs font-bold text-slate-400 uppercase">{selectedOrder.customer.city} ({selectedOrder.customer.zipCode})</p>
                           </div>
                       </div>
                       <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
@@ -459,9 +294,7 @@ const OnlineSales: React.FC = () => {
                   
                   <div className="p-8 bg-white border-t border-gray-100 flex justify-between items-center shrink-0">
                         <div className="flex gap-2">
-                             {/* Fix: Changed TagIcon to Tag and added missing import */}
                              <button className="p-4 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all" title="Imprimir Etiqueta"><Tag size={20}/></button>
-                             {/* Fix: Added missing import for Receipt */}
                              <button className="p-4 bg-slate-100 text-slate-600 rounded-2xl hover:bg-slate-200 transition-all" title="Ver Factura Asociada"><Receipt size={20}/></button>
                         </div>
                         <div className="flex items-center gap-4">
