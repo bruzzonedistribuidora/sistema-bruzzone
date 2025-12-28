@@ -42,6 +42,8 @@ const ALL_SHORTCUTS: Shortcut[] = [
     { id: ViewState.MASS_PRODUCT_UPDATE, label: "Cambios Masivos", category: "Stock", icon: Zap, color: "bg-gradient-to-br from-amber-400 to-orange-500" },
     { id: ViewState.STOCK_TRANSFERS, label: "Traslados", category: "Stock", icon: ArrowLeftRight, color: "bg-gradient-to-br from-slate-600 to-slate-800" },
     { id: ViewState.PURCHASES, label: "Cargar Compras", category: "Stock", icon: Truck, color: "bg-gradient-to-br from-slate-700 to-slate-900" },
+    { id: ViewState.PROVIDERS, label: "Fichero Prov.", category: "Stock", icon: Users, color: "bg-gradient-to-br from-blue-400 to-indigo-600" },
+    { id: ViewState.PROVIDER_BALANCES, label: "Saldos Prov.", category: "Stock", icon: Landmark, color: "bg-gradient-to-br from-orange-500 to-amber-700" },
     { id: ViewState.REPLENISHMENT, label: "Pedidos Prov.", category: "Stock", icon: ShoppingCart, color: "bg-gradient-to-br from-indigo-600 to-blue-800" },
     { id: ViewState.SHORTAGES, label: "Faltantes", category: "Stock", icon: AlertTriangle, color: "bg-gradient-to-br from-orange-400 to-red-500" },
     { id: ViewState.LABEL_PRINTING, label: "Etiquetas", category: "Stock", icon: Tag, color: "bg-gradient-to-br from-amber-500 to-yellow-600" },
@@ -73,7 +75,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<ViewState[]>(() => {
     const saved = localStorage.getItem('ferrecloud_pinned_v3');
-    return saved ? JSON.parse(saved) : [ViewState.POS, ViewState.INVENTORY, ViewState.REMITOS, ViewState.TREASURY, ViewState.PURCHASES, ViewState.PRESUPUESTOS, ViewState.CLIENT_BALANCES, ViewState.PRICE_UPDATES, ViewState.AI_ASSISTANT, ViewState.REPORTS, ViewState.MARKETING, ViewState.PRICE_AUDIT, ViewState.CREDIT_NOTES];
+    return saved ? JSON.parse(saved) : [ViewState.POS, ViewState.INVENTORY, ViewState.REMITOS, ViewState.TREASURY, ViewState.PURCHASES, ViewState.PRESUPUESTOS, ViewState.CLIENT_BALANCES, ViewState.PROVIDER_BALANCES, ViewState.PRICE_UPDATES, ViewState.AI_ASSISTANT, ViewState.REPORTS, ViewState.MARKETING, ViewState.PRICE_AUDIT, ViewState.CREDIT_NOTES];
   });
 
   useEffect(() => {
