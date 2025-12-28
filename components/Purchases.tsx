@@ -47,6 +47,8 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   
   const providerImportRef = useRef<HTMLInputElement>(null);
+  
+  // Estados para el Asistente de Importación de Proveedores
   const [isProviderImportMappingOpen, setIsProviderImportMappingOpen] = useState(false);
   const [provImportRows, setProvImportRows] = useState<string[][]>([]);
   const [provImportMapping, setProvImportMapping] = useState<Record<string, number>>({});
@@ -66,6 +68,105 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
   }, [providers]);
 
+  // --- LÓGICA DE IMPORTACIÓN ---
+  const handleStartImportProviders = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
+        
+        if (lines.length > 0) {
+            // Detección inteligente de separador (; o ,)
+            const firstLine = lines[0];
+            const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+
+            const rows = lines.map(line => line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, '')));
+            
+            setProvImportRows(rows);
+            setProvImportMapping({}); // Limpiar mapeo anterior
+            setIsProviderImportMappingOpen(true);
+        }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const confirmProviderImport = () => {
+    if (provImportMapping.name === undefined || provImportMapping.cuit === undefined) {
+        alert("Debes mapear al menos el Nombre/Razón Social y el CUIT.");
+        return;
+    }
+
+    const currentCuits = new Set(providers.map(p => p.cuit.replace(/[^0-9]/g, '')));
+    const newProviders: Provider[] = [];
+
+    provImportRows.forEach((row, index) => {
+        const name = row[provImportMapping.name];
+        const cuit = row[provImportMapping.cuit];
+        
+        // Ignorar cabeceras y filas vacías
+        if (!name || !cuit || name.toLowerCase() === 'razon social' || name.toLowerCase() === 'nombre') return;
+
+        const cleanCuit = cuit.replace(/[^0-9]/g, '');
+        if (!currentCuits.has(cleanCuit)) {
+            newProviders.push({
+                id: `prov-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                number: provImportMapping.number !== undefined ? row[provImportMapping.number] : '',
+                name: name.toUpperCase(),
+                razonSocial: name.toUpperCase(),
+                fantasyName: provImportMapping.fantasyName !== undefined ? row[provImportMapping.fantasyName].toUpperCase() : '',
+                cuit: cuit,
+                taxCondition: (provImportMapping.taxCondition !== undefined ? row[provImportMapping.taxCondition] : 'Responsable Inscripto') as TaxCondition,
+                locality: provImportMapping.locality !== undefined ? row[provImportMapping.locality] : '',
+                address: provImportMapping.address !== undefined ? row[provImportMapping.address] : '',
+                phone: provImportMapping.phone !== undefined ? row[provImportMapping.phone] : '',
+                email: provImportMapping.email !== undefined ? row[provImportMapping.email] : '',
+                description: provImportMapping.description !== undefined ? row[provImportMapping.description] : '',
+                contact: provImportMapping.contact !== undefined ? row[provImportMapping.contact] : '',
+                balance: 0,
+                defaultDiscounts: [
+                    provImportMapping.desc1 !== undefined ? (parseFloat(row[provImportMapping.desc1].replace(',', '.')) || 0) : 0,
+                    provImportMapping.desc2 !== undefined ? (parseFloat(row[provImportMapping.desc2].replace(',', '.')) || 0) : 0,
+                    provImportMapping.desc3 !== undefined ? (parseFloat(row[provImportMapping.desc3].replace(',', '.')) || 0) : 0,
+                ],
+                currencyQuoteId: ''
+            });
+            currentCuits.add(cleanCuit);
+        }
+    });
+
+    if (newProviders.length === 0) {
+        alert("No se encontraron proveedores nuevos para importar. Verifique si los CUIT ya existen.");
+        return;
+    }
+
+    setProviders([...newProviders, ...providers]);
+    setIsProviderImportMappingOpen(false);
+    setProvImportRows([]);
+    setProvImportMapping({});
+    alert(`Importación finalizada. Se procesaron ${newProviders.length} proveedores nuevos.`);
+  };
+
+  const PROVIDER_FIELDS = [
+      { key: 'name', label: 'Razón Social / Nombre', required: true },
+      { key: 'cuit', label: 'CUIT', required: true },
+      { key: 'number', label: 'Nº Proveedor', required: false },
+      { key: 'fantasyName', label: 'Nombre Fantasía', required: false },
+      { key: 'locality', label: 'Localidad', required: false },
+      { key: 'address', label: 'Domicilio', required: false },
+      { key: 'phone', label: 'Teléfono', required: false },
+      { key: 'email', label: 'E-mail', required: false },
+      { key: 'contact', label: 'Contacto / Vendedor', required: false },
+      { key: 'desc1', label: 'Descuento 1 (%)', required: false },
+      { key: 'desc2', label: 'Descuento 2 (%)', required: false },
+      { key: 'desc3', label: 'Descuento 3 (%)', required: false },
+      { key: 'description', label: 'Descripción', required: false }
+  ];
+
+  // --- RESTO DE HANDLERS ---
   const handleSearchCuit = async () => {
     if (!providerForm.cuit || providerForm.cuit.length < 8) return;
     setIsSearchingCuit(true);
@@ -96,7 +197,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden">
-      <input type="file" ref={providerImportRef} className="hidden" accept=".csv,.txt" />
+      <input type="file" ref={providerImportRef} className="hidden" accept=".csv,.txt" onChange={handleStartImportProviders} />
 
       <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
         <div>
@@ -119,8 +220,13 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <input type="text" placeholder="Filtrar proveedores..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-indigo-100 outline-none transition-all font-bold uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                     <div className="flex gap-2 ml-4">
+                        <button 
+                            onClick={() => providerImportRef.current?.click()}
+                            className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                            <FileUp size={18} /> Importación Inteligente
+                        </button>
                         <button onClick={() => { setIsEditingProvider(false); setModalTab('GENERAL'); setProviderForm({name: '', cuit: '', contact: '', taxCondition: 'Responsable Inscripto', defaultDiscounts: [0,0,0]}); setIsProviderModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">
-                            <UserPlus size={16} /> Nuevo Proveedor
+                            <Plus size={16} /> Nuevo Proveedor
                         </button>
                     </div>
                 </div>
@@ -159,6 +265,96 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
             </div>
         )}
       </div>
+
+      {/* MODAL: ASISTENTE DE IMPORTACIÓN (MAPEO) */}
+      {isProviderImportMappingOpen && (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-8 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-white/20 rounded-2xl shadow-lg"><Columns size={24}/></div>
+                          <div>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Importación de Proveedores</h3>
+                              <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mt-1">Asigne las columnas de su archivo a los campos del sistema</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsProviderImportMappingOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar bg-slate-50/30">
+                      {provImportRows[0]?.length === 1 && (
+                          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 text-amber-800">
+                              <AlertTriangle size={20} className="shrink-0" />
+                              <p className="text-xs font-bold uppercase">¡Atención! Solo se detectó una columna. Asegúrese de que el archivo CSV esté separado por comas o puntos y comas.</p>
+                          </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {PROVIDER_FIELDS.map(field => (
+                              <div key={field.key} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                                  <div className="flex justify-between items-center">
+                                      <label className={`text-[10px] font-black uppercase tracking-widest ${field.required ? 'text-indigo-600' : 'text-slate-400'}`}>
+                                          {field.label} {field.required && '*'}
+                                      </label>
+                                      {provImportMapping[field.key] !== undefined && <CheckCircle size={14} className="text-green-500" />}
+                                  </div>
+                                  <select 
+                                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500"
+                                      value={provImportMapping[field.key] ?? ""}
+                                      onChange={e => {
+                                          const val = e.target.value === "" ? undefined : parseInt(e.target.value);
+                                          setProvImportMapping({ ...provImportMapping, [field.key]: val as any });
+                                      }}
+                                  >
+                                      <option value="">-- No importar --</option>
+                                      {provImportRows[0]?.map((col, idx) => (
+                                          <option key={idx} value={idx}>Columna {idx + 1} ({col.slice(0, 20)}...)</option>
+                                      ))}
+                                  </select>
+                              </div>
+                          ))}
+                      </div>
+
+                      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+                          <div className="p-4 bg-slate-900 text-white flex items-center gap-2">
+                              <TableIcon size={14} className="text-indigo-400"/>
+                              <h4 className="text-[10px] font-black uppercase tracking-widest">Vista previa del archivo (Primeras 5 filas)</h4>
+                          </div>
+                          <div className="overflow-x-auto">
+                              <table className="w-full text-left">
+                                  <thead className="bg-slate-50 border-b">
+                                      <tr>
+                                          {provImportRows[0]?.map((_, idx) => (
+                                              <th key={idx} className="px-4 py-2 text-[9px] font-black text-slate-400 uppercase text-center border-r last:border-0">Col {idx + 1}</th>
+                                          ))}
+                                      </tr>
+                                  </thead>
+                                  <tbody className="divide-y text-[10px]">
+                                      {provImportRows.slice(0, 5).map((row, rIdx) => (
+                                          <tr key={rIdx}>
+                                              {row.map((cell, cIdx) => (
+                                                  <td key={cIdx} className="px-4 py-2 text-slate-600 font-medium truncate max-w-[150px] border-r last:border-0">{cell}</td>
+                                              ))}
+                                          </tr>
+                                      ))}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="p-8 border-t border-slate-100 bg-white flex justify-end gap-4 shrink-0">
+                      <button onClick={() => setIsProviderImportMappingOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
+                      <button 
+                          onClick={confirmProviderImport}
+                          className="bg-indigo-600 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-indigo-700 transition-all flex items-center gap-3 active:scale-95"
+                      >
+                          <Save size={18}/> Procesar e Importar Proveedores
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isProviderModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
