@@ -1,8 +1,7 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
 
 export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
   try {
@@ -39,10 +38,14 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
     });
 
     const installments = JSON.parse(response.text || "[]");
-    // Extraer fuentes de groundingChunks según reglas
+    
+    // Extraer fuentes asegurando que title y uri existan como strings
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.filter(chunk => chunk.web)
-      ?.map(chunk => ({ title: chunk.web!.title, uri: chunk.web!.uri })) || [];
+      ?.map(chunk => ({ 
+        title: chunk.web!.title ?? "Fuente Web", 
+        uri: chunk.web!.uri ?? "" 
+      })) || [];
 
     return { 
       installments: installments.map((inst: any) => ({ ...inst, id: `ai-${Math.random()}` })),
@@ -94,43 +97,21 @@ export const searchVirtualInventory = async (query: string): Promise<Product[]> 
         ...r,
         internalCodes: [r.sku], 
         barcodes: [],
-        providerCodes: []
+        providerCodes: [],
+        isCombo: false,
+        comboItems: [],
+        vatRate: 21.0,
+        listCost: r.price * 0.7,
+        discounts: [0, 0, 0, 0],
+        costAfterDiscounts: r.price * 0.7,
+        profitMargin: 30,
+        priceNeto: r.price / 1.21,
+        priceFinal: r.price,
+        stockDetails: []
     }));
   } catch (error) {
     console.error("Error generating virtual inventory:", error);
     return [];
-  }
-};
-
-export const classifyNewProduct = async (rawDescription: string): Promise<Partial<Product>> => {
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Analyze this raw product input for a hardware store and structure it: "${rawDescription}".`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            sku: { type: Type.STRING },
-            name: { type: Type.STRING },
-            category: { type: Type.STRING },
-            price: { type: Type.NUMBER },
-            description: { type: Type.STRING }
-          }
-        }
-      }
-    });
-
-    const text = response.text?.trim();
-    const data = JSON.parse(text || '{}');
-    return {
-        ...data,
-        internalCodes: data.sku ? [data.sku] : []
-    };
-  } catch (error) {
-    console.error("Error classifying product:", error);
-    return {};
   }
 };
 
@@ -148,7 +129,7 @@ export const askAssistant = async (history: string[], question: string): Promise
         console.error("Error talking to assistant:", error);
         return "Error de conexión con el asistente.";
     }
-}
+};
 
 export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
   try {
