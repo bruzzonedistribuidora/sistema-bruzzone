@@ -1,12 +1,11 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-    FileUp, FileSpreadsheet, ArrowRight, Settings, CheckCircle, 
-    AlertTriangle, ChevronRight, Save, LayoutTemplate, Database, 
-    X, List, Plus, Trash2, Edit2, Bookmark, BookmarkPlus, 
+    FileSpreadsheet, ArrowRight, CheckCircle, 
+    ChevronRight, LayoutTemplate, 
+    X, List, BookmarkPlus, 
     RefreshCw, Layers, TrendingUp, TrendingDown, PackagePlus, 
-    PackageMinus, Calculator, Search, ChevronLeft, Building2, Tag, Percent,
-    Truck, FileText, AlertOctagon
+    PackageMinus, Calculator, Tag, Percent,
+    Truck, FileText, AlertOctagon, Building2
 } from 'lucide-react';
 import { Provider, PriceList, Product } from '../types';
 
@@ -118,7 +117,6 @@ const PriceUpdates: React.FC = () => {
                 const category = mapping.category !== null ? row[mapping.category] : 'GENERAL';
                 const providerName = mapping.provider !== null ? row[mapping.provider] : (selectedProvider?.name || 'DESCONOCIDO');
 
-                // Fix: Updated matching logic to use internalCodes array property
                 const existing = products.find(p => p.internalCodes.includes(code) || p.barcodes.includes(code));
 
                 if (existing) {
@@ -144,7 +142,6 @@ const PriceUpdates: React.FC = () => {
             if (importMode === 'UPDATE' && selectedProvider) {
                 const providerProducts = products.filter(p => p.provider === selectedProvider.name);
                 const excelCodes = rawExcelRows.map(r => r[mapping.code ?? 0]);
-                // Fix: Updated discontinued logic to use internalCodes array property
                 const discontinued = providerProducts.filter(p => !p.internalCodes.some(c => excelCodes.includes(c)));
                 discontinuedCount = discontinued.length;
                 discontinued.forEach(p => {
@@ -205,7 +202,6 @@ const PriceUpdates: React.FC = () => {
             let insertCount = 0;
 
             const updatedProducts = products.map(p => {
-                // Fix: Updated update logic to use internalCodes array property
                 const match = analysis.impactDetails.find(i => p.internalCodes.includes(i.code) && i.status === 'UPDATE');
                 if (match) {
                     updateCount++;
@@ -224,17 +220,15 @@ const PriceUpdates: React.FC = () => {
 
             let finalProductList = [...updatedProducts];
 
-            // SI ES CARGA INICIAL, AGREGAMOS LOS NUEVOS
             if (importMode === 'INITIAL') {
                 const newProductsToAdd = analysis.impactDetails.filter(i => i.status === 'NEW').map(item => {
                     insertCount++;
-                    const profitMargin = 30; // Default
-                    const vatRate = 21; // Default
+                    const profitMargin = 30; 
+                    const vatRate = 21; 
                     const priceNeto = item.newCost * (1 + (profitMargin / 100));
                     const priceFinal = priceNeto * (1 + (vatRate / 100));
 
-                    // Fix: Updated new product object literal to use internalCodes array instead of internalCode string
-                    return {
+                    const newP: Product = {
                         id: `prod-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
                         internalCodes: [item.code],
                         barcodes: [],
@@ -251,7 +245,7 @@ const PriceUpdates: React.FC = () => {
                         saleCurrency: 'ARS',
                         vatRate: vatRate as any,
                         listCost: item.newCost,
-                        discounts: [0, 0, 0, 0] as [number, number, number, number],
+                        discounts: [0, 0, 0, 0],
                         costAfterDiscounts: item.newCost,
                         profitMargin: profitMargin,
                         priceNeto: parseFloat(priceNeto.toFixed(2)),
@@ -262,8 +256,11 @@ const PriceUpdates: React.FC = () => {
                         desiredStock: 0,
                         reorderPoint: 0,
                         location: '',
-                        ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false }
-                    } as Product;
+                        ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+                        isCombo: false,
+                        comboItems: []
+                    };
+                    return newP;
                 });
                 finalProductList = [...finalProductList, ...newProductsToAdd];
             }
@@ -284,7 +281,7 @@ const PriceUpdates: React.FC = () => {
         { key: 'code', label: 'Cód. Interno (SKU)', icon: Tag, color: 'bg-blue-600' },
         { key: 'providerCode', label: 'Cód. Proveedor', icon: Truck, color: 'bg-slate-600' },
         { key: 'description', label: 'Descripción / Nombre', icon: FileText, color: 'bg-yellow-500' },
-        { key: 'brand', label: 'Marca', icon: Bookmark, color: 'bg-purple-600' },
+        { key: 'brand', label: 'Marca', icon: BookmarkPlus, color: 'bg-purple-600' },
         { key: 'category', label: 'Categoría', icon: Layers, color: 'bg-indigo-600' },
         { key: 'provider', label: 'Proveedor', icon: Building2, color: 'bg-teal-600' },
         { key: 'cost', label: 'Costo Neto', icon: Calculator, color: 'bg-green-600' },
@@ -293,13 +290,10 @@ const PriceUpdates: React.FC = () => {
 
     return (
         <div className="p-4 h-full flex flex-col space-y-3 bg-slate-50 overflow-hidden">
-            {/* Header Profesional Compacto */}
             <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm shrink-0">
-                <div>
-                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                        <Calculator size={18} className="text-indigo-600"/> Gestión de Listas y Costos
-                    </h2>
-                </div>
+                <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                    <Calculator size={18} className="text-indigo-600"/> Gestión de Listas y Costos
+                </h2>
                 <div className="flex bg-slate-100 rounded-lg p-1">
                     <button onClick={() => setActiveTab('LISTS')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'LISTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Venta Público</button>
                     <button onClick={() => setActiveTab('MASS_UPDATE')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'MASS_UPDATE' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Importación Masiva</button>
@@ -329,7 +323,6 @@ const PriceUpdates: React.FC = () => {
 
             {activeTab === 'MASS_UPDATE' && (
                 <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in min-h-0">
-                    {/* Stepper Fijo */}
                     <div className="bg-slate-900 px-6 py-3 flex items-center justify-between border-b border-slate-800 shrink-0">
                         <div className="flex gap-8">
                             {[
@@ -502,15 +495,7 @@ const PriceUpdates: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {importMode === 'UPDATE' && analysis.newItems > 0 && (
-                                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3 text-amber-700 shrink-0">
-                                        <AlertOctagon size={20}/>
-                                        <p className="text-[10px] font-black uppercase tracking-tight">Atención: Hay {analysis.newItems} artículos nuevos en el Excel que serán IGNORADOS porque el modo está en "Solo Actualizar Existentes".</p>
-                                    </div>
-                                )}
-
-                                <div className="flex-1 bg-white rounded-[2rem] border border-gray-200 shadow-xl overflow-hidden flex flex-col min-h-0">
-                                    <div className="p-3 bg-slate-50 border-b border-gray-100 text-[9px] font-black text-slate-500 uppercase tracking-widest px-6 shrink-0">Validación Pre-Carga</div>
+                                <div className="flex-1 bg-white rounded-[2.5rem] border border-gray-200 shadow-xl overflow-hidden flex flex-col min-h-0">
                                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                                         <table className="w-full text-left border-collapse">
                                             <thead className="bg-slate-900 sticky top-0 z-10 text-[8px] font-black text-slate-300 uppercase tracking-widest">
