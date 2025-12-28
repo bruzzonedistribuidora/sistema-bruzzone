@@ -1,7 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
   try {
@@ -39,12 +45,11 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
 
     const installments = JSON.parse(response.text || "[]");
     
-    // Extraer fuentes asegurando que title y uri existan como strings
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.filter(chunk => chunk.web)
       ?.map(chunk => ({ 
-        title: chunk.web!.title ?? "Fuente Web", 
-        uri: chunk.web!.uri ?? "" 
+        title: String(chunk.web?.title || "Fuente Web"), 
+        uri: String(chunk.web?.uri || "") 
       })) || [];
 
     return { 
