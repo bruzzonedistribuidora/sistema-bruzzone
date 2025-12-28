@@ -14,6 +14,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [selectedClient, setSelectedClient] = useState('');
   const [cart, setCart] = useState<RemitoItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
@@ -114,7 +115,22 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
       onBillRemitos(allItems);
   };
 
-  const filteredRemitos = existingRemitos.filter(r => historyFilter === 'ALL' || r.status === historyFilter);
+  const filteredRemitos = useMemo(() => {
+    return existingRemitos.filter(r => {
+        const matchesStatus = historyFilter === 'ALL' || r.status === historyFilter;
+        const matchesSearch = r.clientName.toLowerCase().includes(historySearch.toLowerCase()) || 
+                             r.id.toLowerCase().includes(historySearch.toLowerCase());
+        return matchesStatus && matchesSearch;
+    });
+  }, [existingRemitos, historyFilter, historySearch]);
+
+  const toggleSelectAllVisible = () => {
+      if (selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0) {
+          setSelectedRemitoIds([]);
+      } else {
+          setSelectedRemitoIds(filteredRemitos.map(r => r.id));
+      }
+  };
 
   return (
     <div className="p-4 h-full flex flex-col space-y-3 bg-slate-100 overflow-hidden">
@@ -193,57 +209,74 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
       {activeTab === 'HISTORY' && (
         <div className="flex-1 flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in print:hidden">
-             <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <div className="flex gap-2">
+             <div className="p-3 border-b border-gray-100 flex flex-col md:flex-row gap-3 justify-between items-start md:items-center bg-gray-50/50">
+                <div className="flex flex-wrap gap-2">
                     {['PENDING', 'BILLED', 'ALL'].map(f => (
-                        <button key={f} onClick={() => { setHistoryFilter(f as any); setSelectedRemitoIds([]); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${historyFilter === f ? 'bg-slate-900 text-white' : 'bg-white text-gray-500 border'}`}>
+                        <button key={f} onClick={() => { setHistoryFilter(f as any); setSelectedRemitoIds([]); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${historyFilter === f ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'}`}>
                             {f === 'PENDING' ? 'Pendientes' : f === 'BILLED' ? 'Facturados' : 'Todo'}
                         </button>
                     ))}
                 </div>
+
+                <div className="flex-1 max-w-md w-full relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                    <input 
+                        type="text" 
+                        placeholder="Buscar por cliente o remito..." 
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 uppercase transition-all"
+                        value={historySearch}
+                        onChange={e => setHistorySearch(e.target.value)}
+                    />
+                </div>
+
                 {selectedRemitoIds.length > 0 && (
-                    <button onClick={handleBillSelected} className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg font-black text-[9px] uppercase shadow-xl flex items-center gap-2">
+                    <button onClick={handleBillSelected} className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2 active:scale-95 transition-transform">
                         <ShoppingBag size={14}/> Facturar Seleccionados ({selectedRemitoIds.length})
                     </button>
                 )}
              </div>
 
-             <div className="flex-1 overflow-y-auto">
+             <div className="flex-1 overflow-y-auto custom-scrollbar">
                <table className="w-full text-left">
                  <thead className="bg-slate-50 sticky top-0 z-10 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b">
                    <tr>
-                     <th className="px-6 py-2.5 text-center w-10">
+                     <th className="px-6 py-4 text-center w-10">
                          {historyFilter === 'PENDING' && (
-                             <button onClick={() => setSelectedRemitoIds(selectedRemitoIds.length === filteredRemitos.length ? [] : filteredRemitos.map(r => r.id))}>
-                                {selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0 ? <CheckSquare size={16} className="text-indigo-600"/> : <Square size={16}/>}
+                             <button onClick={toggleSelectAllVisible} className="hover:text-indigo-600 transition-colors">
+                                {(selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0) ? <CheckSquare size={18} className="text-indigo-600"/> : <Square size={18}/>}
                              </button>
                          )}
                      </th>
-                     <th className="px-6 py-2.5">ID / Fecha</th>
-                     <th className="px-6 py-2.5">Cliente</th>
-                     <th className="px-6 py-2.5 text-right">Monto</th>
-                     <th className="px-6 py-2.5 text-center">Acciones</th>
+                     <th className="px-6 py-4">ID / Fecha</th>
+                     <th className="px-6 py-4">Cliente</th>
+                     <th className="px-6 py-4 text-right">Monto</th>
+                     <th className="px-6 py-4 text-center">Acciones</th>
                    </tr>
                  </thead>
                  <tbody className="divide-y text-[11px]">
-                   {filteredRemitos.map(remito => (
-                        <tr key={remito.id} className={`hover:bg-slate-50 ${selectedRemitoIds.includes(remito.id) ? 'bg-indigo-50/50' : ''}`}>
-                          <td className="px-6 py-2.5 text-center">
+                   {filteredRemitos.length === 0 ? (
+                       <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">No se encontraron remitos con los criterios de búsqueda</td></tr>
+                   ) : filteredRemitos.map(remito => (
+                        <tr key={remito.id} className={`hover:bg-indigo-50/20 transition-colors group ${selectedRemitoIds.includes(remito.id) ? 'bg-indigo-50/50' : ''}`}>
+                          <td className="px-6 py-4 text-center">
                             {remito.status === 'PENDING' && (
                                 <button onClick={() => setSelectedRemitoIds(prev => prev.includes(remito.id) ? prev.filter(x => x !== remito.id) : [...prev, remito.id])}>
-                                    {selectedRemitoIds.includes(remito.id) ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
+                                    {selectedRemitoIds.includes(remito.id) ? <CheckSquare size={18} className="text-indigo-600" /> : <Square size={18} className="text-gray-300 group-hover:text-indigo-300" />}
                                 </button>
                             )}
                           </td>
-                          <td className="px-6 py-2.5 font-bold text-slate-800">{remito.id} <span className="block text-[8px] text-gray-400">{remito.date}</span></td>
-                          <td className="px-6 py-2.5 font-black text-slate-600 uppercase truncate max-w-[150px]">{remito.clientName}</td>
-                          <td className="px-6 py-2.5 text-right font-black">${remito.items.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString()}</td>
-                          <td className="px-6 py-2.5 text-center">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-slate-800">{remito.id}</div>
+                            <div className="text-[8px] text-gray-400 font-mono uppercase font-bold">{remito.date}</div>
+                          </td>
+                          <td className="px-6 py-4 font-black text-slate-600 uppercase truncate max-w-[200px]">{remito.clientName}</td>
+                          <td className="px-6 py-4 text-right font-black text-slate-900">${remito.items.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString()}</td>
+                          <td className="px-6 py-4 text-center">
                               <div className="flex justify-center gap-2">
                                 {remito.status === 'PENDING' && (
-                                    <button onClick={() => convertRemitoToSale(remito)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Convertir a Venta"><Receipt size={14}/></button>
+                                    <button onClick={() => convertRemitoToSale(remito)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Convertir a Venta"><Receipt size={14}/></button>
                                 )}
-                                <button onClick={() => setShowPrintModal(remito)} className="p-2 text-gray-400 bg-slate-50 rounded-lg hover:bg-slate-900 hover:text-white transition-all"><Printer size={14}/></button>
+                                <button onClick={() => setShowPrintModal(remito)} className="p-2 text-gray-400 bg-slate-50 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Printer size={14}/></button>
                               </div>
                           </td>
                         </tr>
@@ -256,11 +289,11 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
       {/* MODAL PRINT PREVIEW REMITO */}
       {showPrintModal && (
-        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4 print:bg-white print:p-0 print:block">
+        <div className="fixed inset-0 bg-slate-950/80 z-[200] flex items-center justify-center backdrop-blur-sm p-4 animate-fade-in print:bg-white print:p-0 print:block">
            <div className="bg-white w-full max-w-2xl shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col print:shadow-none print:rounded-none print:w-full">
               <div className="p-6 border-b flex justify-between items-center bg-slate-50 print:hidden">
                  <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><FileText size={16}/> Vista Previa de Remito</h3>
-                 <button onClick={() => setShowPrintModal(null)}><X size={24}/></button>
+                 <button onClick={() => setShowPrintModal(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors"><X size={24}/></button>
               </div>
               <div className="flex-1 overflow-y-auto p-12 bg-white print:p-0">
                  <div className="border border-slate-100 p-10 rounded-[2.5rem] shadow-sm print:border-none print:shadow-none print:p-0">
@@ -310,8 +343,8 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
               </div>
               <div className="p-8 bg-slate-50 border-t flex gap-3 print:hidden">
                  <button onClick={() => setShowPrintModal(null)} className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Cerrar</button>
-                 <button onClick={handlePrint} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Printer size={18}/> Imprimir Comprobante</button>
-                 <button onClick={() => convertRemitoToSale(showPrintModal)} className="flex-1 py-4 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3"><Receipt size={18}/> Facturar Ahora</button>
+                 <button onClick={handlePrint} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95"><Printer size={18}/> Imprimir Comprobante</button>
+                 <button onClick={() => convertRemitoToSale(showPrintModal)} className="flex-1 py-4 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95"><Receipt size={18}/> Facturar Ahora</button>
               </div>
            </div>
         </div>
