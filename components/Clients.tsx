@@ -82,13 +82,19 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
     const reader = new FileReader();
     reader.onload = (event) => {
         const content = event.target?.result as string;
-        const rows = content.split(/\r?\n/)
-            .filter(l => l.trim().length > 0)
-            .map(line => line.split(',').map(cell => cell.trim()));
+        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
         
-        if (rows.length > 0) {
+        if (lines.length > 0) {
+            // Detección inteligente de separador (coma o punto y coma)
+            const firstLine = lines[0];
+            const commas = (firstLine.match(/,/g) || []).length;
+            const semicolons = (firstLine.match(/;/g) || []).length;
+            const separator = semicolons > commas ? ';' : ',';
+
+            const rows = lines.map(line => line.split(separator).map(cell => cell.trim()));
+            
             setImportRows(rows);
-            // Inicializar mapeo sugerido (si las columnas tienen nombres parecidos)
+            setImportMapping({}); // Limpiar mapeo anterior
             setIsImportMappingOpen(true);
         }
     };
@@ -105,10 +111,14 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       const currentCuits = new Set(clients.map(c => c.cuit.replace(/[^0-9]/g, '')));
       const newClients: Client[] = [];
 
-      importRows.forEach(row => {
+      // Empezamos desde la fila 0 (asumiendo que si hay cabecera el usuario la ignorará visualmente o la procesará)
+      // Idealmente, si la primera fila es cabecera, podríamos saltarla, pero el usuario decide el mapeo.
+      importRows.forEach((row, index) => {
           const name = row[importMapping.name];
           const cuit = row[importMapping.cuit];
-          if (!name || !cuit) return;
+          
+          // Saltar filas vacías o que no tengan los datos mínimos requeridos en las columnas mapeadas
+          if (!name || !cuit || name.toLowerCase() === 'nombre' || name.toLowerCase() === 'razon social') return;
 
           const cleanCuit = cuit.replace(/[^0-9]/g, '');
           if (!currentCuits.has(cleanCuit)) {
@@ -119,7 +129,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                   phone: importMapping.phone !== undefined ? row[importMapping.phone] : '',
                   address: importMapping.address !== undefined ? row[importMapping.address] : '',
                   email: importMapping.email !== undefined ? row[importMapping.email] : '',
-                  limit: importMapping.limit !== undefined ? (parseFloat(row[importMapping.limit]) || 100000) : 100000,
+                  limit: importMapping.limit !== undefined ? (parseFloat(row[importMapping.limit].replace(',', '.')) || 100000) : 100000,
                   balance: 0,
                   points: 0,
                   portalEnabled: true,
@@ -128,6 +138,11 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
               currentCuits.add(cleanCuit);
           }
       });
+
+      if (newClients.length === 0) {
+          alert("No se encontraron clientes nuevos para importar. Verifique si los CUIT ya existen.");
+          return;
+      }
 
       setClients([...newClients, ...clients]);
       setIsImportMappingOpen(false);
@@ -325,6 +340,13 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar bg-slate-50/30">
+                        {importRows[0]?.length === 1 && (
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 text-amber-800">
+                                <AlertTriangle size={20} className="shrink-0" />
+                                <p className="text-xs font-bold">Solo se detectó una columna. Asegúrese de que el archivo CSV esté separado por comas o puntos y comas.</p>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {CLIENT_FIELDS.map(field => (
                                 <div key={field.key} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
@@ -344,7 +366,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                     >
                                         <option value="">-- No importar --</option>
                                         {importRows[0]?.map((col, idx) => (
-                                            <option key={idx} value={idx}>Columna {idx + 1} ({col.slice(0, 15)}...)</option>
+                                            <option key={idx} value={idx}>Columna {idx + 1} ({col.slice(0, 20)}...)</option>
                                         ))}
                                     </select>
                                 </div>
@@ -393,7 +415,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
         )}
 
-        {/* OTROS MODALES (HISTORIAL, RECIBO, FICHA) - SE MANTIENEN IGUAL PERO CON MEJORAS DE UX */}
+        {/* ... (rest of the modals like history, receipts, etc stay the same) */}
         {isHistoryOpen && selectedClient && (
             <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                 <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col h-[90vh]">
@@ -456,7 +478,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
         )}
 
-        {/* MODAL: REGISTRAR RECIBO (PAGO) */}
         {isReceiptModalOpen && selectedClient && (
             <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
                 <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
@@ -523,7 +544,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
         )}
 
-        {/* MODAL: EDITAR / ALTA FICHA */}
         {isNewClientModalOpen && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                 <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
