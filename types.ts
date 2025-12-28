@@ -43,16 +43,16 @@ export enum ViewState {
 export interface CreditInstallment {
   id: string;
   installments: number;
-  surcharge: number; // Porcentaje de recargo
+  surcharge: number; 
   label: string;
 }
 
 export interface PaymentSystem {
   id: string;
-  name: string; // Ej: Mercado Pago, Galicia Nave, Fiserv
+  name: string; 
   debitSurcharge: number;
   creditInstallments: CreditInstallment[];
-  ratesUrl?: string; // URL opcional para que la IA lea las tasas
+  ratesUrl?: string; 
 }
 
 export interface CompanyConfig {
@@ -76,10 +76,10 @@ export interface CompanyConfig {
   paymentMethods?: string[]; 
   currencies?: CurrencyQuote[];
   loyalty?: LoyaltyConfig;
-  paymentSystems?: PaymentSystem[]; // Lista de sistemas con sus cuotas
+  paymentSystems?: PaymentSystem[]; 
 }
 
-export type TaxCondition = 'Responsable Inscripto' | 'Monotributo' | 'Exento';
+export type TaxCondition = 'Responsable Inscripto' | 'Monotributo' | 'Consumidor Final' | 'Exento';
 
 export interface User {
   id: string;
@@ -153,7 +153,6 @@ export interface ProductProviderHistory {
   price: number;
 }
 
-// Fixed Product interface adding missing members used in Inventory.tsx and Purchases.tsx
 export interface Product {
   id: string;
   internalCodes: string[];
@@ -193,10 +192,56 @@ export interface Product {
 }
 
 export interface ProductStock { branchId: string; branchName: string; quantity: number; }
-export interface Provider { id: string; name: string; cuit: string; contact: string; balance: number; defaultDiscounts: [number, number, number]; orderPhone?: string; orderEmail?: string; address?: string; currencyQuoteId?: string; }
+
+export interface Provider { 
+  id: string; 
+  number?: string;
+  name: string; 
+  razonSocial?: string;
+  fantasyName?: string;
+  cuit: string; 
+  taxCondition?: TaxCondition;
+  locality?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  description?: string;
+  contact: string; 
+  balance: number; 
+  defaultDiscounts: [number, number, number]; 
+  orderPhone?: string; 
+  orderEmail?: string; 
+  currencyQuoteId?: string; 
+}
+
 export interface Branch { id: string; code: string; name: string; address: string; phone: string; manager: string; type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL'; active: boolean; }
 export interface InvoiceItem { product: Product; quantity: number; appliedPrice: number; subtotal: number; priceListId?: string; }
-export interface Client { id: string; name: string; cuit: string; phone: string; address: string; balance: number; limit: number; points: number; email?: string; portalHash?: string; portalEnabled?: boolean; nickname?: string; dni?: string; }
+
+export interface Client { 
+  id: string; 
+  number?: string;
+  name: string; 
+  razonSocial?: string;
+  fantasyName?: string;
+  cuit: string; 
+  taxCondition?: TaxCondition;
+  locality?: string;
+  address: string; 
+  phone: string; 
+  email?: string; 
+  description?: string;
+  balance: number; 
+  limit: number; 
+  points: number; 
+  specialDiscount?: number;
+  currency?: string;
+  contactName?: string;
+  portalHash?: string; 
+  portalEnabled?: boolean; 
+  nickname?: string; 
+  dni?: string; 
+}
+
 export interface PriceList { id: string; name: string; type: 'BASE' | 'CUSTOM'; fixedMargin?: number; active: boolean; }
 export interface Budget { id: string; clientName: string; date: string; validUntil: string; items: InvoiceItem[]; total: number; status: 'OPEN' | 'CLOSED' | 'EXPIRED'; }
 export interface Remito { id: string; clientId: string; clientName: string; items: RemitoItem[]; date: string; status: 'PENDING' | 'BILLED'; }
