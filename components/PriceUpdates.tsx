@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     FileSpreadsheet, ArrowRight, CheckCircle, 
@@ -5,7 +6,7 @@ import {
     X, List, BookmarkPlus, 
     RefreshCw, Layers, TrendingUp, TrendingDown, PackagePlus, 
     PackageMinus, Calculator, Tag, Percent,
-    Truck, FileText, AlertOctagon, Building2
+    Truck, FileText, AlertOctagon, Building2, Edit2, Plus, Trash2, Save
 } from 'lucide-react';
 import { Provider, PriceList, Product } from '../types';
 
@@ -62,11 +63,23 @@ const PriceUpdates: React.FC = () => {
         return saved ? JSON.parse(saved) : [];
     });
 
-    const [priceLists] = useState<PriceList[]>([
-        { id: '1', name: 'Lista Base (Público)', type: 'BASE', active: true },
-        { id: '2', name: 'Gremio / Instalador', type: 'CUSTOM', fixedMargin: 25, active: true },
-        { id: '3', name: 'Mayorista', type: 'CUSTOM', fixedMargin: 15, active: true },
-    ]);
+    // --- ESTADO DE LISTAS DE PRECIOS ---
+    const [priceLists, setPriceLists] = useState<PriceList[]>(() => {
+        const saved = localStorage.getItem('ferrecloud_price_lists');
+        return saved ? JSON.parse(saved) : [
+            { id: '1', name: 'Lista Base (Público)', type: 'BASE', active: true },
+            { id: '2', name: 'Gremio / Instalador', type: 'CUSTOM', fixedMargin: 25, active: true },
+            { id: '3', name: 'Mayorista', type: 'CUSTOM', fixedMargin: 15, active: true },
+        ];
+    });
+
+    const [isListModalOpen, setIsListModalOpen] = useState(false);
+    const [editingList, setEditingList] = useState<PriceList | null>(null);
+    const [listForm, setListForm] = useState<Partial<PriceList>>({ name: '', type: 'CUSTOM', fixedMargin: 0, active: true });
+
+    useEffect(() => {
+        localStorage.setItem('ferrecloud_price_lists', JSON.stringify(priceLists));
+    }, [priceLists]);
 
     // --- MASS UPDATE WIZARD STATE ---
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -221,7 +234,6 @@ const PriceUpdates: React.FC = () => {
             let finalProductList: Product[] = [...updatedProducts];
 
             if (importMode === 'INITIAL') {
-                // Fix: Removed incorrect 'as any' and explicitly typed the mapped result to ensure Product[] type safety
                 const newProductsToAdd: Product[] = analysis.impactDetails.filter(i => i.status === 'NEW').map(item => {
                     insertCount++;
                     const profitMargin = 30; 
@@ -244,7 +256,6 @@ const PriceUpdates: React.FC = () => {
                         conversionFactor: 1,
                         purchaseCurrency: 'ARS',
                         saleCurrency: 'ARS',
-                        // Fix: Removed problematic 'as any' cast that was causing name 'as' errors
                         vatRate: 21.0,
                         listCost: item.newCost,
                         discounts: [0, 0, 0, 0],
@@ -279,6 +290,40 @@ const PriceUpdates: React.FC = () => {
         }, 2000);
     };
 
+    // --- MANEJO DE LISTAS DE PRECIOS ---
+    const handleOpenListModal = (list?: PriceList) => {
+        if (list) {
+            setEditingList(list);
+            setListForm(list);
+        } else {
+            setEditingList(null);
+            setListForm({ name: '', type: 'CUSTOM', fixedMargin: 30, active: true });
+        }
+        setIsListModalOpen(true);
+    };
+
+    const handleSaveList = () => {
+        if (!listForm.name) return;
+        setPriceLists(prev => {
+            if (editingList) {
+                return prev.map(l => l.id === editingList.id ? { ...l, ...listForm } as PriceList : l);
+            } else {
+                return [...prev, { ...listForm, id: Date.now().toString() } as PriceList];
+            }
+        });
+        setIsListModalOpen(false);
+    };
+
+    const handleDeleteList = (id: string) => {
+        if (id === '1') {
+            alert("No se puede eliminar la lista base.");
+            return;
+        }
+        if (confirm("¿Está seguro que desea eliminar esta lista de precios?")) {
+            setPriceLists(prev => prev.filter(l => l.id !== id));
+        }
+    };
+
     const MAP_FIELDS = [
         { key: 'code', label: 'Cód. Interno (SKU)', icon: Tag, color: 'bg-blue-600' },
         { key: 'providerCode', label: 'Cód. Proveedor', icon: Truck, color: 'bg-slate-600' },
@@ -303,23 +348,47 @@ const PriceUpdates: React.FC = () => {
             </div>
 
             {activeTab === 'LISTS' && (
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in overflow-y-auto">
-                    {priceLists.map(list => (
-                        <div key={list.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group h-fit">
-                            <div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className="font-black text-slate-800 uppercase tracking-tight">{list.name}</h3>
-                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${list.type === 'BASE' ? 'bg-indigo-100 text-indigo-700' : 'bg-green-100 text-green-700'}`}>
-                                        {list.type === 'BASE' ? 'Automática' : 'Custom'}
-                                    </span>
+                <div className="flex-1 flex flex-col gap-4 animate-fade-in overflow-hidden">
+                    <div className="flex justify-end pr-2">
+                        <button 
+                            onClick={() => handleOpenListModal()}
+                            className="bg-indigo-600 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all active:scale-95"
+                        >
+                            <Plus size={16}/> Nueva Lista
+                        </button>
+                    </div>
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pb-10">
+                        {priceLists.map(list => (
+                            <div key={list.id} className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between group h-fit relative overflow-hidden">
+                                <div className={`absolute top-0 left-0 w-1.5 h-full ${list.type === 'BASE' ? 'bg-indigo-600' : 'bg-green-500'}`}></div>
+                                <div>
+                                    <div className="flex justify-between items-start mb-4 pl-2">
+                                        <div className="max-w-[70%]">
+                                            <h3 className="font-black text-slate-800 uppercase tracking-tight truncate">{list.name}</h3>
+                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${list.type === 'BASE' ? 'bg-indigo-100 text-indigo-700' : 'bg-green-100 text-green-700'}`}>
+                                                {list.type === 'BASE' ? 'Automática' : 'Custom'}
+                                            </span>
+                                        </div>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleOpenListModal(list)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"><Edit2 size={14}/></button>
+                                            {list.id !== '1' && (
+                                                <button onClick={() => handleDeleteList(list.id)} className="p-2 text-red-500 bg-red-50 rounded-lg hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14}/></button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="pl-2">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Margen Aplicado</p>
+                                        <div className="text-4xl font-black text-slate-900 tracking-tighter">
+                                            {list.type === 'BASE' ? 'S/ ARTÍCULO' : `+${list.fixedMargin}%`}
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Margen Aplicado</p>
-                                <div className="text-3xl font-black text-slate-900 tracking-tighter">
-                                    {list.type === 'BASE' ? 'S/ ARTÍCULO' : `+${list.fixedMargin}%`}
+                                <div className="mt-8 pt-4 border-t border-gray-50 flex justify-end pl-2">
+                                     <button className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors flex items-center gap-2">Ver Artículos <ChevronRight size={12}/></button>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
 
@@ -543,6 +612,67 @@ const PriceUpdates: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: EDITAR / CREAR LISTA DE PRECIOS */}
+            {isListModalOpen && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><List size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{editingList ? 'Editar Lista' : 'Nueva Lista de Venta'}</h3>
+                                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Configuración de Rentabilidad</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsListModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                        </div>
+                        <div className="p-10 space-y-8 bg-slate-50/50">
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Nombre de la Lista</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase shadow-sm" 
+                                        placeholder="Ej: LISTA GREMIO, MAYORISTA..."
+                                        value={listForm.name}
+                                        onChange={e => setListForm({...listForm, name: e.target.value.toUpperCase()})}
+                                        autoFocus
+                                    />
+                                </div>
+                                {listForm.type === 'CUSTOM' && (
+                                    <div className="animate-fade-in">
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Margen de Ganancia General (%)</label>
+                                        <div className="relative group">
+                                            <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={24}/>
+                                            <input 
+                                                type="number" 
+                                                className="w-full pl-12 p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-indigo-600 outline-none font-black text-5xl text-indigo-700 shadow-sm" 
+                                                placeholder="0.00"
+                                                value={listForm.fixedMargin}
+                                                onChange={e => setListForm({...listForm, fixedMargin: parseFloat(e.target.value) || 0})}
+                                            />
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 mt-3 font-medium leading-relaxed italic px-2">Este porcentaje se aplicará automáticamente sobre el costo neto de todos los artículos para esta lista.</p>
+                                    </div>
+                                )}
+                                {listForm.type === 'BASE' && (
+                                    <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-[2rem] flex items-start gap-4">
+                                        <Info className="text-indigo-600 shrink-0" size={24}/>
+                                        <p className="text-[10px] text-indigo-900 font-bold uppercase leading-relaxed">La Lista Base utiliza el margen individual configurado en la ficha de cada producto.</p>
+                                    </div>
+                                )}
+                            </div>
+                            <button 
+                                onClick={handleSaveList}
+                                className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                            >
+                                <Save size={24}/> {editingList ? 'Guardar Cambios' : 'Crear Lista de Precios'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
