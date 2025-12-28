@@ -188,7 +188,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
         if (isEditingProvider && providerForm.id) {
             return prev.map(p => p.id === providerForm.id ? { ...p, ...providerForm } as Provider : p);
         } else {
-            return [{...providerForm as Provider, id: Date.now().toString(), balance: 0}, ...prev];
+            return [{...providerForm as Provider, id: Date.now().toString()}, ...prev];
         }
     });
     setIsProviderModalOpen(false);
@@ -232,7 +232,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                             className="bg-indigo-50 text-indigo-600 px-6 py-3 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-[10px] tracking-widest active:scale-95">
                             <FileUp size={18} /> Importación Inteligente
                         </button>
-                        <button onClick={() => { setIsEditingProvider(false); setModalTab('GENERAL'); setProviderForm({name: '', cuit: '', contact: '', taxCondition: 'Responsable Inscripto', defaultDiscounts: [0,0,0]}); setIsProviderModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">
+                        <button onClick={() => { setIsEditingProvider(false); setModalTab('GENERAL'); setProviderForm({name: '', cuit: '', contact: '', balance: 0, taxCondition: 'Responsable Inscripto', defaultDiscounts: [0,0,0]}); setIsProviderModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-indigo-700 transition-all">
                             <Plus size={16} /> Nuevo Proveedor
                         </button>
                     </div>
@@ -469,12 +469,23 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1 text-red-500">Saldo Inicial / Deuda Pendiente ($)</label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                                        <input type="number" className="w-full pl-11 p-4 bg-red-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-xl text-red-700" value={providerForm.balance} onChange={e => setProviderForm({...providerForm, balance: parseFloat(e.target.value) || 0})} />
+                                    </div>
+                                    <p className="text-[8px] text-gray-400 italic px-2 uppercase">Deuda cargada al momento de iniciar el sistema.</p>
+                                </div>
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cotización Predeterminada</label>
                                     <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold text-slate-700" value={providerForm.currencyQuoteId} onChange={e => setProviderForm({...providerForm, currencyQuoteId: e.target.value})}>
                                         <option value="">ARS - Pesos Argentinos</option>
                                         {currencies.map(c => <option key={c.id} value={c.id}>{c.name} (${c.value})</option>)}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Persona de Contacto</label>
                                     <div className="relative">
@@ -482,16 +493,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                         <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.contact} onChange={e => setProviderForm({...providerForm, contact: e.target.value})} placeholder="Ej: Vendedor Asignado..." />
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Pedidos</label>
                                     <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={providerForm.orderPhone} onChange={e => setProviderForm({...providerForm, orderPhone: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Email Pedidos</label>
-                                    <input type="email" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={providerForm.orderEmail} onChange={e => setProviderForm({...providerForm, orderEmail: e.target.value})} />
                                 </div>
                             </div>
                         </div>
