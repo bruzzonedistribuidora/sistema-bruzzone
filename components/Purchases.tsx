@@ -103,12 +103,19 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     const reader = new FileReader();
     reader.onload = (event) => {
         const content = event.target?.result as string;
-        const rows = content.split(/\r?\n/)
-            .filter(l => l.trim().length > 0)
-            .map(line => line.split(',').map(cell => cell.trim()));
+        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
         
-        if (rows.length > 0) {
+        if (lines.length > 0) {
+            // Detección inteligente de separador
+            const firstLine = lines[0];
+            const commas = (firstLine.match(/,/g) || []).length;
+            const semicolons = (firstLine.match(/;/g) || []).length;
+            const separator = semicolons > commas ? ';' : ',';
+
+            const rows = lines.map(line => line.split(separator).map(cell => cell.trim()));
+            
             setProvImportRows(rows);
+            setProvImportMapping({}); // Limpiar mapeo
             setIsProviderImportMappingOpen(true);
         }
     };
@@ -125,10 +132,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     const currentCuits = new Set(providers.map(p => p.cuit.replace(/[^0-9]/g, '')));
     const newProviders: Provider[] = [];
 
-    provImportRows.forEach(row => {
+    provImportRows.forEach((row, index) => {
         const name = row[provImportMapping.name];
         const cuit = row[provImportMapping.cuit];
-        if (!name || !cuit) return;
+        
+        if (!name || !cuit || name.toLowerCase() === 'razon social' || name.toLowerCase() === 'nombre') return;
 
         const cleanCuit = cuit.replace(/[^0-9]/g, '');
         if (!currentCuits.has(cleanCuit)) {
@@ -148,6 +156,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
         }
     });
 
+    if (newProviders.length === 0) {
+      alert("No se encontraron proveedores nuevos.");
+      return;
+    }
+
     setProviders([...newProviders, ...providers]);
     setIsProviderImportMappingOpen(false);
     setProvImportRows([]);
@@ -164,7 +177,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       { key: 'orderEmail', label: 'Email Pedidos', required: false }
   ];
 
-  // ... (se mantienen los demás handlers como handleSearchCuit, handleSaveProvider, etc.)
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
   const [isEditingProvider, setIsEditingProvider] = useState(false);
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
@@ -198,32 +210,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     if (confirm('¿Desea eliminar este proveedor?')) setProviders(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleOpenPaymentOrder = (providerId?: string) => { /* logic */ };
-
-  const handleScanClick = () => { setLoadMode('IA'); fileInputRef.current?.click(); }
-  const handleInvoiceFile = async (e: React.ChangeEvent<HTMLInputElement>) => { /* logic */ };
-  const handleAddManualItem = (p: Product) => { /* logic */ };
-  const updateManualItem = (idx: number, updates: any) => { /* logic */ };
-  
-  const totalCalculadoFinal = useMemo(() => {
-    const sub = scannedItems.reduce((acc, i) => acc + i.subtotal, 0);
-    return sub * (1 - (invoiceMetadata.descuentoGlobal || 0) / 100);
-  }, [scannedItems, invoiceMetadata.descuentoGlobal]);
-
-  const handleSavePurchase = () => { /* logic */ };
-  const resetCarga = () => {
-    setLoadMode('SELECT');
-    setInvoiceMetadata({ providerId: '', providerName: '', numeroFactura: '', fecha: new Date().toISOString().split('T')[0], totalFactura: 0, cuitProveedor: '', descuentoGlobal: 0 });
-    setScannedItems([]);
-    setIsAiScanning(false);
-    setIsNewPurchaseModalOpen(false);
-  }
-
   const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.cuit.includes(searchTerm));
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden">
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={handleInvoiceFile} />
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" />
       <input type="file" ref={providerImportRef} className="hidden" accept=".csv,.txt" onChange={handleStartImportProviders} />
 
       <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
@@ -359,7 +350,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className="flex justify-center gap-2">
-                                                <button onClick={() => { setSelectedProviderForHistory(prov); /* open history */ }} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 shadow-sm transition-all"><History size={18}/></button>
+                                                <button onClick={() => { setSelectedProviderForHistory(prov); }} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 shadow-sm transition-all"><History size={18}/></button>
                                                 <button onClick={() => { setIsEditingProvider(true); setProviderForm(prov); setIsProviderModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 border border-indigo-100 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all"><Pencil size={18}/></button>
                                                 <button onClick={() => deleteProvider(prov.id)} className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
                                             </div>
@@ -390,6 +381,13 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar bg-slate-50/30">
+                      {provImportRows[0]?.length === 1 && (
+                          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 text-amber-800">
+                              <AlertTriangle size={20} className="shrink-0" />
+                              <p className="text-xs font-bold">Solo se detectó una columna. Asegúrese de que el archivo CSV esté separado por comas o puntos y comas.</p>
+                          </div>
+                      )}
+
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {PROVIDER_FIELDS.map(field => (
                               <div key={field.key} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
@@ -409,7 +407,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                   >
                                       <option value="">-- No importar --</option>
                                       {provImportRows[0]?.map((col, idx) => (
-                                          <option key={idx} value={idx}>Columna {idx + 1} ({col.slice(0, 15)}...)</option>
+                                          <option key={idx} value={idx}>Columna {idx + 1} ({col.slice(0, 20)}...)</option>
                                       ))}
                                   </select>
                               </div>
