@@ -1,9 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
+// Declaración global para que TypeScript reconozca las variables de entorno de la plataforma
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+    // Inicialización dentro de la función para asegurar que la API_KEY esté disponible
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-flash-preview';
     let prompt = `Busca las tasas de interés, recargos o coeficientes de financiación vigentes hoy para cobros con tarjeta de crédito en la plataforma "${platformName}" en Argentina. 
     Necesito que extraigas los recargos para los planes de 1, 3, 6, 9 y 12 cuotas (si existen). `;
@@ -38,6 +46,7 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
 
     const installments = JSON.parse(response.text || "[]");
     
+    // Extracción segura de fuentes de búsqueda web
     const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
       ?.filter(chunk => chunk.web)
       ?.map(chunk => ({ 
@@ -57,7 +66,7 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
 
 export const searchVirtualInventory = async (query: string): Promise<Product[]> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-flash-preview';
     const prompt = `Act as a database search engine for a massive hardware store (Ferretería).
     The user is searching for: "${query}".
@@ -116,7 +125,7 @@ export const searchVirtualInventory = async (query: string): Promise<Product[]> 
 
 export const askAssistant = async (history: string[], question: string): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const chat = ai.chats.create({
             model: 'gemini-3-flash-preview',
             config: {
@@ -133,7 +142,7 @@ export const askAssistant = async (history: string[], question: string): Promise
 
 export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -152,7 +161,7 @@ export const analyzeInvoice = async (base64Data: string, mimeType: string): Prom
 
 export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: (process as any).env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Simula datos AFIP para CUIT: "${cuit}".`,
