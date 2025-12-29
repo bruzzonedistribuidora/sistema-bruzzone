@@ -1,12 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
+// Fix: Added missing Link and Instagram icons to the imports
 import { 
     Tag, Star, Send, Users, Sparkles, Plus, X, Save, 
     Gift, Calendar, Ticket, Megaphone, CheckCircle, 
     Smartphone, Mail, MessageCircle, TrendingUp, Info,
     Percent, DollarSign, ArrowRight, ShieldCheck, Clock,
     Trash2, Edit, MousePointer2, Zap, LayoutGrid, RefreshCw, QrCode, Printer,
-    Copy, ExternalLink, Globe, Smartphone as MobileIcon, ListOrdered, Share2, Eye
+    Copy, ExternalLink, Globe, Smartphone as MobileIcon, ListOrdered, Share2, Eye,
+    ShoppingBag, Link, Instagram
 } from 'lucide-react';
 import { Coupon, LoyaltyConfig, MarketingCampaign, Client, CompanyConfig } from '../types';
 
@@ -83,8 +85,8 @@ const Marketing: React.FC = () => {
         alert(`Campaña "${campaignForm.name}" enviada exitosamente.`);
     };
 
-    // El enlace debe contener el parámetro ?view=fidelidad para que App.tsx lo reconozca
     const portalLink = `${window.location.origin}/?view=fidelidad`;
+    const shopLink = `${window.location.origin}/?view=tienda`;
 
     return (
         <div className="p-6 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in">
@@ -97,7 +99,7 @@ const Marketing: React.FC = () => {
                     <button onClick={() => setActiveTab('LOYALTY')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'LOYALTY' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Puntos</button>
                     <button onClick={() => setActiveTab('COUPONS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'COUPONS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Cupones</button>
                     <button onClick={() => setActiveTab('CAMPAIGNS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'CAMPAIGNS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Difusión</button>
-                    <button onClick={() => setActiveTab('PUBLIC_PORTAL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'PUBLIC_PORTAL' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400'}`}>Portal QR</button>
+                    <button onClick={() => setActiveTab('PUBLIC_PORTAL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'PUBLIC_PORTAL' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400'}`}>Canales Web</button>
                 </div>
             </div>
 
@@ -181,77 +183,70 @@ const Marketing: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            {campaigns.length === 0 && (
-                                <div className="py-20 text-center text-slate-300 flex flex-col items-center">
-                                    <Megaphone size={64} strokeWidth={1} className="mb-4 opacity-20"/>
-                                    <p className="font-black uppercase tracking-widest text-sm">No hay campañas registradas</p>
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}
 
                 {activeTab === 'PUBLIC_PORTAL' && (
-                    <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm animate-fade-in space-y-10">
-                        <div className="flex flex-col md:flex-row gap-10 items-center">
-                            <div className="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed border-slate-200 flex flex-col items-center text-center space-y-4">
-                                <div className="w-48 h-48 bg-white rounded-3xl shadow-xl flex items-center justify-center p-2 relative overflow-hidden">
-                                    <QrCode size={160} className="text-slate-900"/>
-                                    <div className="absolute inset-0 bg-indigo-600/5 flex items-center justify-center">
-                                        <Sparkles className="text-indigo-600 opacity-20" size={80}/>
-                                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in pb-20">
+                        {/* PORTAL FIDELIDAD */}
+                        <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-8 flex flex-col">
+                            <div className="flex items-center gap-4">
+                                <div className="p-4 bg-indigo-50 text-indigo-600 rounded-3xl"><Smartphone size={28}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Portal Fidelidad</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Consulta de puntos por DNI</p>
                                 </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Código QR del Portal</p>
-                                    <p className="text-[8px] text-slate-300 font-bold uppercase">Imprime este código para el mostrador</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-3xl space-y-4">
+                                <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block">Enlace Público</label>
+                                <div className="bg-white p-3 rounded-xl border flex items-center gap-3">
+                                    <Globe size={14} className="text-slate-300"/>
+                                    <span className="text-[10px] font-mono truncate flex-1">{portalLink}</span>
+                                    <button onClick={() => { navigator.clipboard.writeText(portalLink); alert('Copiado'); }} className="p-2 bg-slate-900 text-white rounded-lg"><Copy size={14}/></button>
                                 </div>
-                                <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg">
-                                    <Printer size={14}/> Imprimir Cartel
+                            </div>
+                            <div className="mt-auto pt-6 border-t border-slate-50">
+                                <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3">
+                                    <QrCode size={18}/> Descargar QR Mostrador
                                 </button>
                             </div>
-                            
-                            <div className="flex-1 space-y-6">
-                                <div className="space-y-2">
-                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Portal Público de Clientes</h3>
-                                    <p className="text-slate-500 text-sm font-medium leading-relaxed">Permite que tus clientes consulten sus puntos con su DNI, vean ofertas exclusivas y te envíen pedidos por WhatsApp.</p>
-                                </div>
-                                
-                                <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 space-y-4">
-                                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block">Enlace de Acceso Directo</label>
-                                    <div className="flex items-center gap-2 bg-white p-4 rounded-2xl border border-indigo-100">
-                                        <Globe size={18} className="text-indigo-500 shrink-0"/>
-                                        <p className="text-xs font-mono font-bold text-slate-600 truncate flex-1">{portalLink}</p>
-                                        <button 
-                                            onClick={() => { navigator.clipboard.writeText(portalLink); alert('Copiado'); }}
-                                            className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all">
-                                            <Copy size={16}/>
-                                        </button>
-                                    </div>
-                                </div>
+                        </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600"><Smartphone size={18}/></div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-800 uppercase leading-none mb-1">Optimizado</p>
-                                            <p className="text-[8px] text-slate-400 font-bold uppercase">Mobile-First</p>
-                                        </div>
-                                    </div>
-                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-lg shadow-sm text-green-600"><ShieldCheck size={18}/></div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-800 uppercase leading-none mb-1">Protegido</p>
-                                            <p className="text-[8px] text-slate-400 font-bold uppercase">Acceso vía DNI</p>
-                                        </div>
-                                    </div>
+                        {/* E-COMMERCE SHOP */}
+                        <div className="bg-slate-900 p-10 rounded-[3rem] text-white space-y-8 flex flex-col relative overflow-hidden shadow-2xl">
+                            <div className="absolute top-0 right-0 p-8 opacity-5"><ShoppingBag size={180}/></div>
+                            <div className="relative z-10 flex items-center gap-4">
+                                <div className="p-4 bg-indigo-600 text-white rounded-3xl shadow-xl shadow-indigo-900/50"><Globe size={28}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter">Tienda Online Cloud</h3>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase">Catálogo con Venta Directa</p>
                                 </div>
+                            </div>
+                            <div className="relative z-10 bg-white/5 p-6 rounded-3xl border border-white/10 space-y-4">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">URL para Redes Sociales</label>
+                                <div className="bg-slate-950 p-3 rounded-xl border border-white/5 flex items-center gap-3">
+                                    <Link size={14} className="text-slate-600"/>
+                                    <span className="text-[10px] font-mono truncate flex-1 text-indigo-300">{shopLink}</span>
+                                    <button onClick={() => { navigator.clipboard.writeText(shopLink); alert('Link Tienda Copiado'); }} className="p-2 bg-white text-slate-900 rounded-lg hover:bg-indigo-400 transition-all"><Copy size={14}/></button>
+                                </div>
+                            </div>
+                            <div className="mt-auto pt-6 border-t border-white/5 flex gap-4">
+                                <button 
+                                    onClick={() => window.open(shopLink, '_blank')}
+                                    className="flex-1 bg-white text-slate-900 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                                    <ExternalLink size={16}/> Abrir Tienda
+                                </button>
+                                <button className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                                    <Instagram size={16}/> Vincular IG
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* MODALES REUTILIZADOS Y COMPLETADOS */}
+            {/* MODALES REUTILIZADOS */}
             {isCouponModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
@@ -283,47 +278,6 @@ const Marketing: React.FC = () => {
                             </div>
                             <button onClick={handleSaveCoupon} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
                                 <Save size={18}/> Guardar Cupón
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {isCampaignModalOpen && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
-                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-                            <h3 className="text-xl font-black uppercase tracking-tighter">Nueva Difusión</h3>
-                            <button onClick={() => setIsCampaignModalOpen(false)}><X size={28}/></button>
-                        </div>
-                        <div className="p-10 space-y-6 bg-slate-50/50">
-                            <div>
-                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Nombre de la Campaña</label>
-                                <input type="text" className="w-full p-3 bg-white border border-gray-200 rounded-xl font-bold outline-none uppercase" value={campaignForm.name} onChange={e => setCampaignForm({...campaignForm, name: e.target.value.toUpperCase()})} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Canal</label>
-                                    <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs uppercase outline-none" value={campaignForm.channel} onChange={e => setCampaignForm({...campaignForm, channel: e.target.value as any})}>
-                                        <option value="WHATSAPP">WhatsApp</option>
-                                        <option value="EMAIL">Email</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Segmento Objetivo</label>
-                                    <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs uppercase outline-none" value={campaignForm.targetSegment} onChange={e => setCampaignForm({...campaignForm, targetSegment: e.target.value as any})}>
-                                        <option value="ALL">Todos los Clientes</option>
-                                        <option value="VIP">Clientes VIP</option>
-                                        <option value="INACTIVE">Clientes Inactivos</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Mensaje de la Campaña</label>
-                                <textarea className="w-full p-4 bg-white border border-gray-200 rounded-xl font-medium outline-none h-32 resize-none text-sm" value={campaignForm.message} onChange={e => setCampaignForm({...campaignForm, message: e.target.value})} placeholder="Escribe el mensaje que recibirán tus clientes..."></textarea>
-                            </div>
-                            <button onClick={handleSendCampaign} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3">
-                                <Send size={18}/> Lanzar Campaña
                             </button>
                         </div>
                     </div>
