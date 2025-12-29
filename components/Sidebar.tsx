@@ -127,6 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
                 <DropdownItem view={ViewState.REPORTS} label="Reportes Avanzados" icon={BarChart3} perm="ACCOUNTING_VIEW" />
                 <DropdownItem view={ViewState.PRICE_AUDIT} label="Auditoría de Precios" icon={ShieldAlert} perm="ACCOUNTING_VIEW" />
                 <DropdownItem view={ViewState.MARKETING} label="Marketing & Fidelidad" icon={Sparkles} perm="CLIENTS_VIEW" />
+                <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Gestionar Tienda Web" icon={Globe} perm="CONFIG_ACCESS" />
                 <DropdownItem view={ViewState.AI_ASSISTANT} label="FerreBot IA" icon={Bot} perm="DASHBOARD_VIEW" />
                 <DropdownItem view={ViewState.STATISTICS} label="Estadísticas Rápidas" icon={PieChart} perm="ACCOUNTING_VIEW" />
             </NavDropdown>
