@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Smartphone, ShoppingBag } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
@@ -35,7 +35,6 @@ import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
 import Shop from './components/Shop';
 import EcommerceAdmin from './components/EcommerceAdmin';
-// Added missing import for CompanySettings
 import CompanySettings from './components/CompanySettings';
 import { ViewState, User, Client, InvoiceItem, Provider } from './types';
 
@@ -44,11 +43,6 @@ const App: React.FC = () => {
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
-
-  // Estados persistentes para conversiones entre módulos
-  const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
-  const [itemsToRemito, setItemsToRemito] = useState<InvoiceItem[] | null>(null);
-  const [itemsToBudget, setItemsToBudget] = useState<InvoiceItem[] | null>(null);
 
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
@@ -69,38 +63,21 @@ const App: React.FC = () => {
   };
 
   const renderViewContent = (view: ViewState) => {
-    // --- LÓGICA DE AGRUPACIÓN PARA VENTAS ---
     if ([ViewState.POS, ViewState.SALES_ORDERS, ViewState.CREDIT_NOTES, ViewState.REMITOS, ViewState.PRESUPUESTOS].includes(view)) {
         let tab: any = 'POS';
         if (view === ViewState.SALES_ORDERS) tab = 'ORDERS';
         if (view === ViewState.CREDIT_NOTES) tab = 'CREDIT_NOTES';
         if (view === ViewState.REMITOS) tab = 'REMITOS';
         if (view === ViewState.PRESUPUESTOS) tab = 'BUDGETS';
-
-        return (
-            <SalesManagement 
-                initialTab={tab}
-                itemsToBill={itemsToBill}
-                itemsToRemito={itemsToRemito}
-                itemsToBudget={itemsToBudget}
-                onCartUsed={() => { setItemsToBill(null); setItemsToRemito(null); setItemsToBudget(null); }}
-            />
-        );
+        return <SalesManagement initialTab={tab} onCartUsed={() => {}} />;
     }
 
-    // --- LÓGICA DE AGRUPACIÓN PARA COMPRAS ---
     if ([ViewState.PURCHASES, ViewState.PROVIDERS, ViewState.REPLENISHMENT, ViewState.SHORTAGES].includes(view)) {
         let tab: any = 'PURCHASES';
         if (view === ViewState.PROVIDERS) tab = 'PROVIDERS';
         if (view === ViewState.REPLENISHMENT) tab = 'REPLENISHMENT';
         if (view === ViewState.SHORTAGES) tab = 'SHORTAGES';
-
-        return (
-            <Purchases 
-                defaultTab={tab}
-                onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)}
-            />
-        );
+        return <Purchases defaultTab={tab} onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
     }
 
     switch (view) {
@@ -126,6 +103,8 @@ const App: React.FC = () => {
       case ViewState.MARKETING: return <Marketing />;
       case ViewState.PRICE_AUDIT: return <PriceAudit />;
       case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
+      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      case ViewState.SHOP: return <Shop />;
       case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
       default: return null;
     }
@@ -142,8 +121,19 @@ const App: React.FC = () => {
             {renderViewContent(view)}
           </div>
         ))}
+        {/* BOTONES FLOTANTES DE ACCESO RAPIDO A CANALES PUBLICOS */}
+        <div className="fixed bottom-24 right-6 flex flex-col gap-3 z-[100] print:hidden">
+            <button onClick={() => handleNavigate(ViewState.PUBLIC_PORTAL)} className="w-14 h-14 bg-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all active:scale-95 group">
+                <Smartphone size={24}/>
+                <div className="absolute right-full mr-4 bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase text-slate-800 border shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">Ver Portal Fidelidad</div>
+            </button>
+            <button onClick={() => handleNavigate(ViewState.SHOP)} className="w-14 h-14 bg-slate-900 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all active:scale-95 group">
+                <ShoppingBag size={24}/>
+                <div className="absolute right-full mr-4 bg-white px-4 py-2 rounded-xl text-[10px] font-black uppercase text-slate-800 border shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">Ver Tienda Online</div>
+            </button>
+        </div>
       </main>
-      <footer className="h-14 bg-slate-900 border-t border-slate-800 flex items-center px-4 gap-2 z-50 overflow-x-auto no-scrollbar">
+      <footer className="h-14 bg-slate-900 border-t border-slate-800 flex items-center px-4 gap-2 z-50 overflow-x-auto no-scrollbar print:hidden">
         {openViews.map((view) => (
           <button key={view} onClick={() => setActiveView(view)} className={`flex items-center gap-3 px-4 h-10 rounded-xl transition-all border ${activeView === view ? 'bg-ferre-orange text-white border-orange-400 shadow-lg' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}>
             <span className="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">{view.replace(/_/g, ' ')}</span>
