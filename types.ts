@@ -39,7 +39,8 @@ export enum ViewState {
   PRICE_AUDIT = 'PRICE_AUDIT',
   CREDIT_NOTES = 'CREDIT_NOTES',
   PUBLIC_PORTAL = 'PUBLIC_PORTAL',
-  SHOP = 'SHOP'
+  SHOP = 'SHOP',
+  ECOMMERCE_ADMIN = 'ECOMMERCE_ADMIN'
 }
 
 export interface CreditInstallment {
@@ -189,6 +190,11 @@ export interface Product {
     mercadoLibre?: boolean;
     tiendaNube?: boolean;
     webPropia?: boolean;
+    isPublished?: boolean;
+    shopCategory?: string;
+    isOffer?: boolean;
+    offerPrice?: number;
+    isFeatured?: boolean;
   };
   lastProviders?: ProductProviderHistory[];
   isCombo: boolean;
