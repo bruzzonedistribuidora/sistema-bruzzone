@@ -83,7 +83,8 @@ const Marketing: React.FC = () => {
         alert(`Campaña "${campaignForm.name}" enviada exitosamente.`);
     };
 
-    const portalLink = `${window.location.origin}/portal/publico`;
+    // El enlace debe contener el parámetro ?view=fidelidad para que App.tsx lo reconozca
+    const portalLink = `${window.location.origin}/?view=fidelidad`;
 
     return (
         <div className="p-6 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in">
@@ -100,7 +101,7 @@ const Marketing: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {activeTab === 'LOYALTY' && (
                     <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-8 animate-fade-in">
                         <div className="flex justify-between items-center">
@@ -212,7 +213,7 @@ const Marketing: React.FC = () => {
                             <div className="flex-1 space-y-6">
                                 <div className="space-y-2">
                                     <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Portal Público de Clientes</h3>
-                                    <p className="text-slate-500 text-sm font-medium leading-relaxed">Permite que tus clientes consulten sus puntos, vean ofertas exclusivas y te envíen pedidos por WhatsApp sin necesidad de ser atendidos.</p>
+                                    <p className="text-slate-500 text-sm font-medium leading-relaxed">Permite que tus clientes consulten sus puntos con su DNI, vean ofertas exclusivas y te envíen pedidos por WhatsApp.</p>
                                 </div>
                                 
                                 <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 space-y-4">
