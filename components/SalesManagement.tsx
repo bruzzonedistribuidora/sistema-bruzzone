@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     Receipt, ListOrdered, RotateCcw, ClipboardList, FileSpreadsheet, 
@@ -21,11 +22,13 @@ interface SalesManagementProps {
 const SalesManagement: React.FC<SalesManagementProps> = ({ 
     initialTab = 'POS', 
     itemsToBill, 
-    itemsToRemito, 
-    itemsToBudget,
+    itemsToRemito: externalRemitoItems, 
+    itemsToBudget: externalBudgetItems,
     onCartUsed 
 }) => {
     const [activeTab, setActiveTab] = useState(initialTab);
+    const [internalRemitoItems, setInternalRemitoItems] = useState<InvoiceItem[] | null>(null);
+    const [internalBudgetItems, setInternalBudgetItems] = useState<InvoiceItem[] | null>(null);
 
     useEffect(() => {
         setActiveTab(initialTab);
@@ -38,6 +41,22 @@ const SalesManagement: React.FC<SalesManagementProps> = ({
         { id: 'REMITOS', label: 'Remitos/Cta Cte', icon: ClipboardList },
         { id: 'BUDGETS', label: 'Presupuestos', icon: FileSpreadsheet },
     ];
+
+    const handleTransformToRemito = (items: InvoiceItem[]) => {
+        setInternalRemitoItems(items);
+        setActiveTab('REMITOS');
+    };
+
+    const handleTransformToBudget = (items: InvoiceItem[]) => {
+        setInternalBudgetItems(items);
+        setActiveTab('BUDGETS');
+    };
+
+    const handleItemsConsumed = () => {
+        setInternalRemitoItems(null);
+        setInternalBudgetItems(null);
+        onCartUsed();
+    };
 
     return (
         <div className="flex flex-col h-full bg-slate-50 overflow-hidden">
@@ -68,20 +87,22 @@ const SalesManagement: React.FC<SalesManagementProps> = ({
                         <POS 
                             initialCart={itemsToBill || undefined} 
                             onCartUsed={onCartUsed}
+                            onTransformToRemito={handleTransformToRemito}
+                            onTransformToBudget={handleTransformToBudget}
                         />
                     )}
                     {activeTab === 'ORDERS' && <SalesOrders />}
                     {activeTab === 'CREDIT_NOTES' && <CreditNotes />}
                     {activeTab === 'REMITOS' && (
                         <Remitos 
-                            initialItems={itemsToRemito || undefined}
-                            onItemsConsumed={onCartUsed}
+                            initialItems={internalRemitoItems || externalRemitoItems || undefined}
+                            onItemsConsumed={handleItemsConsumed}
                         />
                     )}
                     {activeTab === 'BUDGETS' && (
                         <Presupuestos 
-                            initialItems={itemsToBudget || undefined}
-                            onItemsConsumed={onCartUsed}
+                            initialItems={internalBudgetItems || externalBudgetItems || undefined}
+                            onItemsConsumed={handleItemsConsumed}
                         />
                     )}
                 </div>
