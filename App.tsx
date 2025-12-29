@@ -40,7 +40,8 @@ import Marketing from './components/Marketing';
 import PriceAudit from './components/PriceAudit';
 import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
-import Shop from './components/Shop';
+// Se agrega la extensión .tsx para resolver el error TS2307 en este entorno específico
+import Shop from './components/Shop.tsx';
 import { ViewState, User, Role, Client, InvoiceItem, Provider } from './types';
 
 const App: React.FC = () => {
