@@ -8,24 +8,21 @@ import {
     Clock, MapPin, CheckCircle, Package, ArrowLeft,
     CreditCard, ExternalLink, Calculator, Trash2
 } from 'lucide-react';
-import { Product, SalesOrder, InvoiceItem, CompanyConfig, Brand, Category } from '../types.ts';
+import { Product, SalesOrder, InvoiceItem, CompanyConfig, Category } from '../types';
+import { searchVirtualInventory } from '../services/geminiService';
 
 const Shop: React.FC = () => {
-    // --- ESTADO TIENDA ---
-    const [view, setView] = useState<'HOME' | 'CATALOG' | 'PRODUCT' | 'CART' | 'CHECKOUT' | 'SUCCESS'>('HOME');
+    const [view, setView] = useState<'HOME' | 'CATALOG' | 'CART' | 'CHECKOUT' | 'SUCCESS'>('HOME');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
-    const [selectedBrand, setSelectedBrand] = useState<string>('TODAS');
     const [cart, setCart] = useState<{product: Product, quantity: number}[]>([]);
     
-    // --- DATOS DEL SISTEMA MAESTRO ---
     const [products, setProducts] = useState<Product[]>(() => 
         JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
     );
     const [categories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
     const [companyConfig] = useState<CompanyConfig>(() => JSON.parse(localStorage.getItem('company_config') || '{}'));
 
-    // Actualizar productos si cambian en el administrador
     useEffect(() => {
         const handleStorage = () => {
             setProducts(JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
@@ -34,8 +31,6 @@ const Shop: React.FC = () => {
         return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
-    // --- LÓGICA DE FILTRADO ---
-    // Solo mostramos lo que está marcado como publicado en el panel admin
     const publishedProducts = useMemo(() => 
         products.filter(p => p.ecommerce?.isPublished),
     [products]);
@@ -51,7 +46,7 @@ const Shop: React.FC = () => {
     const filteredCatalog = useMemo(() => {
         return publishedProducts.filter(p => {
             const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                               p.internalCodes[0].toLowerCase().includes(searchTerm.toLowerCase());
+                               p.internalCodes.some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
             const matchCat = selectedCategory === 'TODOS' || p.category === selectedCategory;
             return matchSearch && matchCat;
         });
@@ -67,7 +62,6 @@ const Shop: React.FC = () => {
         });
     };
 
-    // Fix: Added missing updateCartQty function to handle quantity changes in the cart
     const updateCartQty = (id: string, delta: number) => {
         setCart(prev => prev.map(item => 
             item.product.id === id 
@@ -76,7 +70,6 @@ const Shop: React.FC = () => {
         ));
     };
 
-    // Fix: Added missing removeFromCart function to delete items from the cart
     const removeFromCart = (id: string) => {
         setCart(prev => prev.filter(item => item.product.id !== id));
     };
@@ -118,8 +111,6 @@ const Shop: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
-            
-            {/* NAV BAR */}
             <nav className="fixed top-0 left-0 w-full h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 z-[100] px-6 flex justify-between items-center">
                 <div onClick={() => setView('HOME')} className="flex items-center gap-3 cursor-pointer">
                     <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg">
@@ -147,54 +138,31 @@ const Shop: React.FC = () => {
             <main className="pt-16 min-h-screen">
                 {view === 'HOME' && (
                     <div className="animate-fade-in">
-                        {/* HERO */}
                         <section className="relative h-[70vh] flex flex-col items-center justify-center text-center px-6 overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-b from-indigo-50/50 to-white -z-10"></div>
                             <div className="max-w-4xl space-y-8">
-                                <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Catálogo Online Actualizado</span>
+                                <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Precios Online 24/7</span>
                                 <h2 className="text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-[0.9] uppercase">
-                                    Todo para tu<br/>
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Construcción</span>
+                                    Potencia tu<br/>
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">Proyecto</span>
                                 </h2>
-                                <p className="text-slate-500 text-lg font-medium max-w-xl mx-auto">Explorá más de 140.000 artículos con stock real y precios actualizados al instante.</p>
+                                <p className="text-slate-500 text-lg font-medium max-w-xl mx-auto">Explora nuestro catálogo maestro de ferretería con stock real y ofertas exclusivas.</p>
                                 <button onClick={() => setView('CATALOG')} className="bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all active:scale-95 flex items-center gap-3 mx-auto">
                                     Ver Catálogo Completo <ArrowRight size={20}/>
                                 </button>
                             </div>
                         </section>
 
-                        {/* SECCIÓN OFERTAS */}
                         {offers.length > 0 && (
                             <section className="max-w-7xl mx-auto px-6 py-20 space-y-10">
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Ofertas de la Semana</h3>
-                                        <p className="text-orange-500 font-bold text-[10px] uppercase tracking-widest mt-2">Aprovechá antes que se agoten</p>
-                                    </div>
+                                <div>
+                                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Ofertas Destacadas</h3>
+                                    <p className="text-orange-500 font-bold text-[10px] uppercase tracking-widest mt-2">Ahorrá en cada compra</p>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                                     {offers.slice(0, 4).map(p => (
-                                        <ProductCard key={p.id} product={p} onAdd={addToCart} />
+                                        <ProductCard key={p.id} product={products.find(prod => prod.id === p.id.toString()) || products[0]} onAdd={addToCart} />
                                     ))}
-                                </div>
-                            </section>
-                        )}
-
-                        {/* SECCIÓN DESTACADOS */}
-                        {featuredProducts.length > 0 && (
-                            <section className="bg-slate-900 py-24 text-white">
-                                <div className="max-w-7xl mx-auto px-6 space-y-10">
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <h3 className="text-3xl font-black uppercase tracking-tighter">Productos Destacados</h3>
-                                            <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest mt-2">Lo más buscado en el mostrador</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                                        {featuredProducts.slice(0, 8).map(p => (
-                                            <ProductCard key={p.id} product={p} onAdd={addToCart} dark />
-                                        ))}
-                                    </div>
                                 </div>
                             </section>
                         )}
@@ -222,7 +190,7 @@ const Shop: React.FC = () => {
                                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20}/>
                                 <input 
                                     type="text" 
-                                    placeholder="¿Qué herramienta estás buscando hoy?..." 
+                                    placeholder="¿Qué herramienta buscas hoy?..." 
                                     className="w-full pl-14 pr-6 py-5 bg-white border border-slate-200 rounded-[2rem] font-bold outline-none focus:ring-4 focus:ring-indigo-50 shadow-sm transition-all"
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
@@ -243,24 +211,23 @@ const Shop: React.FC = () => {
                 {view === 'CART' && (
                     <div className="max-w-3xl mx-auto px-6 py-12 animate-fade-in space-y-10">
                         <div className="flex items-center gap-4">
-                            <button onClick={() => setView('CATALOG')} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm"><ArrowLeft size={24}/></button>
-                            <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Tu Carrito<br/><span className="text-indigo-600 text-sm tracking-widest">RESUMEN DE PEDIDO</span></h2>
+                            <button onClick={() => setView('CATALOG')} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 shadow-sm"><ArrowLeft size={24}/></button>
+                            <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Tu Carrito</h2>
                         </div>
 
                         <div className="space-y-4">
                             {cart.length === 0 ? (
-                                <div className="text-center py-24 bg-white rounded-[3rem] border border-slate-100 shadow-inner">
+                                <div className="text-center py-24 bg-white rounded-[3rem] border border-slate-100">
                                     <ShoppingBag size={80} className="mx-auto text-slate-100 mb-6" strokeWidth={1} />
-                                    <p className="text-slate-400 font-black uppercase tracking-widest">El carrito está vacío</p>
-                                    <button onClick={() => setView('CATALOG')} className="mt-6 text-indigo-600 font-black uppercase text-xs hover:underline">Ir al catálogo</button>
+                                    <p className="text-slate-400 font-black uppercase tracking-widest">Carrito vacío</p>
                                 </div>
                             ) : (
                                 <>
                                     {cart.map(item => (
-                                        <div key={item.product.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 flex items-center justify-between shadow-sm group">
+                                        <div key={item.product.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 flex items-center justify-between shadow-sm">
                                             <div className="flex items-center gap-6">
-                                                <div className="p-4 bg-slate-50 rounded-3xl group-hover:bg-indigo-50 transition-colors">
-                                                    <Package size={24} className="text-slate-300 group-hover:text-indigo-400"/>
+                                                <div className="p-4 bg-slate-50 rounded-3xl">
+                                                    <Package size={24} className="text-slate-300"/>
                                                 </div>
                                                 <div>
                                                     <h4 className="font-black text-slate-800 uppercase text-sm leading-tight mb-1">{item.product.name}</h4>
@@ -279,9 +246,8 @@ const Shop: React.FC = () => {
                                             </div>
                                         </div>
                                     ))}
-                                    <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden mt-10">
-                                        <div className="absolute top-0 right-0 p-8 opacity-5"><Zap size={160}/></div>
-                                        <div className="relative z-10 flex justify-between items-baseline border-b border-white/10 pb-8 mb-8">
+                                    <div className="bg-slate-900 rounded-[3.5rem] p-12 text-white shadow-2xl mt-10">
+                                        <div className="flex justify-between items-baseline border-b border-white/10 pb-8 mb-8">
                                             <span className="text-sm font-black uppercase tracking-[0.3em] text-indigo-400">Total Estimado</span>
                                             <span className="text-5xl font-black tracking-tighter">${cartTotal.toLocaleString('es-AR')}</span>
                                         </div>
@@ -308,23 +274,23 @@ const Shop: React.FC = () => {
                             className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
                             <div className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tu Nombre Completo</label>
-                                    <input name="name" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold transition-all" placeholder="Ej: Mario Rossi" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Nombre Completo</label>
+                                    <input name="name" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">WhatsApp de Contacto</label>
-                                    <input name="phone" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold transition-all" placeholder="Ej: 11 4455 6677" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">WhatsApp</label>
+                                    <input name="phone" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Dirección de Envío / Entrega</label>
-                                    <input name="address" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold transition-all" placeholder="Calle, Altura, Localidad..." />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Dirección de Envío</label>
+                                    <input name="address" required className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold" />
                                 </div>
                             </div>
                             <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 flex items-start gap-4">
                                 <Info size={24} className="text-indigo-600 shrink-0"/>
-                                <p className="text-[10px] font-bold text-indigo-900 uppercase leading-relaxed">Al confirmar, enviaremos tu pedido por WhatsApp para coordinar el medio de pago (Transferencia, Link de Pago o Efectivo en local).</p>
+                                <p className="text-[10px] font-bold text-indigo-900 uppercase leading-relaxed">Te contactaremos por WhatsApp para coordinar el pago (Transferencia o Efectivo).</p>
                             </div>
-                            <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all text-xs">ENVIAR PEDIDO POR WHATSAPP</button>
+                            <button type="submit" className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-2xl active:scale-95 transition-all text-xs">ENVIAR PEDIDO</button>
                         </form>
                     </div>
                 )}
@@ -334,11 +300,8 @@ const Shop: React.FC = () => {
                         <div className="w-32 h-32 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner border-4 border-white">
                             <CheckCircle size={64}/>
                         </div>
-                        <div className="space-y-4">
-                            <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-[0.9]">¡Pedido<br/>Enviado!</h2>
-                            <p className="text-slate-500 font-medium text-lg leading-relaxed">Muchas gracias por tu compra. Ya estamos procesando tu pedido. Te contactaremos por WhatsApp a la brevedad.</p>
-                        </div>
-                        <button onClick={() => setView('HOME')} className="bg-white border-2 border-slate-200 text-slate-900 px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:border-indigo-600 transition-all">Volver al Inicio</button>
+                        <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-[0.9]">¡Pedido Enviado!</h2>
+                        <button onClick={() => setView('HOME')} className="bg-white border-2 border-slate-200 text-slate-900 px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:border-indigo-600">Volver al Inicio</button>
                     </div>
                 )}
             </main>
@@ -346,28 +309,21 @@ const Shop: React.FC = () => {
     );
 };
 
-// COMPONENTE DE TARJETA DE PRODUCTO
-const ProductCard: React.FC<{ product: Product, onAdd: any, dark?: boolean }> = ({ product, onAdd, dark }) => {
+const ProductCard: React.FC<{ product: Product, onAdd: (p: Product, qty: number) => void, dark?: boolean }> = ({ product, onAdd, dark }) => {
     const isOffer = product.ecommerce?.isOffer;
     const finalPrice = isOffer ? (product.ecommerce?.offerPrice || product.priceFinal) : product.priceFinal;
 
     return (
-        <div className={`rounded-[2.5rem] border transition-all overflow-hidden flex flex-col group h-[480px] ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-2xl'}`}>
-            <div className={`h-60 flex items-center justify-center p-12 relative overflow-hidden ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+        <div className={`rounded-[2.5rem] border transition-all overflow-hidden flex flex-col group h-[450px] ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-2xl'}`}>
+            <div className={`h-56 flex items-center justify-center p-12 relative overflow-hidden ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
                 {isOffer && (
                     <span className="absolute top-4 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg z-10 animate-pulse">OFERTA</span>
-                )}
-                {product.ecommerce?.isFeatured && (
-                    <span className="absolute top-4 right-4 text-yellow-400 z-10"><Star size={20} className="fill-yellow-400" /></span>
                 )}
                 <Package size={80} className={`transition-transform duration-500 group-hover:scale-125 ${dark ? 'text-white/10' : 'text-slate-200'}`} strokeWidth={1} />
             </div>
             <div className="p-8 flex-1 flex flex-col">
-                <div className="flex justify-between items-start mb-2">
-                    <h4 className={`font-black uppercase tracking-tight text-lg leading-none h-12 overflow-hidden ${dark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h4>
-                </div>
+                <h4 className={`font-black uppercase tracking-tight text-lg leading-tight h-12 overflow-hidden mb-2 ${dark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h4>
                 <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mb-6">{product.brand}</p>
-                
                 <div className="mt-auto flex justify-between items-end">
                     <div>
                         {isOffer && (
@@ -378,8 +334,8 @@ const ProductCard: React.FC<{ product: Product, onAdd: any, dark?: boolean }> = 
                         </p>
                     </div>
                     <button 
-                        onClick={() => onAdd(product)}
-                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-95 ${dark ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
+                        onClick={() => onAdd(product, 1)}
+                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-90 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
                         <Plus size={20}/>
                     </button>
                 </div>
