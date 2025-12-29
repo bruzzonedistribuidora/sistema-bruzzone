@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
     Globe, Search, Star, Percent,
@@ -6,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 
-const EcommerceAdmin: React.FC = () => {
+export const EcommerceAdmin: React.FC = () => {
     const [products, setProducts] = useState<Product[]>(() => 
         JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
     );
@@ -163,5 +162,3 @@ const EcommerceAdmin: React.FC = () => {
         </div>
     );
 };
-
-export default EcommerceAdmin;
