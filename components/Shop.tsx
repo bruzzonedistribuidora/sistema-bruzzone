@@ -35,14 +35,6 @@ const Shop: React.FC = () => {
         products.filter(p => p.ecommerce?.isPublished),
     [products]);
 
-    const featuredProducts = useMemo(() => 
-        publishedProducts.filter(p => p.ecommerce?.isFeatured),
-    [publishedProducts]);
-
-    const offers = useMemo(() => 
-        publishedProducts.filter(p => p.ecommerce?.isOffer),
-    [publishedProducts]);
-
     const filteredCatalog = useMemo(() => {
         return publishedProducts.filter(p => {
             const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -109,6 +101,10 @@ const Shop: React.FC = () => {
         setView('SUCCESS');
     };
 
+    const offers = useMemo(() => 
+        publishedProducts.filter(p => p.ecommerce?.isOffer),
+    [publishedProducts]);
+
     return (
         <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
             <nav className="fixed top-0 left-0 w-full h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 z-[100] px-6 flex justify-between items-center">
@@ -161,7 +157,7 @@ const Shop: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                                     {offers.slice(0, 4).map(p => (
-                                        <ProductCard key={p.id} product={products.find(prod => prod.id === p.id.toString()) || products[0]} onAdd={addToCart} />
+                                        <ProductCard key={p.id} product={p} onAdd={addToCart} />
                                     ))}
                                 </div>
                             </section>
@@ -335,7 +331,7 @@ const ProductCard: React.FC<{ product: Product, onAdd: (p: Product, qty: number)
                     </div>
                     <button 
                         onClick={() => onAdd(product, 1)}
-                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-90 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
+                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-95 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
                         <Plus size={20}/>
                     </button>
                 </div>
