@@ -38,7 +38,8 @@ export enum ViewState {
   MARKETING = 'MARKETING',
   PRICE_AUDIT = 'PRICE_AUDIT',
   CREDIT_NOTES = 'CREDIT_NOTES',
-  PUBLIC_PORTAL = 'PUBLIC_PORTAL'
+  PUBLIC_PORTAL = 'PUBLIC_PORTAL',
+  SHOP = 'SHOP'
 }
 
 export interface CreditInstallment {
