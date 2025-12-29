@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { Product } from '../types';
 
-export const EcommerceAdmin: React.FC = () => {
+const EcommerceAdmin: React.FC = () => {
     const [products, setProducts] = useState<Product[]>(() => 
         JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
     );
@@ -140,7 +140,7 @@ export const EcommerceAdmin: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    <div className="flex flex-col gap-1 min-w-[120px]">
+                                    <div className="flex col-span-2 md:col-span-1 flex-col gap-1 min-w-[120px]">
                                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Precio Web</p>
                                         <div className="relative">
                                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
@@ -162,3 +162,5 @@ export const EcommerceAdmin: React.FC = () => {
         </div>
     );
 };
+
+export default EcommerceAdmin;
