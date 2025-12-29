@@ -42,7 +42,7 @@ import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
 import Shop from './components/Shop';
 import EcommerceAdmin from './components/EcommerceAdmin';
-import { ViewState, User, Role, Client, InvoiceItem, Provider, ReplenishmentItem } from './types';
+import { ViewState, User, Client, InvoiceItem, Provider, ReplenishmentItem } from './types';
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
@@ -68,7 +68,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
     if (savedSession) {
-        setLoggedInUser(JSON.parse(savedSession));
+        try {
+            setLoggedInUser(JSON.parse(savedSession));
+        } catch (e) {
+            localStorage.removeItem('ferrecloud_session');
+        }
     }
   }, []);
 
