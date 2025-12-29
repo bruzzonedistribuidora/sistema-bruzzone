@@ -9,6 +9,7 @@ import SalesManagement from './components/SalesManagement';
 import Assistant from './components/Assistant';
 import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
+import Providers from './components/Providers';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
 import ProviderBalances from './components/ProviderBalances';
@@ -72,9 +73,8 @@ const App: React.FC = () => {
         return <SalesManagement initialTab={tab} onCartUsed={() => {}} />;
     }
 
-    if ([ViewState.PURCHASES, ViewState.PROVIDERS, ViewState.REPLENISHMENT, ViewState.SHORTAGES].includes(view)) {
+    if ([ViewState.PURCHASES, ViewState.REPLENISHMENT, ViewState.SHORTAGES].includes(view)) {
         let tab: any = 'PURCHASES';
-        if (view === ViewState.PROVIDERS) tab = 'PROVIDERS';
         if (view === ViewState.REPLENISHMENT) tab = 'REPLENISHMENT';
         if (view === ViewState.SHORTAGES) tab = 'SHORTAGES';
         return <Purchases defaultTab={tab} onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} />;
@@ -83,6 +83,7 @@ const App: React.FC = () => {
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.PROVIDERS: return <Providers />;
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       case ViewState.TREASURY: return <Treasury />;
