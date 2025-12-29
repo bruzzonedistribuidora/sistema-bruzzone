@@ -423,7 +423,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Precio Final ($)</label>
                                     <div className="relative group">
-                                        {/* Fix: Added missing DollarSign icon in the input field */}
                                         <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={24}/>
                                         <input 
                                             type="number" 
