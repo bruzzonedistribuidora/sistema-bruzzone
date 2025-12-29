@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { Product, CreditInstallment } from "../types";
+import { Product, CreditInstallment } from "../types.ts";
 
 // Declaración global para que TypeScript reconozca las variables de entorno de la plataforma
 declare var process: {
