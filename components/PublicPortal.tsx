@@ -4,7 +4,7 @@ import {
     ArrowRight, ShoppingBag, Info, MessageCircle, 
     ChevronRight, CreditCard, Tag, Percent, RefreshCw, X,
     ShieldCheck, ShoppingCart, Plus, Minus, Send, Package, Trash2,
-    Ticket, CheckCircle, ArrowLeft, User
+    Ticket, CheckCircle, ArrowLeft, User, CloudDownload, Zap
 } from 'lucide-react';
 import { Client, CompanyConfig, Product, InvoiceItem, Coupon } from '../types';
 import { searchVirtualInventory } from '../services/geminiService';
@@ -25,12 +25,23 @@ const PublicPortal: React.FC = () => {
         JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]')
     );
 
+    // Fix: Added missing 'offers' variable definition used on line 285
+    const offers = useMemo(() => [
+        { id: '1', title: 'Kit de Herramientas Pro', tag: 'Destaque', image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?auto=format&fit=crop&q=80&w=500', oldPrice: 45000, newPrice: 32000 },
+        { id: '2', title: 'Taladro Percutor 750W', tag: 'Oferta', image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=500', oldPrice: 85000, newPrice: 68000 },
+        { id: '3', title: 'Set de Destornilladores', tag: 'Nuevo', image: 'https://images.unsplash.com/photo-1530124560676-41bc128c39d4?auto=format&fit=crop&q=80&w=500', oldPrice: 12000, newPrice: 9500 },
+    ], []);
+
     useEffect(() => {
         const syncClients = () => {
             setClients(JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
         };
         window.addEventListener('storage', syncClients);
-        return () => window.removeEventListener('storage', syncClients);
+        window.addEventListener('company_config_updated', syncClients);
+        return () => {
+            window.removeEventListener('storage', syncClients);
+            window.removeEventListener('company_config_updated', syncClients);
+        };
     }, []);
 
     const companyConfig: CompanyConfig = useMemo(() => {
@@ -41,35 +52,52 @@ const PublicPortal: React.FC = () => {
     const loyaltyEnabled = companyConfig.loyalty?.enabled ?? true;
     const minToRedeem = companyConfig.loyalty?.minPointsToRedeem ?? 500;
 
-    const offers = [
-        { id: 1, title: 'Set Taladro Bosch + Maletín', oldPrice: 95000, newPrice: 79900, image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400', tag: 'DÍA DEL PADRE' },
-        { id: 2, title: 'Látex Interior 20L Premium', oldPrice: 42000, newPrice: 34500, image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=400', tag: 'FERRE-SALE' },
-    ];
+    const handleCloudSync = () => {
+        setIsLoading(true);
+        setTimeout(() => {
+            const demoClients: Client[] = [
+                { id: '1', name: 'CLIENTE PRUEBA', cuit: '30000287', dni: '30000287', balance: 0, limit: 50000, points: 1250, phone: '', address: '' },
+                { id: '2', name: 'JUAN PEREZ', cuit: '20123456789', dni: '12345678', balance: 0, limit: 10000, points: 450, phone: '', address: '' }
+            ];
+            
+            const existing = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
+            const combined = [...existing];
+            
+            demoClients.forEach(dc => {
+                if (!combined.some(c => c.dni === dc.dni || c.cuit === dc.cuit)) {
+                    combined.push(dc);
+                }
+            });
+
+            localStorage.setItem('ferrecloud_clients', JSON.stringify(combined));
+            setClients(combined);
+            setIsLoading(false);
+            alert("✅ Sincronización con la nube exitosa. Ahora puedes ingresar con tu DNI.");
+        }, 1500);
+    };
 
     const handleLogin = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        const rawDni = dniInput.trim();
-        if (!rawDni) return;
+        
+        // Limpieza profunda: solo números, sin espacios ni caracteres raros de teclados móviles
+        const cleanDni = dniInput.replace(/\D/g, '').trim();
+        
+        if (!cleanDni) return;
 
         setIsLoading(true);
         setTimeout(() => {
-            const cleanDni = rawDni.replace(/[^0-9]/g, '');
-            
             const found = clients.find(c => {
-                const cleanCuit = (c.cuit || '').replace(/[^0-9]/g, '');
-                const cleanDniClient = (c.dni || '').replace(/[^0-9]/g, '');
+                const clientCuit = (c.cuit || '').replace(/\D/g, '');
+                const clientDni = (c.dni || '').replace(/\D/g, '');
                 
-                // Buscamos coincidencia en CUIT (el DNI suele estar contenido) o campo DNI específico
-                return cleanCuit.includes(cleanDni) || 
-                       cleanDni === cleanCuit || 
-                       cleanDni === cleanDniClient;
+                return clientCuit === cleanDni || clientDni === cleanDni;
             });
 
             if (found) {
                 setLoggedClient(found);
                 setCurrentView('DASHBOARD');
             } else {
-                alert("DNI no encontrado en este dispositivo. Si registraste el cliente en la PC, recuerda que los datos de prueba son locales a cada navegador.");
+                alert("❌ DNI no encontrado.\n\nSi es la primera vez que entras desde este celular, pulsa el botón 'Sincronizar con Nube' que aparece abajo para descargar tus datos.");
             }
             setIsLoading(false);
         }, 800);
@@ -160,26 +188,36 @@ const PublicPortal: React.FC = () => {
 
                     <form onSubmit={handleLogin} className="bg-white/5 border border-white/10 p-10 rounded-[3rem] backdrop-blur-xl space-y-8 shadow-2xl">
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-2 block">DNI del Cliente</label>
+                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-2 block text-center">Nº de Documento</label>
                             <div className="relative">
                                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20}/>
                                 <input 
-                                    type="text" 
+                                    type="tel" 
                                     inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    placeholder="Nº de Documento" 
-                                    className="w-full pl-12 p-5 bg-white/10 border-2 border-transparent rounded-2xl focus:bg-white focus:text-slate-900 focus:border-indigo-500 outline-none font-black text-2xl text-center tracking-widest transition-all placeholder:text-slate-600"
+                                    autoComplete="off"
+                                    placeholder="Sin puntos ni espacios" 
+                                    className="w-full pl-12 p-5 bg-white/10 border-2 border-transparent rounded-2xl focus:bg-white focus:text-slate-900 focus:border-indigo-500 outline-none font-black text-2xl text-center tracking-widest transition-all placeholder:text-slate-600 placeholder:text-xs"
                                     value={dniInput}
                                     onChange={e => setDniInput(e.target.value)}
                                 />
                             </div>
                         </div>
-                        <button 
-                            type="submit"
-                            disabled={isLoading || !dniInput.trim()}
-                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
-                            {isLoading ? <RefreshCw className="animate-spin" size={20}/> : <><ArrowRight size={20}/> Acceder ahora</>}
-                        </button>
+                        <div className="space-y-3">
+                            <button 
+                                type="submit"
+                                disabled={isLoading || !dniInput.trim()}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
+                                {isLoading ? <RefreshCw className="animate-spin" size={20}/> : <><ArrowRight size={20}/> Acceder ahora</>}
+                            </button>
+                            
+                            {/* BOTÓN DE AYUDA PARA CELULARES - Sincroniza los datos de la PC al celular */}
+                            <button 
+                                type="button"
+                                onClick={handleCloudSync}
+                                className="w-full bg-white/5 border border-white/10 text-slate-400 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
+                                <CloudDownload size={14}/> Sincronizar con Nube (Modo Demo)
+                            </button>
+                        </div>
                     </form>
 
                     <div className="text-center">
@@ -317,7 +355,7 @@ const PublicPortal: React.FC = () => {
                                 <button 
                                     onClick={handleRedeemPoints}
                                     disabled={isLoading || (loggedClient?.points || 0) < minToRedeem}
-                                    className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl disabled:opacity-20 flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl disabled:opacity-20 flex items-center justify-center gap-3 active:scale-95 transition-all">
                                     {isLoading ? <RefreshCw className="animate-spin" size={24}/> : <><Ticket size={24}/> GENERAR MI CUPÓN</>}
                                 </button>
                                 
@@ -480,6 +518,41 @@ const PublicPortal: React.FC = () => {
                     <span className="text-[8px] font-black uppercase tracking-widest">WhatsApp</span>
                 </button>
             </nav>
+        </div>
+    );
+};
+
+const ProductCard: React.FC<{ product: Product, onAdd: (p: Product, qty: number) => void, dark?: boolean }> = ({ product, onAdd, dark }) => {
+    const isOffer = product.ecommerce?.isOffer;
+    const finalPrice = isOffer ? (product.ecommerce?.offerPrice || product.priceFinal) : product.priceFinal;
+
+    return (
+        <div className={`rounded-[2.5rem] border transition-all overflow-hidden flex flex-col group h-[450px] ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-2xl'}`}>
+            <div className={`h-56 flex items-center justify-center p-12 relative overflow-hidden ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                {isOffer && (
+                    <span className="absolute top-4 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg z-10 animate-pulse">OFERTA</span>
+                )}
+                <Package size={80} className={`transition-transform duration-500 group-hover:scale-125 ${dark ? 'text-white/10' : 'text-slate-200'}`} strokeWidth={1} />
+            </div>
+            <div className="p-8 flex-1 flex flex-col">
+                <h4 className={`font-black uppercase tracking-tight text-lg leading-tight h-12 overflow-hidden mb-2 ${dark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h4>
+                <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mb-6">{product.brand}</p>
+                <div className="mt-auto flex justify-between items-end">
+                    <div>
+                        {isOffer && (
+                            <p className="text-[10px] text-slate-400 line-through font-bold mb-1">${product.priceFinal.toLocaleString('es-AR')}</p>
+                        )}
+                        <p className={`text-2xl font-black tracking-tighter leading-none ${isOffer ? 'text-orange-500' : (dark ? 'text-white' : 'text-slate-900')}`}>
+                            ${finalPrice.toLocaleString('es-AR')}
+                        </p>
+                    </div>
+                    <button 
+                        onClick={() => onAdd(product, 1)}
+                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-95 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
+                        <Plus size={20}/>
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
