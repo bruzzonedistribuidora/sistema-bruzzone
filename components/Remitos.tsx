@@ -5,7 +5,8 @@ import {
     User, ClipboardList, AlertCircle, X, 
     Minus, Package, Trash2, History, CheckCircle, 
     ChevronRight, DollarSign, UserSearch, Filter,
-    TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download
+    TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download,
+    PackagePlus, Save
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem } from '../types';
 
@@ -20,6 +21,10 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
   const [selectedRemitoIds, setSelectedRemitoIds] = useState<string[]>([]);
   const [showPrintModal, setShowPrintModal] = useState<Remito | null>(null);
+
+  // Estado para Ítem Manual
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
   const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
   const [allClients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
@@ -61,6 +66,48 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     });
     setSearchTerm('');
     setShowSearchResults(false);
+  };
+
+  const handleAddManualItem = () => {
+    if (!manualItemForm.name || !manualItemForm.price) return;
+    
+    const priceNum = parseFloat(manualItemForm.price);
+    const mockProduct: Product = {
+        id: `manual-rem-${Date.now()}`,
+        internalCodes: ['VARIO'],
+        barcodes: [],
+        providerCodes: [],
+        name: manualItemForm.name.toUpperCase(),
+        brand: 'GENERICO',
+        provider: '',
+        description: 'Ingreso manual desde Remitos',
+        category: 'VARIOS',
+        measureUnitSale: 'Unidad',
+        measureUnitPurchase: 'Unidad',
+        conversionFactor: 1,
+        purchaseCurrency: 'ARS',
+        saleCurrency: 'ARS',
+        vatRate: 21.0,
+        listCost: priceNum * 0.7,
+        discounts: [0,0,0,0],
+        costAfterDiscounts: priceNum * 0.7,
+        profitMargin: 30,
+        priceNeto: priceNum / 1.21,
+        priceFinal: priceNum,
+        stock: 0,
+        stockDetails: [],
+        minStock: 0,
+        desiredStock: 0,
+        reorderPoint: 0,
+        location: '',
+        ecommerce: {},
+        isCombo: false,
+        comboItems: []
+    };
+
+    setCart(prev => [...prev, { product: mockProduct, quantity: 1, historicalPrice: priceNum }]);
+    setIsManualModalOpen(false);
+    setManualItemForm({ name: '', price: '' });
   };
 
   const handleCreateRemito = () => {
@@ -147,18 +194,26 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
       {activeTab === 'NEW' && (
         <div className="flex-1 flex flex-col gap-3 min-0 print:hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
-                <div className="md:col-span-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
+                <div className="md:col-span-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Cliente Destino</label>
                     <select className="w-full p-1.5 bg-slate-50 border rounded-lg font-bold text-xs" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
                         <option value="">-- SELECCIONE --</option>
                         {allClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                 </div>
-                <div className="md:col-span-5 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5 relative">
+                <div className="md:col-span-6 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5 relative">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Añadir Artículos</label>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                        <input type="text" placeholder="Buscar..." className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-100 rounded-lg font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
+                            <input type="text" placeholder="Buscar..." className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-100 rounded-lg font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
+                        </div>
+                        <button 
+                            onClick={() => setIsManualModalOpen(true)}
+                            className="bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 font-black text-[9px] uppercase tracking-widest flex items-center gap-1.5 hover:bg-indigo-100 transition-all"
+                            title="Agregar artículo no listado">
+                            <PackagePlus size={14}/> Manual
+                        </button>
                     </div>
                     {showSearchResults && searchTerm.trim().length > 0 && (
                         <div className="absolute top-full left-0 w-full bg-white border rounded-xl shadow-2xl mt-1 max-h-60 overflow-y-auto z-50 p-1">
@@ -190,7 +245,12 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                         <tbody>
                             {cart.map((item, i) => (
                                 <tr key={i} className="border-b last:border-0 text-[11px] hover:bg-slate-50">
-                                    <td className="px-4 py-2 font-black uppercase text-slate-800">{item.product.name}</td>
+                                    <td className="px-4 py-2">
+                                        <p className="font-black uppercase text-slate-800 leading-none mb-1">{item.product.name}</p>
+                                        {item.product.id.startsWith('manual-rem') && (
+                                            <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase tracking-widest">No Listado</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-2 text-center font-bold">{item.quantity}</td>
                                     <td className="px-4 py-2 text-right font-bold text-slate-400">${item.historicalPrice.toLocaleString()}</td>
                                     <td className="px-4 py-2 text-center"><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14}/></button></td>
@@ -255,7 +315,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                  </thead>
                  <tbody className="divide-y text-[11px]">
                    {filteredRemitos.length === 0 ? (
-                       <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">No se encontraron remitos con los criterios de búsqueda</td></tr>
+                       <tr><td colSpan={5} className="py-24 text-center text-slate-300 font-black uppercase tracking-widest">No se encontraron remitos con los criterios de búsqueda</td></tr>
                    ) : filteredRemitos.map(remito => (
                         <tr key={remito.id} className={`hover:bg-indigo-50/20 transition-colors group ${selectedRemitoIds.includes(remito.id) ? 'bg-indigo-50/50' : ''}`}>
                           <td className="px-6 py-4 text-center">
@@ -285,6 +345,58 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                </table>
              </div>
         </div>
+      )}
+
+      {/* MODAL: AGREGAR ÍTEM MANUAL */}
+      {isManualModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in print:hidden">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><PackagePlus size={24}/></div>
+                          <div>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Despacho Libre</h3>
+                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Artículo no listado en catálogo</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                  </div>
+                  <div className="p-10 space-y-8 bg-slate-50/50">
+                      <div className="space-y-6">
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Descripción del Artículo</label>
+                              <input 
+                                  type="text" 
+                                  className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase shadow-sm" 
+                                  placeholder="Ej: Material de obra varios..."
+                                  value={manualItemForm.name}
+                                  onChange={e => setManualItemForm({...manualItemForm, name: e.target.value})}
+                                  autoFocus
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Precio de Referencia ($)</label>
+                              <div className="relative group">
+                                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={24}/>
+                                  <input 
+                                      type="number" 
+                                      className="w-full pl-12 p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-indigo-600 outline-none font-black text-5xl text-indigo-700 shadow-sm" 
+                                      placeholder="0.00"
+                                      value={manualItemForm.price}
+                                      onChange={e => setManualItemForm({...manualItemForm, price: e.target.value})}
+                                  />
+                              </div>
+                          </div>
+                      </div>
+                      <button 
+                          onClick={handleAddManualItem}
+                          className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                      >
+                          <Save size={24}/> Agregar al Remito
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
 
       {/* MODAL PRINT PREVIEW REMITO */}
