@@ -1,12 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
-    Globe, Search, CheckCircle, XCircle, Plus, Trash2, 
-    Tag, Star, Percent, ArrowRight, LayoutGrid, Info,
-    Eye, EyeOff, Sparkles, RefreshCw, ShoppingCart,
-    AlertTriangle, Smartphone, MousePointer2, Save, Package
+    Globe, Search, Star, Percent,
+    Eye, EyeOff, Package
 } from 'lucide-react';
-import { Product, Category } from '../types';
+import { Product } from '../types';
 
 const EcommerceAdmin: React.FC = () => {
     const [products, setProducts] = useState<Product[]>(() => 
@@ -14,10 +11,6 @@ const EcommerceAdmin: React.FC = () => {
     );
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMode, setFilterMode] = useState<'ALL' | 'PUBLISHED' | 'OFFERS'>('ALL');
-
-    const categories = useMemo(() => 
-        JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'), 
-    []);
 
     const filtered = useMemo(() => {
         return products.filter(p => {
@@ -57,7 +50,7 @@ const EcommerceAdmin: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">Administrador de Tienda</h2>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Gestiona que artículos ven tus clientes en la web</p>
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Gestiona qué artículos ven tus clientes en la web</p>
                     </div>
                 </div>
 
