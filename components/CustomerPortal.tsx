@@ -60,7 +60,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
             <header className="bg-white border-b border-gray-200 px-6 h-16 flex justify-between items-center shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-md">
-                        {/* Fix: Added missing import for User */}
+                        {/* Import check: User is now imported from lucide-react */}
                         <User size={20} />
                     </div>
                     <div>
@@ -147,7 +147,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                                 <p className="text-xs font-black text-slate-800 uppercase tracking-tight leading-none mb-1">{m.voucherType}</p>
                                                 <p className="text-[9px] text-gray-400 font-bold uppercase truncate max-w-[250px]">{m.description}</p>
                                             </td>
-                                            <td className={`px-6 py-5 text-right font-black text-lg tracking-tighter ${m.debit > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                            <td className={`px-6 py-5 text-right font-black text-lg tracking-tighter ${m.debit > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                                 {m.debit > 0 ? `+$${m.debit.toLocaleString('es-AR')}` : `-$${m.credit.toLocaleString('es-AR')}`}
                                             </td>
                                             <td className="px-6 py-5 text-center">
@@ -186,7 +186,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                     <div className="space-y-3">
                                         {activeAccounts.length === 0 ? (
                                             <div className="p-10 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                                {/* Fix: Added missing import for AlertTriangle */}
+                                                {/* Import check: AlertTriangle is now imported from lucide-react */}
                                                 <AlertTriangle size={32} className="mx-auto text-amber-500 mb-2" />
                                                 <p className="text-[10px] font-black uppercase text-slate-400">Sin cuentas configuradas</p>
                                             </div>
@@ -313,7 +313,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                             
                             <div className="space-y-3">
                                 <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    {/* Fix: Added missing import for Info */}
+                                    {/* Import check: Info is now imported from lucide-react */}
                                     <Info size={12} className="text-indigo-600"/> Concepto del Movimiento
                                 </h4>
                                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
