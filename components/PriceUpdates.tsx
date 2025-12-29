@@ -6,7 +6,8 @@ import {
     X, List, BookmarkPlus, 
     RefreshCw, Layers, TrendingUp, TrendingDown, PackagePlus, 
     PackageMinus, Calculator, Tag, Percent,
-    Truck, FileText, AlertOctagon, Building2, Edit2, Plus, Trash2, Save, Info
+    Truck, FileText, AlertOctagon, Building2, Edit2, Plus, Trash2, Save, Info,
+    Search, ArrowLeft, Eye, ShoppingBag
 } from 'lucide-react';
 import { Provider, PriceList, Product } from '../types';
 
@@ -51,6 +52,8 @@ interface AnalysisResult {
 
 const PriceUpdates: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'LISTS' | 'MASS_UPDATE'>('LISTS');
+    const [viewingListDetail, setViewingListDetail] = useState<PriceList | null>(null);
+    const [listSearchTerm, setListSearchTerm] = useState('');
 
     // --- DATOS DEL SISTEMA ---
     const [products, setProducts] = useState<Product[]>(() => {
@@ -80,6 +83,28 @@ const PriceUpdates: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('ferrecloud_price_lists', JSON.stringify(priceLists));
     }, [priceLists]);
+
+    // --- LÓGICA DE DETALLE DE ARTÍCULOS ---
+    const productsInList = useMemo(() => {
+        if (!viewingListDetail) return [];
+        const term = listSearchTerm.toLowerCase();
+        
+        return products.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            p.internalCodes.some(c => c.toLowerCase().includes(term))
+        ).map(p => {
+            const cost = p.costAfterDiscounts || p.listCost;
+            const margin = viewingListDetail.type === 'BASE' ? p.profitMargin : (viewingListDetail.fixedMargin || 0);
+            const priceNeto = cost * (1 + (margin / 100));
+            const priceFinal = priceNeto * (1 + (p.vatRate / 100));
+            
+            return {
+                ...p,
+                appliedMargin: margin,
+                calculatedPrice: priceFinal
+            };
+        });
+    }, [products, viewingListDetail, listSearchTerm]);
 
     // --- MASS UPDATE WIZARD STATE ---
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -342,12 +367,12 @@ const PriceUpdates: React.FC = () => {
                     <Calculator size={18} className="text-indigo-600"/> Gestión de Listas y Costos
                 </h2>
                 <div className="flex bg-slate-100 rounded-lg p-1">
-                    <button onClick={() => setActiveTab('LISTS')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'LISTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Venta Público</button>
-                    <button onClick={() => setActiveTab('MASS_UPDATE')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'MASS_UPDATE' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Importación Masiva</button>
+                    <button onClick={() => {setActiveTab('LISTS'); setViewingListDetail(null);}} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'LISTS' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Venta Público</button>
+                    <button onClick={() => {setActiveTab('MASS_UPDATE'); setViewingListDetail(null);}} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'MASS_UPDATE' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Importación Masiva</button>
                 </div>
             </div>
 
-            {activeTab === 'LISTS' && (
+            {activeTab === 'LISTS' && !viewingListDetail && (
                 <div className="flex-1 flex flex-col gap-4 animate-fade-in overflow-hidden">
                     <div className="flex justify-end pr-2">
                         <button 
@@ -384,10 +409,80 @@ const PriceUpdates: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="mt-8 pt-4 border-t border-gray-50 flex justify-end pl-2">
-                                     <button className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors flex items-center gap-2">Ver Artículos <ChevronRight size={12}/></button>
+                                     <button 
+                                        onClick={() => setViewingListDetail(list)}
+                                        className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors flex items-center gap-2">
+                                        Ver Artículos <ChevronRight size={12}/>
+                                     </button>
                                 </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'LISTS' && viewingListDetail && (
+                <div className="flex-1 bg-white rounded-[2rem] border border-gray-200 shadow-sm flex flex-col overflow-hidden animate-fade-in">
+                    <div className="p-6 bg-slate-900 text-white flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setViewingListDetail(null)} className="p-2.5 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><ArrowLeft size={20}/></button>
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{viewingListDetail.name}</h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Explorador de Precios Calculados</p>
+                            </div>
+                        </div>
+                        <div className="relative w-full md:w-96">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
+                            <input 
+                                type="text" 
+                                placeholder="Buscar en esta lista..." 
+                                className="w-full pl-12 pr-4 py-3 bg-white/10 border border-white/5 rounded-2xl outline-none text-white font-bold text-sm focus:bg-white focus:text-slate-900 transition-all uppercase"
+                                value={listSearchTerm}
+                                onChange={e => setListSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-8 py-5">Artículo / SKU</th>
+                                    <th className="px-8 py-5 text-right">Costo Neto</th>
+                                    <th className="px-8 py-5 text-center">Margen</th>
+                                    <th className="px-8 py-5 text-center">IVA %</th>
+                                    <th className="px-8 py-5 text-right bg-indigo-50/30">Precio Final</th>
+                                    <th className="px-8 py-5"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-[11px]">
+                                {productsInList.length === 0 ? (
+                                    <tr><td colSpan={6} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">No se encontraron artículos en esta lista</td></tr>
+                                ) : productsInList.map(p => (
+                                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="px-8 py-5">
+                                            <p className="font-black text-slate-800 uppercase leading-none mb-1.5">{p.name}</p>
+                                            <p className="text-[9px] font-mono font-bold text-indigo-600 uppercase">{p.internalCodes[0]}</p>
+                                        </td>
+                                        <td className="px-8 py-5 text-right font-bold text-slate-400">
+                                            ${(p.costAfterDiscounts || p.listCost).toLocaleString('es-AR')}
+                                        </td>
+                                        <td className="px-8 py-5 text-center font-black text-slate-600">
+                                            <span className="bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                                                +{p.appliedMargin}%
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-5 text-center text-slate-400 font-bold">{p.vatRate}%</td>
+                                        <td className="px-8 py-5 text-right font-black text-lg text-slate-900 bg-indigo-50/10 tracking-tighter">
+                                            ${p.calculatedPrice.toLocaleString('es-AR')}
+                                        </td>
+                                        <td className="px-8 py-5 text-right">
+                                            <button className="p-2 text-slate-300 hover:text-indigo-600"><Eye size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
