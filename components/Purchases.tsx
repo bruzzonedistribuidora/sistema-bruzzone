@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Truck, Plus, Search, FileText, User, UserPlus, MoreVertical, 
@@ -31,7 +30,7 @@ interface PurchasesProps {
 }
 
 const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigateToPrices, onViewHistory }) => {
-  const [activeTab, setActiveTab] = useState<'PURCHASES' | 'PROVIDERS'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'PURCHASES' | 'PROVIDERS'>(defaultTab as 'PURCHASES' | 'PROVIDERS');
   const [searchTerm, setSearchTerm] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'COMMERCIAL'>('GENERAL');
   
@@ -48,8 +47,8 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   
   const providerImportRef = useRef<HTMLInputElement>(null);
+  const invoiceFileRef = useRef<HTMLInputElement>(null);
   
-  // Estados para el Asistente de Importación de Proveedores
   const [isProviderImportMappingOpen, setIsProviderImportMappingOpen] = useState(false);
   const [provImportRows, setProvImportRows] = useState<string[][]>([]);
   const [provImportMapping, setProvImportMapping] = useState<Record<string, number>>({});
@@ -57,6 +56,14 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   const [providers, setProviders] = useState<Provider[]>(() => {
     const saved = localStorage.getItem('ferrecloud_providers');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [purchases, setPurchases] = useState<Purchase[]>(() => {
+      const saved = localStorage.getItem('ferrecloud_purchases');
+      return saved ? JSON.parse(saved) : [
+          { id: 'FAC-00214', providerId: '1', providerName: 'Herramientas Global SA', date: '2023-10-25', type: 'Factura A', items: 12, total: 125400, status: 'PAID' },
+          { id: 'FAC-99022', providerId: '2', providerName: 'Pinturas del Centro', date: '2023-10-26', type: 'Factura A', items: 5, total: 45000, status: 'PENDING' }
+      ];
   });
 
   const [providerForm, setProviderForm] = useState<Partial<Provider>>({
@@ -67,9 +74,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
   useEffect(() => {
       localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
-  }, [providers]);
+      localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
+  }, [providers, purchases]);
 
-  // --- LÓGICA DE IMPORTACIÓN ---
   const handleStartImportProviders = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -80,14 +87,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
         const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
         
         if (lines.length > 0) {
-            // Detección inteligente de separador (; o ,)
             const firstLine = lines[0];
             const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
-
             const rows = lines.map(line => line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, '')));
-            
             setProvImportRows(rows);
-            setProvImportMapping({}); // Limpiar mapeo anterior
+            setProvImportMapping({});
             setIsProviderImportMappingOpen(true);
         }
     };
@@ -104,11 +108,10 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     const currentCuits = new Set(providers.map(p => p.cuit.replace(/[^0-9]/g, '')));
     const newProviders: Provider[] = [];
 
-    provImportRows.forEach((row, index) => {
+    provImportRows.forEach((row) => {
         const name = row[provImportMapping.name];
         const cuit = row[provImportMapping.cuit];
         
-        // Ignorar cabeceras y filas vacías
         if (!name || !cuit || name.toLowerCase() === 'razon social' || name.toLowerCase() === 'nombre') return;
 
         const cleanCuit = cuit.replace(/[^0-9]/g, '');
@@ -148,7 +151,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
     setIsProviderImportMappingOpen(false);
     setProvImportRows([]);
     setProvImportMapping({});
-    alert(`Importación finalizada. Se procesaron ${newProviders.length} proveedores nuevos.`);
   };
 
   const PROVIDER_FIELDS = [
@@ -167,7 +169,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       { key: 'description', label: 'Descripción', required: false }
   ];
 
-  // --- RESTO DE HANDLERS ---
   const handleSearchCuit = async () => {
     if (!providerForm.cuit || providerForm.cuit.length < 8) return;
     setIsSearchingCuit(true);
@@ -195,16 +196,24 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   };
 
   const deleteProvider = (id: string) => {
-    if (confirm('¿Está seguro de eliminar este proveedor permanentemente? Se perderá todo su historial de deudas.')) {
+    if (confirm('¿Está seguro de eliminar este proveedor permanentemente?')) {
         setProviders(prev => prev.filter(p => p.id !== id));
     }
   };
 
   const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.cuit.includes(searchTerm));
+  const filteredPurchases = purchases.filter(p => p.providerName.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm));
+
+  const stats = useMemo(() => {
+      const total = purchases.reduce((a,c) => a + c.total, 0);
+      const pending = purchases.filter(p => p.status === 'PENDING').reduce((a,c) => a + c.total, 0);
+      return { total, pending, count: purchases.length };
+  }, [purchases]);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden">
       <input type="file" ref={providerImportRef} className="hidden" accept=".csv,.txt" onChange={handleStartImportProviders} />
+      <input type="file" ref={invoiceFileRef} className="hidden" accept="image/*,application/pdf" />
 
       <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
         <div>
@@ -219,7 +228,75 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 space-y-4">
-        {activeTab === 'PROVIDERS' && (
+        {activeTab === 'PURCHASES' ? (
+            <div className="animate-fade-in flex flex-col flex-1 space-y-4 overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+                    <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex items-center gap-6">
+                        <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl"><Receipt size={24}/></div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Compras Mes</p>
+                            <h4 className="text-2xl font-black text-slate-800">${stats.total.toLocaleString('es-AR')}</h4>
+                        </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex items-center gap-6">
+                        <div className="p-4 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle size={24}/></div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Facturas Pendientes</p>
+                            <h4 className="text-2xl font-black text-red-600">${stats.pending.toLocaleString('es-AR')}</h4>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-end">
+                        <button onClick={() => setIsNewPurchaseModalOpen(true)} className="bg-slate-900 text-white px-10 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
+                            <FileUp size={20} className="text-indigo-400"/> Cargar Factura IA
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
+                    <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center">
+                        <div className="relative max-w-md w-full">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16}/>
+                            <input type="text" placeholder="Filtrar facturas o proveedores..." className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-8 py-5">Tipo / Nº Comprobante</th>
+                                    <th className="px-8 py-5">Proveedor</th>
+                                    <th className="px-8 py-5">Fecha</th>
+                                    <th className="px-8 py-5 text-right">Monto Total</th>
+                                    <th className="px-8 py-5 text-center">Estado</th>
+                                    <th className="px-8 py-5"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-[11px]">
+                                {filteredPurchases.map(purchase => (
+                                    <tr key={purchase.id} className="hover:bg-slate-50 transition-colors group">
+                                        <td className="px-8 py-5">
+                                            <p className="font-black text-slate-800 text-sm uppercase leading-none mb-1">{purchase.id}</p>
+                                            <p className="text-[10px] text-indigo-500 font-bold uppercase">{purchase.type}</p>
+                                        </td>
+                                        <td className="px-8 py-5 font-black text-slate-600 uppercase">{purchase.providerName}</td>
+                                        <td className="px-8 py-5 text-gray-400 font-bold">{purchase.date}</td>
+                                        <td className="px-8 py-5 text-right font-black text-slate-900 text-lg">${purchase.total.toLocaleString('es-AR')}</td>
+                                        <td className="px-8 py-5 text-center">
+                                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${purchase.status === 'PAID' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                                {purchase.status === 'PAID' ? 'PAGADA' : 'PENDIENTE'}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-5 text-right">
+                                            <button className="p-3 text-slate-300 hover:text-indigo-600 transition-colors"><Eye size={18}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        ) : (
             <div className="animate-fade-in flex flex-col flex-1 space-y-4 overflow-hidden">
                 <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-gray-200 shadow-sm">
                     <div className="relative group flex-1 max-w-md">
@@ -275,7 +352,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
         )}
       </div>
 
-      {/* MODAL: ASISTENTE DE IMPORTACIÓN (MAPEO) */}
       {isProviderImportMappingOpen && (
           <div className="fixed inset-0 z-[250] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -291,13 +367,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar bg-slate-50/30">
-                      {provImportRows[0]?.length === 1 && (
-                          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center gap-3 text-amber-800">
-                              <AlertTriangle size={20} className="shrink-0" />
-                              <p className="text-xs font-bold uppercase">¡Atención! Solo se detectó una columna. Asegúrese de que el archivo CSV esté separado por comas o puntos y comas.</p>
-                          </div>
-                      )}
-
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {PROVIDER_FIELDS.map(field => (
                               <div key={field.key} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
@@ -322,33 +391,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                   </select>
                               </div>
                           ))}
-                      </div>
-
-                      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                          <div className="p-4 bg-slate-900 text-white flex items-center gap-2">
-                              <TableIcon size={14} className="text-indigo-400"/>
-                              <h4 className="text-[10px] font-black uppercase tracking-widest">Vista previa del archivo (Primeras 5 filas)</h4>
-                          </div>
-                          <div className="overflow-x-auto">
-                              <table className="w-full text-left">
-                                  <thead className="bg-slate-50 border-b">
-                                      <tr>
-                                          {provImportRows[0]?.map((_, idx) => (
-                                              <th key={idx} className="px-4 py-2 text-[9px] font-black text-slate-400 uppercase text-center border-r last:border-0">Col {idx + 1}</th>
-                                          ))}
-                                      </tr>
-                                  </thead>
-                                  <tbody className="divide-y text-[10px]">
-                                      {provImportRows.slice(0, 5).map((row, rIdx) => (
-                                          <tr key={rIdx}>
-                                              {row.map((cell, cIdx) => (
-                                                  <td key={cIdx} className="px-4 py-2 text-slate-600 font-medium truncate max-w-[150px] border-r last:border-0">{cell}</td>
-                                              ))}
-                                          </tr>
-                                      ))}
-                                  </tbody>
-                              </table>
-                          </div>
                       </div>
                   </div>
 
@@ -419,30 +461,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                     <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.razonSocial} onChange={e => setProviderForm({...providerForm, razonSocial: e.target.value.toUpperCase(), name: e.target.value.toUpperCase()})} />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Fantasía</label>
-                                    <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.fantasyName} onChange={e => setProviderForm({...providerForm, fantasyName: e.target.value.toUpperCase()})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Localidad</label>
-                                    <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.locality} onChange={e => setProviderForm({...providerForm, locality: e.target.value})} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Domicilio</label>
-                                <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.address} onChange={e => setProviderForm({...providerForm, address: e.target.value})} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
-                                    <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={providerForm.phone} onChange={e => setProviderForm({...providerForm, phone: e.target.value})} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
-                                    <input type="email" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={providerForm.email} onChange={e => setProviderForm({...providerForm, email: e.target.value})} />
-                                </div>
-                            </div>
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descripción</label>
                                 <textarea className="w-full p-4 bg-white border border-gray-200 rounded-2xl h-24 resize-none" value={providerForm.description} onChange={e => setProviderForm({...providerForm, description: e.target.value})} />
@@ -451,51 +469,18 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                       ) : (
                         <div className="space-y-8 animate-fade-in">
                             <div className="bg-indigo-900 p-8 rounded-[2.5rem] text-white space-y-6 shadow-2xl">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-indigo-300">Esquema de Descuentos en Cascada</h4>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-indigo-300">Esquema de Descuentos</h4>
                                 <div className="grid grid-cols-3 gap-4">
                                     {[0, 1, 2].map(idx => (
                                         <div key={idx} className="space-y-2">
                                             <label className="text-[9px] font-black uppercase opacity-60">Desc. {idx+1} (%)</label>
-                                            <input type="number" className="w-full p-4 bg-white/10 border border-white/20 rounded-2xl font-black text-2xl outline-none focus:bg-white/20" value={providerForm.defaultDiscounts?.[idx]} onChange={e => {
+                                            <input type="number" className="w-full p-4 bg-white/10 border border-white/20 rounded-2xl font-black text-2xl outline-none" value={providerForm.defaultDiscounts?.[idx]} onChange={e => {
                                                 const d = [...(providerForm.defaultDiscounts || [0,0,0])];
                                                 d[idx] = parseFloat(e.target.value) || 0;
                                                 setProviderForm({...providerForm, defaultDiscounts: d as [number, number, number]});
                                             }} />
                                         </div>
                                     ))}
-                                </div>
-                                <p className="text-[10px] italic opacity-50">Se aplicarán automáticamente al cargar facturas o actualizar listas de este proveedor.</p>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1 text-red-500">Saldo Inicial / Deuda Pendiente ($)</label>
-                                    <div className="relative">
-                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                        <input type="number" className="w-full pl-11 p-4 bg-red-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-xl text-red-700" value={providerForm.balance} onChange={e => setProviderForm({...providerForm, balance: parseFloat(e.target.value) || 0})} />
-                                    </div>
-                                    <p className="text-[8px] text-gray-400 italic px-2 uppercase">Deuda cargada al momento de iniciar el sistema.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cotización Predeterminada</label>
-                                    <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold text-slate-700" value={providerForm.currencyQuoteId} onChange={e => setProviderForm({...providerForm, currencyQuoteId: e.target.value})}>
-                                        <option value="">ARS - Pesos Argentinos</option>
-                                        {currencies.map(c => <option key={c.id} value={c.id}>{c.name} (${c.value})</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Persona de Contacto</label>
-                                    <div className="relative">
-                                        <Notebook className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                        <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={providerForm.contact} onChange={e => setProviderForm({...providerForm, contact: e.target.value})} placeholder="Ej: Vendedor Asignado..." />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Pedidos</label>
-                                    <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={providerForm.orderPhone} onChange={e => setProviderForm({...providerForm, orderPhone: e.target.value})} />
                                 </div>
                             </div>
                         </div>
@@ -504,9 +489,35 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
                   <div className="p-8 bg-slate-50 border-t border-gray-100 flex justify-end gap-4 shrink-0">
                       <button onClick={() => setIsProviderModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                      <button onClick={handleSaveProvider} className="bg-slate-900 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
+                      <button onClick={handleSaveProvider} className="bg-slate-900 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3">
                           <SaveIcon size={18}/> {isEditingProvider ? 'Guardar Cambios' : 'Registrar Proveedor'}
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {isNewPurchaseModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <h3 className="font-black uppercase tracking-widest text-sm">Carga Inteligente Factura</h3>
+                      <button onClick={() => setIsNewPurchaseModalOpen(false)}><X size={24}/></button>
+                  </div>
+                  <div className="p-10 text-center space-y-6">
+                      <div className="w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner border border-indigo-100">
+                          <Upload size={40} />
+                      </div>
+                      <div>
+                          <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Sube el Comprobante</h4>
+                          <p className="text-xs text-slate-400 font-medium mt-2 leading-relaxed">Nuestra IA procesará automáticamente los ítems, costos y CUIT para cargarlo al libro de IVA.</p>
+                      </div>
+                      <button 
+                        onClick={() => invoiceFileRef.current?.click()}
+                        className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                          <Scan size={20}/> SELECCIONAR ARCHIVO
+                      </button>
+                      <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest">SOPORTA PDF, JPG, PNG • MAX 10MB</p>
                   </div>
               </div>
           </div>
