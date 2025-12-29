@@ -40,13 +40,17 @@ import Marketing from './components/Marketing';
 import PriceAudit from './components/PriceAudit';
 import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
+import Shop from './components/Shop';
 import { ViewState, User, Role, Client, InvoiceItem, Provider } from './types';
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   
   const [isPublicMode, setIsPublicMode] = useState(() => {
-      return window.location.search.includes('view=fidelidad');
+      const search = window.location.search;
+      if (search.includes('view=fidelidad')) return 'FIDELIDAD';
+      if (search.includes('view=tienda')) return 'SHOP';
+      return null;
   });
 
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
@@ -206,12 +210,17 @@ const App: React.FC = () => {
       case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
       case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
       case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      case ViewState.SHOP: return <Shop />;
       default: return null;
     }
   };
 
-  if (isPublicMode) {
+  if (isPublicMode === 'FIDELIDAD') {
       return <PublicPortal />;
+  }
+
+  if (isPublicMode === 'SHOP') {
+      return <Shop />;
   }
 
   if (!loggedInUser) {
