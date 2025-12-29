@@ -42,12 +42,12 @@ import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
 import Shop from './components/Shop';
 import EcommerceAdmin from './components/EcommerceAdmin';
-import { ViewState, User, Role, Client, InvoiceItem, Provider } from './types';
+import { ViewState, User, Role, Client, InvoiceItem, Provider, ReplenishmentItem } from './types';
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   
-  const [isPublicMode, setIsPublicMode] = useState(() => {
+  const [isPublicMode, setIsPublicMode] = useState<'FIDELIDAD' | 'SHOP' | null>(() => {
       const search = window.location.search;
       if (search.includes('view=fidelidad')) return 'FIDELIDAD';
       if (search.includes('view=tienda')) return 'SHOP';
@@ -61,7 +61,6 @@ const App: React.FC = () => {
   const [targetProviderId, setTargetProviderId] = useState<string | undefined>(undefined);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
   
-  // Estados de transferencia de datos entre módulos
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [itemsToRemito, setItemsToRemito] = useState<InvoiceItem[] | null>(null);
   const [itemsToBudget, setItemsToBudget] = useState<InvoiceItem[] | null>(null);
@@ -157,7 +156,7 @@ const App: React.FC = () => {
         <Purchases 
             defaultTab="PROVIDERS" 
             onNavigateToPrices={() => handleNavigate(ViewState.PRICE_UPDATES)} 
-            onViewHistory={(provider) => {
+            onViewHistory={(provider: Provider) => {
                 setTargetProviderId(provider.id);
                 handleNavigate(ViewState.PROVIDER_BALANCES);
             }}
@@ -172,7 +171,7 @@ const App: React.FC = () => {
       case ViewState.CLIENTS: return (
         <Clients 
             initialClientId={targetClientId} 
-            onOpenPortal={(client) => {
+            onOpenPortal={(client: Client) => {
                 setPortalPreviewClient(client);
                 handleNavigate(ViewState.CUSTOMER_PORTAL);
             }}
@@ -180,7 +179,7 @@ const App: React.FC = () => {
       );
       case ViewState.CLIENT_BALANCES: return (
         <ClientBalances 
-            onNavigateToHistory={(client) => {
+            onNavigateToHistory={(client: Client) => {
                 setTargetClientId(client.id);
                 handleNavigate(ViewState.CLIENTS);
             }} 
@@ -188,7 +187,7 @@ const App: React.FC = () => {
       );
       case ViewState.PROVIDER_BALANCES: return (
         <ProviderBalances 
-            onNavigateToHistory={(provider) => {
+            onNavigateToHistory={(provider: Provider) => {
                 setTargetProviderId(provider.id);
                 handleNavigate(ViewState.PROVIDER_BALANCES);
             }} 
@@ -202,7 +201,9 @@ const App: React.FC = () => {
       case ViewState.USERS: return <UsersComponent />;
       case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
-      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { /* handle */ }} />;
+      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items: ReplenishmentItem[]) => { 
+        setItemsToBudget(items.map(i => ({ product: i.product, quantity: i.quantity, appliedPrice: i.product.listCost, subtotal: i.quantity * i.product.listCost })));
+      }} />;
       case ViewState.PRINT_CONFIG: return <PrintSettings />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting />;
       case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
