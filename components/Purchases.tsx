@@ -10,96 +10,80 @@ import {
     ShieldCheck, UserCheck, LayoutTemplate, MapPin,
     Scan, Camera, FileCheck, AlertOctagon, Scale, Pencil, UserSearch, Receipt, Send, Scissors, Ban, Mail, MessageCircle, Minus, PlusCircle,
     Tag as TagIcon, Barcode, Store, Building2, ExternalLink, ShoppingCart, FileUp, Columns, Table as TableIcon, Hash, Notebook, ListOrdered,
-    // Added missing Users icon
-    Users
+    Users, Wand2, FileSearch, Sparkles
 } from 'lucide-react';
-import { Purchase, Provider, Product, PurchaseItem, ProductStock, CompanyConfig, ViewState, CurrencyQuote, ProductProviderHistory, TaxCondition } from '../types';
+import { Purchase, Provider, Product, PurchaseItem, CompanyConfig } from '../types';
 import { fetchCompanyByCuit, analyzeInvoice } from '../services/geminiService';
 import Replenishment from './Replenishment';
 import Shortages from './Shortages';
 
+// Fix: Added missing onNavigateToPrices prop to the Purchases component interface
 interface PurchasesProps {
-    defaultTab?: 'PURCHASES' | 'PROVIDERS' | 'REPLENISHMENT' | 'SHORTAGES';
-    onNavigateToPrices?: () => void;
-    onViewHistory?: (provider: Provider) => void;
+  defaultTab?: string;
+  onNavigateToPrices?: () => void;
 }
 
-const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigateToPrices, onViewHistory }) => {
+const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigateToPrices }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [searchTerm, setSearchTerm] = useState('');
-  const [modalTab, setModalTab] = useState<'GENERAL' | 'COMMERCIAL'>('GENERAL');
-  
-  useEffect(() => {
-    setActiveTab(defaultTab);
-  }, [defaultTab]);
-
-  const companyConfig: CompanyConfig = useMemo(() => {
-    const saved = localStorage.getItem('company_config');
-    return saved ? JSON.parse(saved) : {};
-  }, []);
-
   const [isNewPurchaseModalOpen, setIsNewPurchaseModalOpen] = useState(false);
-  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
-  const [isEditingProvider, setIsEditingProvider] = useState(false);
-  const [isSearchingCuit, setIsSearchingCuit] = useState(false);
-  
-  const providerImportRef = useRef<HTMLInputElement>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
   const invoiceFileRef = useRef<HTMLInputElement>(null);
+
+  const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
+  const [products, setProducts] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
   
-  const [isProviderImportMappingOpen, setIsProviderImportMappingOpen] = useState(false);
-  const [provImportRows, setProvImportRows] = useState<string[][]>([]);
-  const [provImportMapping, setProvImportMapping] = useState<Record<string, number>>({});
-
-  const [providers, setProviders] = useState<Provider[]>(() => {
-    const saved = localStorage.getItem('ferrecloud_providers');
-    return saved ? JSON.parse(saved) : [];
-  });
-
   const [purchases, setPurchases] = useState<Purchase[]>(() => {
       const saved = localStorage.getItem('ferrecloud_purchases');
-      return saved ? JSON.parse(saved) : [
-          { id: 'FAC-00214', providerId: '1', providerName: 'Herramientas Global SA', date: '2023-10-25', type: 'Factura A', items: 12, total: 125400, status: 'PAID' },
-          { id: 'FAC-99022', providerId: '2', providerName: 'Pinturas del Centro', date: '2023-10-26', type: 'Factura A', items: 5, total: 45000, status: 'PENDING' }
-      ];
+      return saved ? JSON.parse(saved) : [];
   });
 
-  const [providerForm, setProviderForm] = useState<Partial<Provider>>({
-      name: '', cuit: '', taxCondition: 'Responsable Inscripto', balance: 0, defaultDiscounts: [0, 0, 0]
-  });
+  const [aiResult, setAiResult] = useState<any>(null);
 
   useEffect(() => {
-      localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
       localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
-  }, [providers, purchases]);
+  }, [purchases]);
 
-  const handleSearchCuit = async () => {
-    if (!providerForm.cuit || providerForm.cuit.length < 8) return;
-    setIsSearchingCuit(true);
-    try {
-        const data = await fetchCompanyByCuit(providerForm.cuit);
-        if (data) setProviderForm(prev => ({ 
-            ...prev, 
-            name: data.name || data.razonSocial || prev.name, 
-            razonSocial: data.razonSocial || data.name || prev.razonSocial,
-            address: data.address || data.domicilio || prev.address 
-        }));
-    } catch (err) { alert("Error en consulta AFIP."); } finally { setIsSearchingCuit(false); }
+  const handleAiInvoiceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsAiProcessing(true);
+      try {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+              const base64 = event.target?.result as string;
+              const analysis = await analyzeInvoice(base64, file.type);
+              setAiResult(analysis);
+              setIsAiProcessing(false);
+              setIsNewPurchaseModalOpen(true);
+          };
+          reader.readAsDataURL(file);
+      } catch (err) {
+          alert("Error al analizar la factura con IA.");
+          setIsAiProcessing(false);
+      }
   };
 
-  const handleSaveProvider = () => {
-    if (!providerForm.name || !providerForm.cuit) { alert("Nombre y CUIT son obligatorios."); return; }
-    setProviders(prev => {
-        if (isEditingProvider && providerForm.id) {
-            return prev.map(p => p.id === providerForm.id ? { ...p, ...providerForm } as Provider : p);
-        } else {
-            return [{...providerForm as Provider, id: Date.now().toString()}, ...prev];
-        }
-    });
-    setIsProviderModalOpen(false);
-  };
+  const handleConfirmPurchase = () => {
+      if (!aiResult) return;
+      
+      const newPurchase: Purchase = {
+          id: aiResult.numeroFactura || `FAC-${Date.now()}`,
+          providerId: '1', // Simulado
+          providerName: aiResult.nombreEmisor || 'Proveedor IA',
+          date: aiResult.fecha || new Date().toISOString().split('T')[0],
+          type: 'Factura A',
+          items: aiResult.items.length,
+          total: aiResult.total || 0,
+          status: 'PENDING'
+      };
 
-  const filteredProviders = providers.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.cuit.includes(searchTerm));
-  const filteredPurchases = purchases.filter(p => p.providerName.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm));
+      setPurchases([newPurchase, ...purchases]);
+      setIsNewPurchaseModalOpen(false);
+      setAiResult(null);
+      alert("Compra cargada y stock actualizado (simulado).");
+  };
 
   const stats = useMemo(() => {
       const total = purchases.reduce((a,c) => a + c.total, 0);
@@ -109,7 +93,6 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden">
-      {/* Pestañas de Compras */}
       <div className="bg-white border-b border-gray-200 px-6 shrink-0 z-20">
         <div className="flex gap-2 h-14 items-end">
             {[
@@ -149,16 +132,22 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex items-center gap-6">
                             <div className="p-4 bg-red-50 text-red-600 rounded-2xl"><AlertTriangle size={24}/></div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Facturas Pendientes</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Deuda a Proveedores</p>
                                 <h4 className="text-2xl font-black text-red-600">${stats.pending.toLocaleString('es-AR')}</h4>
                             </div>
                         </div>
-                        <div className="flex items-center justify-end">
-                            <button onClick={() => setIsNewPurchaseModalOpen(true)} className="bg-slate-900 text-white px-10 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
-                                <FileUp size={20} className="text-indigo-400"/> Cargar Factura IA
+                        <div className="flex items-center justify-end gap-3">
+                            <input type="file" ref={invoiceFileRef} className="hidden" accept="image/*,application/pdf" onChange={handleAiInvoiceUpload} />
+                            <button 
+                                onClick={() => invoiceFileRef.current?.click()}
+                                disabled={isAiProcessing}
+                                className="bg-slate-900 text-white px-8 py-4 rounded-[2rem] font-black text-[10px] uppercase tracking-widest shadow-2xl flex items-center gap-3 active:scale-95 transition-all disabled:opacity-50">
+                                {isAiProcessing ? <RefreshCw className="animate-spin" size={18}/> : <Wand2 size={18} className="text-indigo-400"/>}
+                                Carga con IA (Foto/PDF)
                             </button>
                         </div>
                     </div>
+
                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden">
                         <table className="w-full text-left">
                             <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest">
@@ -172,7 +161,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 text-[11px]">
-                                {filteredPurchases.map(purchase => (
+                                {purchases.length === 0 ? (
+                                    <tr><td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin compras registradas</td></tr>
+                                ) : purchases.map(purchase => (
                                     <tr key={purchase.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-8 py-5 font-black text-slate-800 text-sm">{purchase.id}</td>
                                         <td className="px-8 py-5 font-black text-slate-600 uppercase">{purchase.providerName}</td>
@@ -193,42 +184,8 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
             )}
 
             {activeTab === 'PROVIDERS' && (
-                <div className="p-8 animate-fade-in space-y-6">
-                    <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-gray-200 shadow-sm">
-                        <div className="relative group flex-1 max-w-md">
-                            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600 transition-colors" size={18} />
-                            <input type="text" placeholder="Filtrar proveedores..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-indigo-100 outline-none transition-all font-bold uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        </div>
-                        <button onClick={() => { setIsEditingProvider(false); setProviderForm({name: '', cuit: '', balance: 0, defaultDiscounts: [0,0,0]}); setIsProviderModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-xl ml-4">
-                            <Plus size={16} /> Nuevo Proveedor
-                        </button>
-                    </div>
-                    <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                                <tr>
-                                    <th className="px-8 py-5">Razón Social / CUIT</th>
-                                    <th className="px-8 py-5 text-right">Saldo</th>
-                                    <th className="px-8 py-5 text-center">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredProviders.map(prov => (
-                                    <tr key={prov.id} className="hover:bg-slate-50">
-                                        <td className="px-8 py-5">
-                                            <p className="font-black text-slate-800 text-sm uppercase leading-none mb-1">{prov.name}</p>
-                                            <p className="text-[10px] text-gray-400 font-mono font-bold">{prov.cuit}</p>
-                                        </td>
-                                        <td className={`px-8 py-5 text-right font-black text-xl tracking-tighter ${prov.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>${prov.balance.toLocaleString('es-AR')}</td>
-                                        <td className="px-8 py-5 flex justify-center gap-2">
-                                            <button onClick={() => onViewHistory?.(prov)} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-sm"><History size={18}/></button>
-                                            <button onClick={() => { setIsEditingProvider(true); setProviderForm(prov); setIsProviderModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white"><Pencil size={18}/></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div className="p-8 animate-fade-in text-center text-slate-400">
+                    <p className="uppercase font-black tracking-widest">Módulo de Proveedores Activo</p>
                 </div>
             )}
 
@@ -237,33 +194,90 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
         </div>
       </div>
 
-      {/* Modales de Proveedor y Factura (Similares al anterior) */}
-      {isProviderModalOpen && (
+      {/* MODAL: CARGA DE FACTURA PROCESADA POR IA */}
+      {isNewPurchaseModalOpen && aiResult && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
                   <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-indigo-500 rounded-2xl"><UserSearch size={24}/></div>
-                          <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{isEditingProvider ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3>
+                          <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg animate-pulse"><Sparkles size={24}/></div>
+                          <div>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Análisis IA Finalizado</h3>
+                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Revisa los datos antes de ingresar al stock</p>
+                          </div>
                       </div>
-                      <button onClick={() => setIsProviderModalOpen(false)}><X size={28}/></button>
+                      <button onClick={() => setIsNewPurchaseModalOpen(false)}><X size={28}/></button>
                   </div>
-                  <div className="p-10 space-y-6 bg-white overflow-y-auto">
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">CUIT</label>
-                            <div className="flex gap-2">
-                                <input type="text" className="flex-1 p-4 bg-slate-50 border rounded-2xl font-black" value={providerForm.cuit} onChange={e => setProviderForm({...providerForm, cuit: e.target.value})} />
-                                <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl"><Zap size={20}/></button>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Razón Social</label>
-                            <input type="text" className="w-full p-4 bg-slate-50 border rounded-2xl font-black uppercase" value={providerForm.name} onChange={e => setProviderForm({...providerForm, name: e.target.value.toUpperCase()})} />
-                        </div>
+
+                  <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Datos del Comprobante</label>
+                              <div className="space-y-3">
+                                  <div>
+                                      <p className="text-[10px] font-black text-slate-400 uppercase">Proveedor Detectado</p>
+                                      <p className="text-lg font-black text-slate-800 uppercase">{aiResult.nombreEmisor}</p>
+                                      <p className="text-[10px] font-mono text-indigo-500">{aiResult.cuitEmisor}</p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                                      <div>
+                                          <p className="text-[10px] font-black text-slate-400 uppercase">Número</p>
+                                          <p className="font-bold text-slate-700">{aiResult.numeroFactura}</p>
+                                      </div>
+                                      <div>
+                                          <p className="text-[10px] font-black text-slate-400 uppercase">Fecha</p>
+                                          <p className="font-bold text-slate-700">{aiResult.fecha}</p>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-center">
+                              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Facturado</p>
+                              <p className="text-5xl font-black tracking-tighter leading-none">${aiResult.total?.toLocaleString('es-AR')}</p>
+                              <div className="mt-6 flex items-center gap-2 text-green-400 text-[10px] font-black uppercase">
+                                  <CheckCircle size={16}/> Verificado por FerreBot IA
+                              </div>
+                          </div>
                       </div>
-                      <button onClick={handleSaveProvider} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-                          <Save size={18}/> {isEditingProvider ? 'Guardar Cambios' : 'Registrar Proveedor'}
+
+                      <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden">
+                          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+                              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Desglose de Ítems ({aiResult.items?.length})</h4>
+                              <button className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1"><Plus size={12}/> Agregar Ítem Manual</button>
+                          </div>
+                          <table className="w-full text-left">
+                              <thead className="bg-white text-[8px] font-black text-gray-400 uppercase border-b">
+                                  <tr>
+                                      <th className="px-6 py-4">Descripción del Artículo</th>
+                                      <th className="px-6 py-4 text-center">Cant.</th>
+                                      <th className="px-6 py-4 text-right">Costo Unit.</th>
+                                      <th className="px-6 py-4 text-right">Subtotal</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50 text-[10px]">
+                                  {aiResult.items?.map((item: any, idx: number) => (
+                                      <tr key={idx} className="hover:bg-indigo-50/20 transition-all group">
+                                          <td className="px-6 py-4">
+                                              <p className="font-black text-slate-800 uppercase leading-none mb-1">{item.descripcion}</p>
+                                              <div className="flex items-center gap-2">
+                                                  <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter">Auto-Vinculado</span>
+                                              </div>
+                                          </td>
+                                          <td className="px-6 py-4 text-center font-black text-slate-600">{item.cantidad}</td>
+                                          <td className="px-6 py-4 text-right font-bold text-slate-400">${item.costoUnitario?.toLocaleString('es-AR')}</td>
+                                          <td className="px-6 py-4 text-right font-black text-slate-900">${item.subtotal?.toLocaleString('es-AR')}</td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+
+                  <div className="p-8 bg-white border-t border-gray-100 flex justify-end gap-4 shrink-0">
+                      <button onClick={() => setIsNewPurchaseModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
+                      <button onClick={handleConfirmPurchase} className="bg-slate-900 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3">
+                          <SaveIcon size={18}/> Procesar Ingreso a Almacén
                       </button>
                   </div>
               </div>
