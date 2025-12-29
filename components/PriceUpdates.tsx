@@ -6,7 +6,7 @@ import {
     X, List, BookmarkPlus, 
     RefreshCw, Layers, TrendingUp, TrendingDown, PackagePlus, 
     PackageMinus, Calculator, Tag, Percent,
-    Truck, FileText, AlertOctagon, Building2, Edit2, Plus, Trash2, Save
+    Truck, FileText, AlertOctagon, Building2, Edit2, Plus, Trash2, Save, Info
 } from 'lucide-react';
 import { Provider, PriceList, Product } from '../types';
 
