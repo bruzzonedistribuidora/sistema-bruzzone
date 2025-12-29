@@ -40,7 +40,7 @@ import PriceAudit from './components/PriceAudit';
 import CreditNotes from './components/CreditNotes';
 import PublicPortal from './components/PublicPortal';
 import Shop from './components/Shop';
-import { EcommerceAdmin } from './components/EcommerceAdmin.tsx';
+import EcommerceAdmin from './components/EcommerceAdmin';
 import { ViewState, User, Client, InvoiceItem, Provider, ReplenishmentItem } from './types';
 
 const App: React.FC = () => {
