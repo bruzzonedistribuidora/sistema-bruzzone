@@ -8,8 +8,8 @@ import {
     Clock, MapPin, CheckCircle, Package, ArrowLeft,
     CreditCard, ExternalLink, Calculator, Trash2
 } from 'lucide-react';
-import { Product, SalesOrder, InvoiceItem, CompanyConfig, Brand, Category } from '../types';
-import { searchVirtualInventory } from '../services/geminiService';
+import { Product, SalesOrder, InvoiceItem, CompanyConfig, Brand, Category } from '../types.ts';
+import { searchVirtualInventory } from '../services/geminiService.ts';
 
 const Shop: React.FC = () => {
     // --- ESTADO TIENDA ---
