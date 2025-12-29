@@ -4,7 +4,8 @@ import {
     ShoppingCart, Printer, Trash2, Search, CheckCircle, 
     Plus, Minus, X, RefreshCw, Landmark,
     PlusCircle, Receipt, Truck, FileSpreadsheet,
-    CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign
+    CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
+    ShieldCheck, FileText, ArrowRight, ClipboardList
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
 
@@ -31,16 +32,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [productSearch, setProductSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isFiscalInvoicing, setIsFiscalInvoicing] = useState(false);
     const [syncKey, setSyncKey] = useState(0);
     
     const [lastSale, setLastSale] = useState<any>(null);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     
-    // Estado para Ítem Manual
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
-    const [products, setProducts] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
+    const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
@@ -118,7 +119,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
 
     const handleAddManualItem = () => {
         if (!manualItemForm.name || !manualItemForm.price) return;
-        
         const priceNum = parseFloat(manualItemForm.price);
         const mockProduct: Product = {
             id: `manual-${Date.now()}`,
@@ -152,18 +152,21 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             isCombo: false,
             comboItems: []
         };
-
         addToCart(mockProduct);
         setIsManualModalOpen(false);
         setManualItemForm({ name: '', price: '' });
     };
 
-    const handleCheckout = () => {
+    const handleCheckout = (isFiscal: boolean = false) => {
         if (cart.length === 0) return;
-        setIsProcessing(true);
+        if (isFiscal) setIsFiscalInvoicing(true);
+        else setIsProcessing(true);
+
         setTimeout(() => {
             const newSale = {
                 id: `VEN-${Date.now().toString().slice(-6)}`,
+                isFiscal: isFiscal,
+                cae: isFiscal ? Math.floor(Math.random() * 10000000000000).toString() : null,
                 date: new Date().toLocaleString(),
                 client: selectedClient.name,
                 items: [...cart],
@@ -177,12 +180,13 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify(updatedHistory));
             setLastSale(newSale);
             setIsProcessing(false);
+            setIsFiscalInvoicing(false);
             setShowSuccessModal(true);
             setCart([]);
             setPaymentMethod('EFECTIVO');
             setSelectedSystemId('');
             setSelectedCuotaId('');
-        }, 800);
+        }, isFiscal ? 2500 : 800);
     };
 
     return (
@@ -358,9 +362,38 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     {totals.interestAmount > 0 && <p className="text-[9px] font-bold text-indigo-400 mt-1 uppercase">Incluye Financiamiento Final: ${totals.interestAmount.toLocaleString('es-AR')}</p>}
                                 </div>
                             </div>
-                            <button onClick={handleCheckout} disabled={cart.length === 0 || isProcessing} className="w-full py-5 rounded-[1.8rem] font-black uppercase tracking-widest text-xs shadow-2xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
-                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={18}/> FINALIZAR COBRO</>}
-                            </button>
+
+                            {/* ACCIONES DE DOCUMENTO */}
+                            <div className="space-y-2 pt-4">
+                                <button 
+                                    onClick={() => handleCheckout(true)} 
+                                    disabled={cart.length === 0 || isFiscalInvoicing || isProcessing} 
+                                    className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    {isFiscalInvoicing ? <RefreshCw className="animate-spin" /> : <><ShieldCheck size={18}/> FACTURAR (ARCA)</>}
+                                </button>
+                                
+                                <button 
+                                    onClick={() => handleCheckout(false)} 
+                                    disabled={cart.length === 0 || isProcessing || isFiscalInvoicing} 
+                                    className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={18}/> FINALIZAR COBRO</>}
+                                </button>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={() => onTransformToRemito?.(cart)}
+                                        disabled={cart.length === 0}
+                                        className="py-3 rounded-xl font-black uppercase text-[9px] border-2 border-blue-100 text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                                        <Truck size={14}/> REMITO
+                                    </button>
+                                    <button 
+                                        onClick={() => onTransformToBudget?.(cart)}
+                                        disabled={cart.length === 0}
+                                        className="py-3 rounded-xl font-black uppercase text-[9px] border-2 border-teal-100 text-teal-600 hover:bg-teal-50 transition-all flex items-center justify-center gap-2">
+                                        <FileText size={14}/> PRESUP.
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -370,7 +403,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                         <table className="w-full text-left">
                             <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest sticky top-0">
                                 <tr>
-                                    <th className="px-6 py-4">ID</th>
+                                    <th className="px-6 py-4">ID / Tipo</th>
                                     <th className="px-6 py-4">Fecha</th>
                                     <th className="px-6 py-4">Cliente</th>
                                     <th className="px-6 py-4">Medio / Plataforma</th>
@@ -380,7 +413,14 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             <tbody className="divide-y divide-gray-100 text-[11px]">
                                 {salesHistory.map(sale => (
                                     <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 font-mono font-bold text-indigo-600">{sale.id}</td>
+                                        <td className="px-6 py-4 font-mono font-bold">
+                                            <div className="flex flex-col">
+                                                <span className="text-indigo-600">{sale.id}</span>
+                                                <span className={`text-[7px] uppercase px-1 py-0.5 rounded w-fit ${sale.isFiscal ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
+                                                    {sale.isFiscal ? 'Factura Fiscal' : 'Ticket Interno'}
+                                                </span>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-slate-400">{sale.date}</td>
                                         <td className="px-6 py-4 font-black uppercase text-slate-700">{sale.client}</td>
                                         <td className="px-6 py-4"><span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-slate-50 text-slate-500 border border-slate-200">{sale.paymentMethod} {sale.system ? `• ${sale.system}` : ''}</span></td>
@@ -448,10 +488,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             {showSuccessModal && lastSale && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in print:bg-white print:p-0 print:block">
                     <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col print:shadow-none print:rounded-none print:max-h-none print:w-full">
-                        <div className="p-8 bg-green-600 text-white flex justify-between items-center shrink-0 print:hidden">
+                        <div className={`p-8 ${lastSale.isFiscal ? 'bg-indigo-600' : 'bg-green-600'} text-white flex justify-between items-center shrink-0 print:hidden`}>
                             <div className="flex items-center gap-4">
-                                <CheckCircle size={32}/>
-                                <h3 className="text-2xl font-black uppercase tracking-tighter">Venta Confirmada</h3>
+                                {lastSale.isFiscal ? <ShieldCheck size={32}/> : <CheckCircle size={32}/>}
+                                <h3 className="text-2xl font-black uppercase tracking-tighter">
+                                    {lastSale.isFiscal ? 'Factura Autorizada' : 'Venta Registrada'}
+                                </h3>
                             </div>
                             <button onClick={() => setShowSuccessModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={32}/></button>
                         </div>
@@ -465,6 +507,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <div className="text-right">
                                         <p className="text-xl font-mono font-black">{lastSale.id}</p>
                                         <p className="text-[10px] font-bold text-slate-400 uppercase">{lastSale.date}</p>
+                                        {lastSale.isFiscal && <p className="text-[9px] font-black text-indigo-600 uppercase mt-1">Factura Electrónica A</p>}
                                     </div>
                                 </div>
                                 <div className="mb-8 space-y-1">
@@ -485,12 +528,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         ))}
                                     </tbody>
                                 </table>
-                                {lastSale.interest > 0 && (
-                                    <div className="flex justify-end pt-4 mb-4">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Recargo por Financiación: ${lastSale.interest.toLocaleString('es-AR')}</p>
+                                
+                                <div className="flex justify-between items-end pt-6 border-t-2 border-dashed border-slate-200">
+                                    <div>
+                                        {lastSale.isFiscal && (
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase">CAE: {lastSale.cae}</p>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase">Vto CAE: 30/11/2024</p>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                <div className="flex justify-end pt-6 border-t-2 border-dashed border-slate-200">
                                     <div className="text-right">
                                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Abonado</p>
                                         <p className="text-5xl font-black text-slate-900 tracking-tighter">${lastSale.total.toLocaleString('es-AR')}</p>
