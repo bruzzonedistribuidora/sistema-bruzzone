@@ -1,21 +1,21 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Save, Building2, CreditCard, Plus, Trash2, CheckCircle, 
-    X, Edit2, RefreshCw, Camera,
+    X, Edit2, RefreshCw, Camera, Upload,
     Percent, CreditCard as CardIcon, Zap, ChevronRight, Info,
-    Calculator, Smartphone, Landmark, Globe, Search, Link2, ExternalLink
+    Calculator, Smartphone, Landmark, Globe, Search, Link2, ExternalLink,
+    MapPin, Mail, Phone, Hash, FileText
 } from 'lucide-react';
-import { CompanyConfig, PaymentSystem, CreditInstallment } from '../types';
+import { CompanyConfig, PaymentSystem, CreditInstallment, TaxCondition } from '../types';
 import { fetchLatestFinancingRates } from '../services/geminiService';
 
 const CompanySettings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'CARDS'>('GENERAL');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [selectedSystemId, setSelectedSystemId] = useState<string | null>(null);
   const [lastSources, setLastSources] = useState<{title: string, uri: string}[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<CompanyConfig>(() => {
       const saved = localStorage.getItem('company_config');
@@ -53,7 +53,6 @@ const CompanySettings: React.FC = () => {
 
       setIsAiSearching(true);
       try {
-          // Se envía el nombre de la plataforma y la URL (si existe)
           const result = await fetchLatestFinancingRates(system.name, system.ratesUrl);
           setFormData(prev => ({
               ...prev,
@@ -65,16 +64,28 @@ const CompanySettings: React.FC = () => {
               })
           }));
           setLastSources(result.sources);
-          alert(`Sincronización exitosa para ${system.name}. Se han cargado ${result.installments.length} planes de cuotas.`);
+          alert(`Sincronización exitosa para ${system.name}.`);
       } catch (error) {
-          alert("Error al buscar las tasas en la web. Verifique la URL ingresada o inténtelo manualmente.");
+          alert("Error al buscar las tasas en la web.");
       } finally {
           setIsAiSearching(false);
       }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          const base64 = event.target?.result as string;
+          setFormData(prev => ({ ...prev, logo: base64 }));
+      };
+      reader.readAsDataURL(file);
+  };
+
   const addManualSystem = () => {
-      const name = prompt("Ingrese nombre de la plataforma (ej: Galicia Nave, Mercado Pago, Fiserv):");
+      const name = prompt("Ingrese nombre de la plataforma:");
       if (!name) return;
       const newSystem: PaymentSystem = {
           id: `sys-${Date.now()}`,
@@ -98,21 +109,177 @@ const CompanySettings: React.FC = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto h-full overflow-y-auto space-y-8 animate-fade-in bg-slate-50 pb-20">
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleLogoUpload} 
+        />
+
         <div className="flex justify-between items-center bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-sm">
             <div>
-                <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase leading-none">Mi Empresa</h2>
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-2">Finanzas y Configuración de Cobros</p>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tighter uppercase leading-none">Configuración de Empresa</h2>
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-2">Identidad, Fiscalidad y Sistemas de Pago</p>
             </div>
             <div className="flex gap-4">
                 <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
-                    <button onClick={() => setActiveTab('GENERAL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'GENERAL' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400'}`}>General</button>
+                    <button onClick={() => setActiveTab('GENERAL')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'GENERAL' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400'}`}>Datos Identidad</button>
                     <button onClick={() => setActiveTab('CARDS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'CARDS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400'}`}>Intereses y Cuotas</button>
                 </div>
-                <button onClick={() => alert('Configuración guardada.')} className="bg-slate-900 text-white px-8 py-2 rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all">
+                <button onClick={() => alert('¡Configuración guardada con éxito!')} className="bg-slate-900 text-white px-8 py-2 rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95">
                     <Save size={16}/> Guardar Cambios
                 </button>
             </div>
         </div>
+
+        {activeTab === 'GENERAL' && (
+            <div className="animate-fade-in space-y-8">
+                {/* SECCIÓN 1: IDENTIDAD VISUAL Y LEGAL */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-1 bg-white p-8 rounded-[3rem] border border-gray-200 shadow-sm flex flex-col items-center justify-center text-center">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Logo Corporativo</label>
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-48 h-48 bg-slate-50 border-4 border-dashed border-slate-100 rounded-[3rem] flex flex-col items-center justify-center relative group cursor-pointer hover:border-indigo-300 transition-all overflow-hidden shadow-inner"
+                        >
+                            {formData.logo ? (
+                                <img src={formData.logo} alt="Logo" className="w-full h-full object-contain p-4 transition-transform group-hover:scale-105" />
+                            ) : (
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="p-4 bg-white rounded-2xl shadow-sm text-slate-300 group-hover:text-indigo-400 transition-colors">
+                                        <Camera size={32} />
+                                    </div>
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Subir Imagen</span>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-indigo-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Upload size={32} className="text-white" />
+                            </div>
+                        </div>
+                        <p className="text-[9px] text-slate-400 font-medium mt-6 leading-relaxed uppercase">Haga clic para cambiar el logo.<br/>Recomendado: PNG fondo transparente.</p>
+                        {formData.logo && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setFormData({...formData, logo: null}); }}
+                                className="mt-4 text-[9px] font-black text-red-400 hover:text-red-600 uppercase tracking-widest"
+                            >
+                                Eliminar Logo
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm space-y-8">
+                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 border-b pb-4">
+                            <Building2 size={18} className="text-indigo-600"/> Datos Legales y Comerciales
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                    <FileText size={12}/> Razón Social
+                                </label>
+                                <input 
+                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold uppercase outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" 
+                                    placeholder="EJ: FERRETERIA BRUZZONE S.R.L."
+                                    value={formData.name} 
+                                    onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                    <Zap size={12}/> Nombre de Fantasía
+                                </label>
+                                <input 
+                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold uppercase outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" 
+                                    placeholder="EJ: BRUZZONE FERRETERÍA"
+                                    value={formData.fantasyName} 
+                                    onChange={e => setFormData({...formData, fantasyName: e.target.value.toUpperCase()})} 
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                    <Hash size={12}/> CUIT
+                                </label>
+                                <input 
+                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-mono font-black outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" 
+                                    placeholder="30-XXXXXXXX-X"
+                                    value={formData.cuit} 
+                                    onChange={e => setFormData({...formData, cuit: e.target.value})} 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                    <Landmark size={12}/> Condición IVA
+                                </label>
+                                <select 
+                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm"
+                                    value={formData.taxCondition}
+                                    onChange={e => setFormData({...formData, taxCondition: e.target.value as TaxCondition})}
+                                >
+                                    <option value="Responsable Inscripto">Responsable Inscripto</option>
+                                    <option value="Monotributo">Monotributo</option>
+                                    <option value="Exento">Exento</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
+                                    <Hash size={12}/> Ingresos Brutos (IIBB)
+                                </label>
+                                <input 
+                                    className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" 
+                                    placeholder="901-XXXXXX-X"
+                                    value={formData.iibb} 
+                                    onChange={e => setFormData({...formData, iibb: e.target.value})} 
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* SECCIÓN 2: CONTACTO Y UBICACIÓN */}
+                <div className="bg-white p-10 rounded-[3.5rem] border border-gray-200 shadow-sm space-y-8">
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 border-b pb-4">
+                        <MapPin size={18} className="text-red-500"/> Información de Contacto y Ubicación
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Dirección Fiscal / Local</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ciudad</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Código Postal</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.zipCode} onChange={e => setFormData({...formData, zipCode: e.target.value})} />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2"><Phone size={12}/> Teléfono Fijo</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2"><Smartphone size={12} className="text-green-500"/> WhatsApp Ventas</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-green-500 transition-all text-sm" value={formData.whatsappNumber} onChange={e => setFormData({...formData, whatsappNumber: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2"><Mail size={12}/> Email Corporativo</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2"><Globe size={12}/> Sitio Web</label>
+                            <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all text-sm" value={formData.web} onChange={e => setFormData({...formData, web: e.target.value})} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {activeTab === 'CARDS' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -165,7 +332,6 @@ const CompanySettings: React.FC = () => {
                                 <button onClick={() => deleteSystem(currentSystem.id)} className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={20}/></button>
                             </div>
 
-                            {/* NUEVO CAMPO: LINK DE TASAS OFICIALES */}
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">
                                     <Link2 size={12} className="text-indigo-600"/> Link de Tasas Oficiales (Opcional)
@@ -190,7 +356,6 @@ const CompanySettings: React.FC = () => {
                                         </a>
                                     )}
                                 </div>
-                                <p className="text-[8px] text-slate-400 px-2 italic uppercase font-bold">Si pegas un link, la IA entrará directamente ahí para buscar los recargos.</p>
                             </div>
 
                             {lastSources.length > 0 && (
@@ -301,31 +466,6 @@ const CompanySettings: React.FC = () => {
                             <p className="font-black uppercase tracking-[0.2em] text-[10px]">Selecciona o crea una plataforma para sincronizar sus tasas</p>
                         </div>
                     )}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'GENERAL' && (
-            <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm animate-fade-in space-y-8">
-                <div className="flex items-center gap-6 border-b pb-8">
-                    <div className="w-24 h-24 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white relative group overflow-hidden shadow-lg">
-                        {formData.logo ? <img src={formData.logo} alt="Logo" className="w-full h-full object-contain" /> : <Building2 size={40} />}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"><Camera size={24} /></div>
-                    </div>
-                    <div>
-                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter mb-2">{formData.name}</h3>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{formData.taxCondition} • CUIT {formData.cuit}</p>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">Nombre de Fantasía</label>
-                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold uppercase outline-none focus:bg-white focus:border-indigo-500 transition-all" value={formData.fantasyName} onChange={e => setFormData({...formData, fantasyName: e.target.value.toUpperCase()})} />
-                    </div>
-                    <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">WhatsApp Comercial</label>
-                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold outline-none focus:bg-white focus:border-green-500 transition-all" value={formData.whatsappNumber} onChange={e => setFormData({...formData, whatsappNumber: e.target.value})} />
-                    </div>
                 </div>
             </div>
         )}
