@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Star, Gift, Sparkles, Smartphone, QrCode, Search, 
@@ -16,16 +15,24 @@ const PublicPortal: React.FC = () => {
     const [loggedClient, setLoggedClient] = useState<Client | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     
-    // --- ESTADO DEL CARRITO DE PEDIDO ---
     const [cart, setCart] = useState<{product: Partial<Product>, quantity: number}[]>([]);
     const [productSearch, setProductSearch] = useState('');
     const [searchResults, setSearchResults] = useState<Partial<Product>[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-
-    // --- ESTADO DE CANJE ---
     const [redeemedCoupon, setRedeemedCoupon] = useState<string | null>(null);
 
-    // --- CARGA DE CONFIGURACIÓN ---
+    const [clients, setClients] = useState<Client[]>(() => 
+        JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]')
+    );
+
+    useEffect(() => {
+        const syncClients = () => {
+            setClients(JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
+        };
+        window.addEventListener('storage', syncClients);
+        return () => window.removeEventListener('storage', syncClients);
+    }, []);
+
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { fantasyName: 'Ferretería Bruzzone', loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 }, whatsappNumber: '5491144556677' };
@@ -34,32 +41,38 @@ const PublicPortal: React.FC = () => {
     const loyaltyEnabled = companyConfig.loyalty?.enabled ?? true;
     const minToRedeem = companyConfig.loyalty?.minPointsToRedeem ?? 500;
 
-    const clients: Client[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'), []);
-
     const offers = [
         { id: 1, title: 'Set Taladro Bosch + Maletín', oldPrice: 95000, newPrice: 79900, image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=400', tag: 'DÍA DEL PADRE' },
         { id: 2, title: 'Látex Interior 20L Premium', oldPrice: 42000, newPrice: 34500, image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=400', tag: 'FERRE-SALE' },
     ];
 
-    const handleLogin = () => {
-        if (!dniInput) return;
+    const handleLogin = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const rawDni = dniInput.trim();
+        if (!rawDni) return;
+
         setIsLoading(true);
         setTimeout(() => {
-            // Buscamos coincidencia parcial o total de DNI en CUIT
+            const cleanDni = rawDni.replace(/[^0-9]/g, '');
+            
             const found = clients.find(c => {
-                const cleanDni = dniInput.replace(/[^0-9]/g, '');
-                const cleanCuit = c.cuit.replace(/[^0-9]/g, '');
-                return cleanCuit.includes(cleanDni) || cleanDni === cleanCuit;
+                const cleanCuit = (c.cuit || '').replace(/[^0-9]/g, '');
+                const cleanDniClient = (c.dni || '').replace(/[^0-9]/g, '');
+                
+                // Buscamos coincidencia en CUIT (el DNI suele estar contenido) o campo DNI específico
+                return cleanCuit.includes(cleanDni) || 
+                       cleanDni === cleanCuit || 
+                       cleanDni === cleanDniClient;
             });
 
             if (found) {
                 setLoggedClient(found);
                 setCurrentView('DASHBOARD');
             } else {
-                alert("DNI no encontrado. Regístrate en el mostrador para empezar a sumar puntos.");
+                alert("DNI no encontrado en este dispositivo. Si registraste el cliente en la PC, recuerda que los datos de prueba son locales a cada navegador.");
             }
             setIsLoading(false);
-        }, 1000);
+        }, 800);
     };
 
     const handleSearchProducts = async (term: string) => {
@@ -111,11 +124,9 @@ const PublicPortal: React.FC = () => {
         
         setIsLoading(true);
         setTimeout(() => {
-            // Generar código aleatorio de cupón
             const code = `CANJE-${Math.random().toString(36).substring(7).toUpperCase()}`;
             setRedeemedCoupon(code);
             
-            // Simular descuento de puntos en la base local
             const updatedPoints = loggedClient.points - minToRedeem;
             const allClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
             const newClients = allClients.map((c: any) => c.id === loggedClient.id ? {...c, points: updatedPoints} : c);
@@ -130,7 +141,6 @@ const PublicPortal: React.FC = () => {
     if (currentView === 'LOGIN') {
         return (
             <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white font-sans overflow-hidden">
-                {/* Background Decor */}
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 blur-[100px] rounded-full"></div>
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-600/10 blur-[100px] rounded-full"></div>
 
@@ -148,28 +158,29 @@ const PublicPortal: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-white/5 border border-white/10 p-10 rounded-[3rem] backdrop-blur-xl space-y-8 shadow-2xl">
+                    <form onSubmit={handleLogin} className="bg-white/5 border border-white/10 p-10 rounded-[3rem] backdrop-blur-xl space-y-8 shadow-2xl">
                         <div className="space-y-4">
                             <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] ml-2 block">DNI del Cliente</label>
                             <div className="relative">
                                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={20}/>
                                 <input 
                                     type="text" 
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     placeholder="Nº de Documento" 
                                     className="w-full pl-12 p-5 bg-white/10 border-2 border-transparent rounded-2xl focus:bg-white focus:text-slate-900 focus:border-indigo-500 outline-none font-black text-2xl text-center tracking-widest transition-all placeholder:text-slate-600"
                                     value={dniInput}
                                     onChange={e => setDniInput(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleLogin()}
                                 />
                             </div>
                         </div>
                         <button 
-                            onClick={handleLogin}
-                            disabled={isLoading || !dniInput}
+                            type="submit"
+                            disabled={isLoading || !dniInput.trim()}
                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
                             {isLoading ? <RefreshCw className="animate-spin" size={20}/> : <><ArrowRight size={20}/> Acceder ahora</>}
                         </button>
-                    </div>
+                    </form>
 
                     <div className="text-center">
                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">¿Aún no eres cliente? Regístrate en el mostrador</p>
@@ -181,7 +192,6 @@ const PublicPortal: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800 pb-24 overflow-hidden">
-            {/* MOBILE HEADER */}
             <header className="bg-slate-900 text-white p-6 rounded-b-[3.5rem] shadow-2xl shrink-0 transition-all">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
@@ -193,10 +203,9 @@ const PublicPortal: React.FC = () => {
                             <h2 className="text-lg font-black uppercase tracking-tight truncate max-w-[180px]">{loggedClient?.name || 'Cliente'}</h2>
                         </div>
                     </div>
-                    <button onClick={() => { setLoggedClient(null); setCurrentView('LOGIN'); }} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors"><X size={20}/></button>
+                    <button onClick={() => { setLoggedClient(null); setCurrentView('LOGIN'); setDniInput(''); }} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-colors"><X size={20}/></button>
                 </div>
 
-                {/* AREA DE PUNTOS */}
                 {loyaltyEnabled && (
                     <div 
                         onClick={() => setCurrentView('REDEEM')}
@@ -218,7 +227,6 @@ const PublicPortal: React.FC = () => {
                     </div>
                 )}
 
-                {/* BUSCADOR DE PRODUCTOS */}
                 <div className="relative group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18}/>
                     <input 
@@ -232,9 +240,7 @@ const PublicPortal: React.FC = () => {
                 </div>
             </header>
 
-            {/* MAIN CONTENT MOBILE */}
             <main className="flex-1 p-6 space-y-8 overflow-y-auto custom-scrollbar">
-                
                 {currentView === 'DASHBOARD' && (
                     <>
                         <section className="space-y-4">
@@ -334,7 +340,7 @@ const PublicPortal: React.FC = () => {
                                     <Info size={16} className="shrink-0" />
                                     <p className="text-[10px] font-bold uppercase leading-tight text-left">Válido por 24hs. Solo un uso por cliente. Se aplicará sobre el total de tu compra.</p>
                                 </div>
-                                <button onClick={() => setCurrentView('DASHBOARD')} className="text-indigo-600 font-black text-xs uppercase tracking-widest underline">Volver al Inicio</button>
+                                <button onClick={() => {setRedeemedCoupon(null); setCurrentView('DASHBOARD');}} className="text-indigo-600 font-black text-xs uppercase tracking-widest underline">Volver al Inicio</button>
                             </div>
                         )}
                     </div>
@@ -434,7 +440,6 @@ const PublicPortal: React.FC = () => {
                 )}
             </main>
 
-            {/* BARRA DE NAVEGACIÓN INFERIOR (TAB BAR) */}
             <nav className="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-xl border-t border-slate-200 h-24 flex items-center justify-around px-6 z-[100] shadow-[0_-15px_40px_rgba(0,0,0,0.08)] rounded-t-[3.5rem]">
                 <button 
                     onClick={() => setCurrentView('DASHBOARD')}
