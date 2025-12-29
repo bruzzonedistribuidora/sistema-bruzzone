@@ -1,5 +1,5 @@
 // @ts-ignore
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoggleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // Configuración de la API usando la variable de entorno de Vite
