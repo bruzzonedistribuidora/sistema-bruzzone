@@ -5,17 +5,24 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+
+    /* Bundler mode - ESTO ARREGLA EL ERROR DE LA LIBRERIA */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+
+    /* Vite Types - ESTO ARREGLA EL ERROR DE IMPORT.META.ENV */
+    "types": ["vite/client"],
+
+    /* Linting */
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "services", "components", "types.ts", "App.tsx"],
+  "include": ["src", "services", "components", "types.ts", "App.tsx", "vite-env.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
