@@ -41,6 +41,7 @@ import PriceAudit from './components/PriceAudit.tsx';
 import CreditNotes from './components/CreditNotes.tsx';
 import PublicPortal from './components/PublicPortal.tsx';
 import Shop from './components/Shop.tsx';
+import EcommerceAdmin from './components/EcommerceAdmin.tsx';
 import { ViewState, User, Role, Client, InvoiceItem, Provider } from './types.ts';
 
 const App: React.FC = () => {
@@ -167,6 +168,7 @@ const App: React.FC = () => {
       case ViewState.CREDIT_NOTES: return <CreditNotes />;
       case ViewState.CURRENCIES: return <Currencies />;
       case ViewState.MARKETING: return <Marketing />;
+      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
       case ViewState.CLIENTS: return (
         <Clients 
             initialClientId={targetClientId} 
@@ -188,7 +190,7 @@ const App: React.FC = () => {
         <ProviderBalances 
             onNavigateToHistory={(provider) => {
                 setTargetProviderId(provider.id);
-                handleNavigate(ViewState.PROVIDERS);
+                handleNavigate(ViewState.PROVIDER_BALANCES);
             }} 
         />
       );
