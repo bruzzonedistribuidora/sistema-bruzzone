@@ -138,7 +138,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogo
                 <DropdownItem view={ViewState.MASS_PRODUCT_UPDATE} label="Cambios Masivos" icon={Zap} perm="STOCK_EDIT" />
                 <DropdownItem view={ViewState.STOCK_TRANSFERS} label="Traslados de Stock" icon={ArrowLeftRight} perm="STOCK_EDIT" />
                 <div className="h-px bg-slate-800 my-1 mx-4 opacity-50"></div>
-                <DropdownItem view={ViewState.PURCHASES} label="Carga de Compras" icon={Truck} perm="PURCHASES_VIEW" />
+                <DropdownItem view={ViewState.PURCHASES} label="Libro de Compras" icon={Truck} perm="PURCHASES_VIEW" />
                 <DropdownItem view={ViewState.PROVIDERS} label="Fichero Proveedores" icon={Users} perm="PURCHASES_VIEW" />
                 <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Proveedores" icon={Landmark} perm="PURCHASES_VIEW" />
                 <div className="h-px bg-slate-800 my-1 mx-4 opacity-50"></div>
