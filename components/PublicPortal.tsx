@@ -1,4 +1,4 @@
-import Sidebar from "./components/Sidebar";
+import Sidebar from "./Sidebar";
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     X, Smartphone, ShoppingBag, Plus, LayoutDashboard, Database, 
