@@ -222,8 +222,12 @@ const Shop: React.FC = () => {
                                     {cart.map(item => (
                                         <div key={item.product.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 flex items-center justify-between shadow-sm">
                                             <div className="flex items-center gap-6">
-                                                <div className="p-4 bg-slate-50 rounded-3xl">
-                                                    <Package size={24} className="text-slate-300"/>
+                                                <div className="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center">
+                                                    {item.product.ecommerce?.imageUrl ? (
+                                                        <img src={item.product.ecommerce.imageUrl} className="w-full h-full object-cover" alt={item.product.name} />
+                                                    ) : (
+                                                        <Package size={24} className="text-slate-300"/>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <h4 className="font-black text-slate-800 uppercase text-sm leading-tight mb-1">{item.product.name}</h4>
@@ -235,7 +239,7 @@ const Shop: React.FC = () => {
                                             <div className="flex items-center gap-4">
                                                 <div className="flex items-center gap-3 bg-slate-100 p-2 rounded-2xl">
                                                     <button onClick={() => updateCartQty(item.product.id, -1)} className="p-1 hover:bg-white rounded-lg transition-all"><Minus size={14}/></button>
-                                                    <span className="font-black text-xs w-6 text-center">{item.quantity}</span>
+                                                    <span className="font-black text-sm min-w-[24px] text-center">{item.quantity}</span>
                                                     <button onClick={() => updateCartQty(item.product.id, 1)} className="p-1 hover:bg-white rounded-lg transition-all"><Plus size={14}/></button>
                                                 </div>
                                                 <button onClick={() => removeFromCart(item.product.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
@@ -311,11 +315,20 @@ const ProductCard: React.FC<{ product: Product, onAdd: (p: Product, qty: number)
 
     return (
         <div className={`rounded-[2.5rem] border transition-all overflow-hidden flex flex-col group h-[450px] ${dark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-2xl'}`}>
-            <div className={`h-56 flex items-center justify-center p-12 relative overflow-hidden ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
+            <div className={`h-56 flex items-center justify-center relative overflow-hidden ${dark ? 'bg-white/5' : 'bg-slate-50'}`}>
                 {isOffer && (
                     <span className="absolute top-4 left-4 bg-orange-500 text-white px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest shadow-lg z-10 animate-pulse">OFERTA</span>
                 )}
-                <Package size={80} className={`transition-transform duration-500 group-hover:scale-125 ${dark ? 'text-white/10' : 'text-slate-200'}`} strokeWidth={1} />
+                
+                {product.ecommerce?.imageUrl ? (
+                    <img 
+                        src={product.ecommerce.imageUrl} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        alt={product.name} 
+                    />
+                ) : (
+                    <Package size={80} className={`transition-transform duration-500 group-hover:scale-125 ${dark ? 'text-white/10' : 'text-slate-200'}`} strokeWidth={1} />
+                )}
             </div>
             <div className="p-8 flex-1 flex flex-col">
                 <h4 className={`font-black uppercase tracking-tight text-lg leading-tight h-12 overflow-hidden mb-2 ${dark ? 'text-white' : 'text-slate-800'}`}>{product.name}</h4>
@@ -331,7 +344,7 @@ const ProductCard: React.FC<{ product: Product, onAdd: (p: Product, qty: number)
                     </div>
                     <button 
                         onClick={() => onAdd(product, 1)}
-                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-95 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
+                        className={`p-4 rounded-2xl shadow-xl transition-all active:scale-90 ${dark ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
                         <Plus size={20}/>
                     </button>
                 </div>
