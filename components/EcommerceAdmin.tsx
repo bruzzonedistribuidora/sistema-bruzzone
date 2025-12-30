@@ -44,6 +44,22 @@ export enum ViewState {
   INITIAL_IMPORT = 'INITIAL_IMPORT'
 }
 
+import React from 'react';
+// Importamos los tipos usando ../ porque types está afuera de la carpeta components
+import { ViewState, User, Client, InvoiceItem } from '../types';
+
+const EcommerceAdmin: React.FC = () => {
+    return (
+        <div className="p-6">
+            <h1 className="text-2xl font-bold">Administración E-commerce</h1>
+            <p>Panel de control para Mercado Libre, Tienda Nube y Web Propia.</p>
+        </div>
+    );
+};
+
+// ESTA ES LA LÍNEA QUE FALTA Y QUE CAUSA EL ERROR:
+export default EcommerceAdmin;
+
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 
 export interface Product {
