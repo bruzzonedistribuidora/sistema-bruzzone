@@ -8,7 +8,7 @@ import {
     LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart
 } from 'lucide-react';
 
-// TODOS ESTOS DEBEN IR SIN "./components/"
+// RUTAS CORREGIDAS
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import Inventory from './Inventory';
@@ -45,5 +45,21 @@ import MassProductUpdate from './MassProductUpdate';
 import StockTransfers from './StockTransfers';
 import Login from './Login';
 
-// ESTE LLEVA LOS DOS PUNTOS PORQUE ESTÁ AFUERA
+// RUTA HACIA AFUERA PARA LOS TIPOS
 import { ViewState, User, Client, InvoiceItem } from '../types';
+
+// 1. EL COMPONENTE DEBE LLAMARSE PublicPortal
+const PublicPortal: React.FC = () => {
+    // Aquí debe ir toda tu lógica de estados (useState, useEffect, etc.)
+    // que tenías en el archivo original.
+    
+    return (
+        <div className="p-4">
+            {/* Aquí va tu JSX (el HTML del componente) */}
+            <h1>Portal Público</h1>
+        </div>
+    );
+};
+
+// 2. ESTA LÍNEA ES LA MÁS IMPORTANTE PARA QUITAR EL ERROR DEL BUILD
+export default PublicPortal;
