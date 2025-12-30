@@ -1,14 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-    ShoppingCart, User, CreditCard, Printer, Trash2, Search, CheckCircle, 
-    Plus, Minus, Banknote, FileText, X, AlertCircle, RefreshCw, Barcode, 
-    DollarSign, History, Filter, Eye, Package, Zap, Landmark, Smartphone,
-    PackagePlus, Loader2, Globe, Tag, ClipboardList, CheckSquare, Square, Layers,
-    Scroll, TabletSmartphone, Pencil, PlusCircle, ShieldCheck, FileSpreadsheet, Receipt,
-    ArrowRightLeft, Send, Shield, Hash, QrCode, Save, Check
+    ShoppingCart, Printer, Trash2, Search, CheckCircle, 
+    Plus, Minus, X, RefreshCw, Landmark,
+    PlusCircle, Receipt, Truck, FileSpreadsheet,
+    CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
+    ShieldCheck, FileText, ArrowRight, ClipboardList
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, PriceList, Budget, Remito, CompanyConfig } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
 
 const DEFAULT_CLIENT: Client = {
     id: 'cf-default',
@@ -24,51 +23,90 @@ const DEFAULT_CLIENT: Client = {
 interface POSProps {
     initialCart?: InvoiceItem[];
     onCartUsed?: () => void;
+    onTransformToRemito?: (items: InvoiceItem[]) => void;
+    onTransformToBudget?: (items: InvoiceItem[]) => void;
 }
 
-const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
+const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito, onTransformToBudget }) => {
     const [activeTab, setActiveTab] = useState<'SALES' | 'HISTORY'>('SALES');
-    const searchRef = useRef<HTMLDivElement>(null);
-    const clientRef = useRef<HTMLDivElement>(null);
+    const [productSearch, setProductSearch] = useState('');
+    const [showProductResults, setShowProductResults] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isFiscalInvoicing, setIsFiscalInvoicing] = useState(false);
+    const [syncKey, setSyncKey] = useState(0);
+    
+    const [lastSale, setLastSale] = useState<any>(null);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    
+    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+    const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
-    const [products, setProducts] = useState<Product[]>(() => {
-        const saved = localStorage.getItem('ferrecloud_products');
-        return saved ? JSON.parse(saved) : [];
-    });
+    const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
+    const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
+    const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
-    const [clients, setClients] = useState<Client[]>(() => {
-        const saved = localStorage.getItem('ferrecloud_clients');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    const [salesHistory, setSalesHistory] = useState<any[]>(() => {
-        return JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
-    });
+    useEffect(() => {
+        const handleSync = () => setSyncKey(k => k + 1);
+        window.addEventListener('company_config_updated', handleSync);
+        window.addEventListener('storage', handleSync);
+        return () => {
+            window.removeEventListener('company_config_updated', handleSync);
+            window.removeEventListener('storage', handleSync);
+        };
+    }, []);
 
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
-        return saved ? JSON.parse(saved) : { loyalty: { enabled: true, pointsPerPeso: 0.01 } };
-    }, []);
+        return saved ? JSON.parse(saved) : { 
+            paymentMethods: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'],
+            paymentSystems: []
+        };
+    }, [syncKey]);
 
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
-    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'MERCADO_PAGO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'MIXTO' | 'RETENCION'>('EFECTIVO');
-    
-    const [isManualModalOpen, setIsManualModalOpen] = useState(false);
-    const [manualItemForm, setManualItemForm] = useState({ name: '', price: 0 });
+    const [paymentMethod, setPaymentMethod] = useState<string>('EFECTIVO');
     const [discountPerc, setDiscountPerc] = useState<number>(0);
-    const [productSearch, setProductSearch] = useState('');
-    const [clientSearch, setClientSearch] = useState('');
-    const [showProductResults, setShowProductResults] = useState(false);
-    const [showClientResults, setShowClientResults] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
 
-    const [priceLists] = useState<PriceList[]>([
-        { id: '1', name: 'Lista Base', type: 'BASE', active: true },
-        { id: '2', name: 'Gremio', type: 'CUSTOM', fixedMargin: 25, active: true },
-        { id: '3', name: 'Mayorista', type: 'CUSTOM', fixedMargin: 15, active: true },
-    ]);
-    const [selectedPriceList, setSelectedPriceList] = useState<PriceList>(priceLists[0]);
+    const [selectedSystemId, setSelectedSystemId] = useState<string>('');
+    const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
+
+    // Lógica de búsqueda avanzada
+    const filteredProducts = useMemo(() => {
+        const term = productSearch.toLowerCase().trim();
+        if (!term) return [];
+        return products.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
+            p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
+            p.barcodes.some(c => c.toLowerCase().includes(term))
+        ).slice(0, 10);
+    }, [productSearch, products]);
+
+    const currentSystem = useMemo(() => 
+        (companyConfig.paymentSystems || []).find(s => s.id === selectedSystemId),
+    [selectedSystemId, companyConfig]);
+
+    const cardInterest = useMemo(() => {
+        if (paymentMethod !== 'TARJETA' || !currentSystem) return 0;
+        if (!selectedCuotaId) return currentSystem.debitSurcharge;
+        const plan = currentSystem.creditInstallments.find(p => p.id === selectedCuotaId);
+        return plan ? plan.surcharge : 0;
+    }, [paymentMethod, currentSystem, selectedCuotaId]);
+
+    const totals = useMemo(() => {
+        const grossTotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
+        const discountAmount = grossTotal * (discountPerc / 100);
+        const baseTotal = grossTotal - discountAmount;
+        const interestAmount = baseTotal * (cardInterest / 100);
+        return { 
+            total: baseTotal + interestAmount, 
+            discountAmount, 
+            grossTotal, 
+            interestAmount, 
+            baseTotal 
+        };
+    }, [cart, discountPerc, cardInterest]);
 
     useEffect(() => {
         if (initialCart && initialCart.length > 0) {
@@ -77,88 +115,95 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         }
     }, [initialCart]);
 
-    const totals = useMemo(() => {
-        const grossTotal = cart.reduce((acc, item) => acc + item.subtotal, 0);
-        const discountAmount = grossTotal * (discountPerc / 100);
-        return { total: grossTotal - discountAmount, discountAmount, grossTotal };
-    }, [cart, discountPerc]);
-
     const addToCart = (product: Product) => {
-        const price = product.priceFinal;
         setCart(prev => {
             const existing = prev.find(item => item.product.id === product.id);
             if (existing) {
                 return prev.map(item => item.product.id === product.id ? 
-                    { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * price } : item
+                    { ...item, quantity: item.quantity + 1, subtotal: (item.quantity + 1) * item.appliedPrice } : item
                 );
             }
-            return [...prev, { product, quantity: 1, appliedPrice: price, subtotal: price }];
+            return [...prev, { product, quantity: 1, appliedPrice: product.priceFinal, subtotal: product.priceFinal }];
         });
         setProductSearch('');
         setShowProductResults(false);
     };
 
-    const handleCheckout = () => {
+    const handleAddManualItem = () => {
+        if (!manualItemForm.name || !manualItemForm.price) return;
+        const priceNum = parseFloat(manualItemForm.price);
+        const mockProduct: Product = {
+            id: `manual-${Date.now()}`,
+            internalCodes: ['VARIO'],
+            barcodes: [],
+            providerCodes: [],
+            name: manualItemForm.name.toUpperCase(),
+            brand: 'GENERICO',
+            provider: '',
+            description: 'Ingreso manual desde POS',
+            category: 'VARIOS',
+            measureUnitSale: 'Unidad',
+            measureUnitPurchase: 'Unidad',
+            conversionFactor: 1,
+            purchaseCurrency: 'ARS',
+            saleCurrency: 'ARS',
+            vatRate: 21.0,
+            listCost: priceNum * 0.7,
+            discounts: [0,0,0,0],
+            costAfterDiscounts: priceNum * 0.7,
+            profitMargin: 30,
+            priceNeto: priceNum / 1.21,
+            priceFinal: priceNum,
+            stock: 0,
+            stockDetails: [],
+            minStock: 0,
+            desiredStock: 0,
+            reorderPoint: 0,
+            location: '',
+            ecommerce: {},
+            isCombo: false,
+            comboItems: []
+        };
+        addToCart(mockProduct);
+        setIsManualModalOpen(false);
+        setManualItemForm({ name: '', price: '' });
+    };
+
+    const handleCheckout = (isFiscal: boolean = false) => {
         if (cart.length === 0) return;
-        setIsProcessing(true);
+        if (isFiscal) setIsFiscalInvoicing(true);
+        else setIsProcessing(true);
 
         setTimeout(() => {
-            const saleId = `VEN-${Date.now().toString().slice(-6)}`;
             const newSale = {
-                id: saleId,
+                id: `VEN-${Date.now().toString().slice(-6)}`,
+                isFiscal: isFiscal,
+                cae: isFiscal ? Math.floor(Math.random() * 10000000000000).toString() : null,
                 date: new Date().toLocaleString(),
                 client: selectedClient.name,
-                items: cart,
+                items: [...cart],
                 total: totals.total,
-                paymentMethod
+                paymentMethod,
+                system: currentSystem?.name,
+                interest: totals.interestAmount
             };
-
-            // 1. Guardar en historial
             const updatedHistory = [newSale, ...salesHistory];
             setSalesHistory(updatedHistory);
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify(updatedHistory));
-
-            // 2. Descontar Stock
-            const updatedProducts = products.map(p => {
-                const cartItem = cart.find(item => item.product.id === p.id);
-                if (cartItem) {
-                    return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
-                }
-                return p;
-            });
-            setProducts(updatedProducts);
-            localStorage.setItem('ferrecloud_products', JSON.stringify(updatedProducts));
-
-            // 3. Sumar Puntos si aplica
-            if (companyConfig.loyalty?.enabled && selectedClient.id !== 'cf-default') {
-                const pointsEarned = Math.floor(totals.total * (companyConfig.loyalty.pointsPerPeso || 0.01));
-                const updatedClients = clients.map(c => 
-                    c.id === selectedClient.id ? { ...c, points: (c.points || 0) + pointsEarned } : c
-                );
-                setClients(updatedClients);
-                localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
-            }
-
+            setLastSale(newSale);
             setIsProcessing(false);
+            setIsFiscalInvoicing(false);
+            setShowSuccessModal(true);
             setCart([]);
-            setSelectedClient(DEFAULT_CLIENT);
-            setDiscountPerc(0);
-            alert(`Venta ${saleId} procesada con éxito.`);
-        }, 1000);
+            setPaymentMethod('EFECTIVO');
+            setSelectedSystemId('');
+            setSelectedCuotaId('');
+        }, isFiscal ? 2500 : 800);
     };
 
-    const localResults = useMemo(() => {
-        const term = productSearch.trim().toLowerCase();
-        if (!term) return [];
-        return products.filter(p => 
-            (p.name || '').toLowerCase().includes(term) || 
-            p.internalCodes.some(c => c.toLowerCase().includes(term))
-        ).slice(0, 8);
-    }, [productSearch, products]);
-
     return (
-        <div className="flex h-full bg-slate-50 overflow-hidden flex-col">
-            <div className="bg-white border-b border-gray-200 px-6 h-12 flex justify-between items-center shrink-0">
+        <div className="flex h-full bg-slate-50 overflow-hidden flex-col font-sans">
+            <div className="bg-white border-b border-gray-200 px-6 h-12 flex justify-between items-center shrink-0 print:hidden">
                 <div className="flex gap-6 h-full">
                     <button onClick={() => setActiveTab('SALES')} className={`h-full px-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all ${activeTab === 'SALES' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Caja Registradora</button>
                     <button onClick={() => setActiveTab('HISTORY')} className={`h-full px-2 font-black text-xs uppercase tracking-wider border-b-2 transition-all ${activeTab === 'HISTORY' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Ventas Recientes</button>
@@ -166,46 +211,51 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
             </div>
 
             {activeTab === 'SALES' ? (
-                <div className="flex flex-1 overflow-hidden p-4 gap-4">
+                <div className="flex flex-1 overflow-hidden p-4 gap-4 print:p-0">
                     <div className="flex-[3] flex flex-col gap-4 overflow-hidden">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
-                            <div className="md:col-span-8 relative">
-                                <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500 transition-all">
-                                    <Search className="text-gray-300 mr-3" size={20} />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Buscar por descripción o código SKU..." 
-                                        className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 uppercase" 
-                                        value={productSearch}
-                                        onFocus={() => setShowProductResults(true)}
-                                        onChange={(e) => setProductSearch(e.target.value)}
-                                    />
-                                </div>
-                                {showProductResults && productSearch.length > 0 && (
-                                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden">
-                                        {localResults.map(p => (
-                                            <div key={p.id} onClick={() => addToCart(p)} className="p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer">
-                                                <div>
-                                                    <p className="font-black text-slate-800 uppercase text-xs mb-1">{p.name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{p.internalCodes[0]} • {p.brand}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-black text-indigo-600 text-sm">${p.priceFinal.toLocaleString('es-AR')}</p>
-                                                    <p className="text-[9px] text-slate-300 font-bold uppercase">Stock: {p.stock}</p>
-                                                </div>
-                                            </div>
-                                        ))}
+                            <div className="md:col-span-8 flex gap-2">
+                                <div className="relative flex-1">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500">
+                                        <Search className="text-gray-300 mr-3" size={20} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Buscar descripción, SKU, Barras o Prov..." 
+                                            className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-700 uppercase" 
+                                            value={productSearch}
+                                            onFocus={() => setShowProductResults(true)}
+                                            onChange={(e) => setProductSearch(e.target.value)}
+                                        />
                                     </div>
-                                )}
+                                    {showProductResults && productSearch.length > 0 && (
+                                        <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] overflow-hidden">
+                                            {filteredProducts.map(p => (
+                                                <div key={p.id} onClick={() => addToCart(p)} className="p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer group">
+                                                    <div>
+                                                        <p className="font-black text-slate-800 uppercase text-xs">{p.name}</p>
+                                                        <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase">
+                                                            <span>INT: {p.internalCodes[0]}</span>
+                                                            <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="font-black text-indigo-600 text-sm">${p.priceFinal.toLocaleString('es-AR')}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button 
+                                    onClick={() => setIsManualModalOpen(true)}
+                                    className="bg-indigo-50 text-indigo-600 px-4 py-3 rounded-2xl border border-indigo-100 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm"
+                                    title="Agregar producto no listado">
+                                    <PackagePlus size={18}/> <span className="hidden xl:inline">Ítem Manual</span>
+                                </button>
                             </div>
-                            <div className="md:col-span-4 relative">
+                            <div className="md:col-span-4">
                                 <select 
-                                    className="w-full h-full p-3 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full h-full p-3 bg-white border border-gray-200 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                                     value={selectedClient.id}
-                                    onChange={e => {
-                                        const c = clients.find(cl => cl.id === e.target.value) || DEFAULT_CLIENT;
-                                        setSelectedClient(c);
-                                    }}
+                                    onChange={e => setSelectedClient(clients.find(cl => cl.id === e.target.value) || DEFAULT_CLIENT)}
                                 >
                                     <option value="cf-default">Consumidor Final</option>
                                     {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -215,109 +265,308 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
 
                         <div className="bg-white rounded-[2rem] shadow-sm border border-gray-200 overflow-hidden flex flex-col flex-1">
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <table className="w-full text-left">
+                                <table className="w-full text-left border-collapse">
                                     <thead className="bg-slate-900 text-white sticky top-0 z-10 text-[10px] font-black uppercase tracking-widest">
                                         <tr>
                                             <th className="px-6 py-4">Producto</th>
                                             <th className="px-6 py-4 text-center">Cantidad</th>
-                                            <th className="px-6 py-4 text-right">Unitario</th>
                                             <th className="px-6 py-4 text-right">Subtotal</th>
                                             <th className="px-6 py-4 text-center"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {cart.map(item => (
-                                            <tr key={item.product.id} className="hover:bg-slate-50/50 transition-colors">
+                                        {cart.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={4} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest italic opacity-50">
+                                                    Escanee o busque productos para iniciar
+                                                </td>
+                                            </tr>
+                                        ) : cart.map(item => (
+                                            <tr key={item.product.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-6 py-4">
-                                                    <p className="font-black text-slate-800 text-xs uppercase leading-none mb-1">{item.product.name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{item.product.internalCodes[0]}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div>
+                                                            <p className="font-black text-slate-800 text-xs uppercase leading-none mb-1">{item.product.name}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{item.product.internalCodes[0]}</p>
+                                                                {item.product.id.startsWith('manual-') && (
+                                                                    <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">Manual</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-center gap-3">
+                                                    <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-xl p-1 w-fit mx-auto border border-slate-100">
                                                         <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: Math.max(1, i.quantity - 1), subtotal: Math.max(1, i.quantity - 1) * i.appliedPrice} : i))} className="p-1 text-slate-300 hover:text-indigo-600"><Minus size={16}/></button>
                                                         <span className="font-black text-sm w-8 text-center">{item.quantity}</span>
                                                         <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.appliedPrice} : i))} className="p-1 text-slate-300 hover:text-indigo-600"><Plus size={16}/></button>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 text-right font-bold text-slate-400">${item.appliedPrice.toLocaleString('es-AR')}</td>
                                                 <td className="px-6 py-4 text-right font-black text-slate-900">${item.subtotal.toLocaleString('es-AR')}</td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="text-gray-300 hover:text-red-500"><Trash2 size={18}/></button>
+                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
                                                 </td>
                                             </tr>
                                         ))}
-                                        {cart.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="py-32 text-center opacity-20">
-                                                    <ShoppingCart size={80} className="mx-auto mb-4" />
-                                                    <p className="font-black uppercase tracking-widest text-sm">Esperando artículos...</p>
-                                                </td>
-                                            </tr>
-                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col gap-4">
-                        <div className="bg-white border border-gray-200 rounded-[2rem] shadow-sm p-8 space-y-6 flex-1 flex flex-col">
-                            <h3 className="font-black text-xs uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Resumen de Venta</h3>
-                            
+                    <div className="flex-1 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
+                        <div className="bg-white border border-gray-200 rounded-[2rem] shadow-sm p-6 space-y-4 flex flex-col">
+                            <h3 className="font-black text-[10px] uppercase tracking-widest text-slate-400 border-b pb-4 mb-2">Checkout Inteligente</h3>
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase">Subtotal Bruto</span>
-                                    <span className="text-lg font-black text-slate-700">${totals.grossTotal.toLocaleString('es-AR')}</span>
+                                    <span className="text-[10px] font-black text-slate-500 uppercase">Subtotal Neto</span>
+                                    <span className="text-lg font-black text-slate-700">${totals.baseTotal.toLocaleString('es-AR')}</span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase">Bonificación (%)</span>
-                                    <input type="number" className="w-20 p-2 bg-slate-50 border rounded-xl text-right font-black text-indigo-600" value={discountPerc} onChange={e => setDiscountPerc(parseFloat(e.target.value) || 0)} />
+                                <div className="pt-4 border-t border-dashed border-slate-200">
+                                    <label className="text-[9px] font-black text-gray-400 uppercase mb-3 block tracking-widest">Modalidad</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {companyConfig.paymentMethods?.map(m => (
+                                            <button 
+                                                key={m} 
+                                                onClick={() => setPaymentMethod(m)} 
+                                                className={`py-3 rounded-xl font-black text-[9px] uppercase border-2 transition-all ${paymentMethod === m ? 'border-slate-900 bg-slate-900 text-white shadow-lg' : 'border-gray-50 text-gray-400 hover:bg-gray-100'}`}>
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="pt-4 border-t border-dashed">
+
+                                {paymentMethod === 'TARJETA' && (
+                                    <div className="space-y-4 animate-fade-in">
+                                        <div className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100 space-y-3">
+                                            <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block">Canal de Cobro</label>
+                                            <select 
+                                                className="w-full p-3 bg-white border border-indigo-100 rounded-xl font-black text-[10px] uppercase outline-none focus:ring-2 focus:ring-indigo-500"
+                                                value={selectedSystemId}
+                                                onChange={e => { setSelectedSystemId(e.target.value); setSelectedCuotaId(''); }}
+                                            >
+                                                <option value="">-- SELECCIONE PLATAFORMA --</option>
+                                                {(companyConfig.paymentSystems || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            </select>
+                                        </div>
+
+                                        {currentSystem && (
+                                            <div className="grid grid-cols-1 gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Plan Seleccionado (CFT Inc.)</label>
+                                                <button 
+                                                    onClick={() => setSelectedCuotaId('')}
+                                                    className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${!selectedCuotaId ? 'bg-green-600 border-green-700 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                                    <span className="text-[10px] font-black uppercase">Débito</span>
+                                                    <span className="text-[9px] font-bold">+{currentSystem.debitSurcharge}%</span>
+                                                </button>
+                                                {currentSystem.creditInstallments.map(plan => (
+                                                    <button 
+                                                        key={plan.id}
+                                                        onClick={() => setSelectedCuotaId(plan.id)}
+                                                        className={`w-full p-3 rounded-xl border flex justify-between items-center transition-all ${selectedCuotaId === plan.id ? 'bg-indigo-600 border-indigo-700 text-white shadow-md' : 'bg-white border-slate-100 text-slate-600'}`}>
+                                                        <span className="text-[10px] font-black uppercase">{plan.label}</span>
+                                                        <span className="text-[9px] font-bold">+{plan.surcharge}%</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="pt-4 border-t border-slate-200">
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Final a Cobrar</p>
-                                    <p className="text-5xl font-black text-slate-900 tracking-tighter">${totals.total.toLocaleString('es-AR')}</p>
+                                    <p className={`text-4xl font-black tracking-tighter ${totals.interestAmount > 0 ? 'text-indigo-600 animate-pulse' : 'text-slate-900'}`}>${totals.total.toLocaleString('es-AR')}</p>
+                                    {totals.interestAmount > 0 && <p className="text-[9px] font-bold text-indigo-400 mt-1 uppercase">Incluye Financiamiento Final: ${totals.interestAmount.toLocaleString('es-AR')}</p>}
                                 </div>
                             </div>
 
-                            <div className="space-y-3 pt-6">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Medio de Pago</label>
-                                <select className="w-full p-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase outline-none" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)}>
-                                    <option value="EFECTIVO">Efectivo Cash</option>
-                                    <option value="MERCADO_PAGO">Mercado Pago / QR</option>
-                                    <option value="TRANSFERENCIA">Transferencia</option>
-                                    <option value="CTACTE">Cuenta Corriente</option>
-                                </select>
-                            </div>
+                            {/* ACCIONES DE DOCUMENTO */}
+                            <div className="space-y-2 pt-4">
+                                <button 
+                                    onClick={() => handleCheckout(true)} 
+                                    disabled={cart.length === 0 || isFiscalInvoicing || isProcessing} 
+                                    className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    {isFiscalInvoicing ? <RefreshCw className="animate-spin" /> : <><ShieldCheck size={18}/> FACTURAR (ARCA)</>}
+                                </button>
+                                
+                                <button 
+                                    onClick={() => handleCheckout(false)} 
+                                    disabled={cart.length === 0 || isProcessing || isFiscalInvoicing} 
+                                    className="w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                    {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={18}/> FINALIZAR COBRO</>}
+                                </button>
 
-                            <button 
-                                onClick={handleCheckout}
-                                disabled={cart.length === 0 || isProcessing}
-                                className="w-full mt-auto bg-indigo-600 text-white py-6 rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 flex items-center justify-center gap-3">
-                                {isProcessing ? <RefreshCw className="animate-spin" /> : <><CheckCircle size={24}/> FINALIZAR VENTA</>}
-                            </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button 
+                                        onClick={() => onTransformToRemito?.(cart)}
+                                        disabled={cart.length === 0}
+                                        className="py-3 rounded-xl font-black uppercase text-[9px] border-2 border-blue-100 text-blue-600 hover:bg-blue-50 transition-all flex items-center justify-center gap-2">
+                                        <Truck size={14}/> REMITO
+                                    </button>
+                                    <button 
+                                        onClick={() => onTransformToBudget?.(cart)}
+                                        disabled={cart.length === 0}
+                                        className="py-3 rounded-xl font-black uppercase text-[9px] border-2 border-teal-100 text-teal-600 hover:bg-teal-50 transition-all flex items-center justify-center gap-2">
+                                        <FileText size={14}/> PRESUP.
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 p-6 overflow-y-auto animate-fade-in">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {salesHistory.map(sale => (
-                            <div key={sale.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-md transition-all">
-                                <div className="flex justify-between items-start mb-4">
-                                    <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase">{sale.id}</span>
-                                    <p className="text-[10px] font-bold text-gray-400">{sale.date}</p>
-                                </div>
-                                <h4 className="font-black text-slate-800 uppercase text-sm mb-1">{sale.client}</h4>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase mb-4">{sale.paymentMethod}</p>
-                                <div className="flex justify-between items-end border-t border-gray-50 pt-4">
-                                    <div>
-                                        <p className="text-[9px] font-black text-slate-300 uppercase">Importe</p>
-                                        <p className="text-xl font-black text-slate-900">${sale.total.toLocaleString('es-AR')}</p>
-                                    </div>
-                                    <button className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Printer size={18}/></button>
+                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                    <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest sticky top-0">
+                                <tr>
+                                    <th className="px-6 py-4">ID / Tipo</th>
+                                    <th className="px-6 py-4">Fecha</th>
+                                    <th className="px-6 py-4">Cliente</th>
+                                    <th className="px-6 py-4">Medio / Plataforma</th>
+                                    <th className="px-6 py-4 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 text-[11px]">
+                                {salesHistory.map(sale => (
+                                    <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-4 font-mono font-bold">
+                                            <div className="flex flex-col">
+                                                <span className="text-indigo-600">{sale.id}</span>
+                                                <span className={`text-[7px] uppercase px-1 py-0.5 rounded w-fit ${sale.isFiscal ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
+                                                    {sale.isFiscal ? 'Factura Fiscal' : 'Ticket Interno'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-400">{sale.date}</td>
+                                        <td className="px-6 py-4 font-black uppercase text-slate-700">{sale.client}</td>
+                                        <td className="px-6 py-4"><span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-slate-50 text-slate-500 border border-slate-200">{sale.paymentMethod} {sale.system ? `• ${sale.system}` : ''}</span></td>
+                                        <td className="px-6 py-4 text-right font-black text-slate-900 text-sm">${sale.total.toLocaleString('es-AR')}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: AGREGAR ÍTEM MANUAL */}
+            {isManualModalOpen && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><PackagePlus size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Venta Libre</h3>
+                                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Artículo o Servicio no listado</p>
                                 </div>
                             </div>
-                        ))}
+                            <button onClick={() => setIsManualModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                        </div>
+                        <div className="p-10 space-y-8 bg-slate-50/50">
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Descripción del Ítem</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-bold text-slate-800 uppercase shadow-sm" 
+                                        placeholder="Ej: Servicio de Corte, Artículo varios..."
+                                        value={manualItemForm.name}
+                                        onChange={e => setManualItemForm({...manualItemForm, name: e.target.value})}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Precio Final ($)</label>
+                                    <div className="relative group">
+                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={24}/>
+                                        <input 
+                                            type="number" 
+                                            className="w-full pl-12 p-6 bg-white border-2 border-transparent rounded-[2rem] focus:border-indigo-600 outline-none font-black text-5xl text-indigo-700 shadow-sm" 
+                                            placeholder="0.00"
+                                            value={manualItemForm.price}
+                                            onChange={e => setManualItemForm({...manualItemForm, price: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleAddManualItem}
+                                className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95"
+                            >
+                                <Save size={24}/> Agregar al Carrito
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showSuccessModal && lastSale && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in print:bg-white print:p-0 print:block">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col print:shadow-none print:rounded-none print:max-h-none print:w-full">
+                        <div className={`p-8 ${lastSale.isFiscal ? 'bg-indigo-600' : 'bg-green-600'} text-white flex justify-between items-center shrink-0 print:hidden`}>
+                            <div className="flex items-center gap-4">
+                                {lastSale.isFiscal ? <ShieldCheck size={32}/> : <CheckCircle size={32}/>}
+                                <h3 className="text-2xl font-black uppercase tracking-tighter">
+                                    {lastSale.isFiscal ? 'Factura Autorizada' : 'Venta Registrada'}
+                                </h3>
+                            </div>
+                            <button onClick={() => setShowSuccessModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={32}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-10 bg-white print:p-0">
+                            <div className="border border-slate-100 p-8 rounded-[2rem] shadow-sm print:border-none print:p-0">
+                                <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-6">
+                                    <div>
+                                        <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-2">{companyConfig.fantasyName}</h1>
+                                        <p className="text-[10px] text-slate-400 mt-1 uppercase font-medium">CUIT: {companyConfig.cuit}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xl font-mono font-black">{lastSale.id}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase">{lastSale.date}</p>
+                                        {lastSale.isFiscal && <p className="text-[9px] font-black text-indigo-600 uppercase mt-1">Factura Electrónica A</p>}
+                                    </div>
+                                </div>
+                                <div className="mb-8 space-y-1">
+                                    <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">{lastSale.client}</h4>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase">Pago: {lastSale.paymentMethod} {lastSale.system ? `(${lastSale.system})` : ''}</p>
+                                </div>
+                                <table className="w-full text-left mb-10">
+                                    <thead className="bg-slate-50 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b">
+                                        <tr><th className="py-3 px-2">Descripción</th><th className="py-3 px-2 text-center">Cant.</th><th className="py-3 px-2 text-right">Subtotal</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {lastSale.items.map((item: any, i: number) => (
+                                            <tr key={i}>
+                                                <td className="py-4 px-2 uppercase text-xs font-black">{item.product.name}</td>
+                                                <td className="py-4 px-2 text-center font-black text-slate-700 text-xs">{item.quantity}</td>
+                                                <td className="py-4 px-2 text-right font-black text-slate-900 text-xs">${item.subtotal.toLocaleString('es-AR')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                
+                                <div className="flex justify-between items-end pt-6 border-t-2 border-dashed border-slate-200">
+                                    <div>
+                                        {lastSale.isFiscal && (
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase">CAE: {lastSale.cae}</p>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase">Vto CAE: 30/11/2024</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Abonado</p>
+                                        <p className="text-5xl font-black text-slate-900 tracking-tighter">${lastSale.total.toLocaleString('es-AR')}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-8 bg-slate-50 border-t flex justify-end gap-3 print:hidden">
+                            <button onClick={() => setShowSuccessModal(false)} className="px-8 py-4 text-gray-400 font-black text-[10px] uppercase">Cerrar</button>
+                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-12 py-4 rounded-[1.8rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all"><Printer size={20}/> Imprimir Ticket</button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -7,12 +7,12 @@ import {
     Smartphone, Search, Filter, History, Truck, MoreVertical, 
     ArrowDownRight, Landmark, Receipt, Info, LogOut, LogIn, Download,
     RotateCcw, Send, Building, LockKeyhole, Unlock, CheckCircle2, XCircle,
-    Printer
+    Printer, Smartphone as ECheqIcon, ShieldCheck, Trash2
 } from 'lucide-react';
 import { CashRegister, Check, TreasuryMovement } from '../types';
 
 const Treasury: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'CAJAS' | 'MOVIMIENTOS' | 'CHEQUES' | 'BANCOS'>('CAJAS');
+  const [activeTab, setActiveTab] = useState<'CAJAS' | 'MOVIMIENTOS' | 'CHEQUES'>('CAJAS');
   
   const [registers, setRegisters] = useState<CashRegister[]>(() => {
     const saved = localStorage.getItem('ferrecloud_registers');
@@ -30,14 +30,23 @@ const Treasury: React.FC = () => {
 
   const [checks, setChecks] = useState<Check[]>(() => {
       const saved = localStorage.getItem('ferrecloud_checks');
-      return saved ? JSON.parse(saved) : [];
+      return saved ? JSON.parse(saved) : [
+          { id: '1', number: '0012458', bank: 'Galicia', issuer: 'Juan Perez', amount: 45000, dueDate: '2023-11-15', status: 'PENDING', type: 'FISICO' },
+          { id: '2', number: 'ECH-9902', bank: 'Santander', issuer: 'Constructora S.A.', amount: 125000, dueDate: '2023-12-01', status: 'PENDING', type: 'ECHEQ' },
+      ];
   });
 
-  // Modal y Estados de Visualización
   const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
   const [selectedRegisterForHistory, setSelectedRegisterForHistory] = useState<CashRegister | null>(null);
+  const [checkFilter, setCheckFilter] = useState<'PENDING' | 'DEPOSITED' | 'REJECTED' | 'ALL'>('PENDING');
+
   const [manualForm, setManualForm] = useState<Partial<TreasuryMovement>>({
       type: 'INCOME', subtype: 'GASTO_VARIO', paymentMethod: 'EFECTIVO', amount: 0, description: '', cashRegisterId: '1'
+  });
+
+  const [checkForm, setCheckForm] = useState<Partial<Check>>({
+      number: '', bank: '', issuer: '', amount: 0, dueDate: new Date().toISOString().split('T')[0], type: 'FISICO', status: 'PENDING'
   });
 
   useEffect(() => {
@@ -46,7 +55,6 @@ const Treasury: React.FC = () => {
     localStorage.setItem('ferrecloud_checks', JSON.stringify(checks));
   }, [registers, movements, checks]);
 
-  // Lógica mejorada de Apertura/Cierre
   const toggleRegisterStatus = (id: string) => {
       const reg = registers.find(r => r.id === id);
       if (!reg) return;
@@ -57,11 +65,10 @@ const Treasury: React.FC = () => {
       setRegisters(prev => prev.map(r => {
           if (r.id === id) {
               const newState = !r.isOpen;
-              // Registrar evento en el log de movimientos para trazabilidad
               const auditEvent: TreasuryMovement = {
                   id: `LOG-${Date.now()}`,
                   date: new Date().toLocaleString(),
-                  type: 'INCOME', // No afecta saldo real
+                  type: 'INCOME',
                   subtype: 'GASTO_VARIO',
                   paymentMethod: 'EFECTIVO',
                   amount: 0,
@@ -80,19 +87,16 @@ const Treasury: React.FC = () => {
           alert("Faltan datos obligatorios.");
           return;
       }
-
       const reg = registers.find(r => r.id === manualForm.cashRegisterId);
       if (!reg?.isOpen) {
-          alert("Error: La caja seleccionada se encuentra CERRADA. Debe abrirla para operar.");
+          alert("Error: La caja seleccionada se encuentra CERRADA.");
           return;
       }
-
       const newMov: TreasuryMovement = {
           ...manualForm as TreasuryMovement,
           id: `M-${Date.now()}`,
           date: new Date().toLocaleString()
       };
-
       setMovements([newMov, ...movements]);
       setRegisters(prev => prev.map(r => {
           if (r.id === manualForm.cashRegisterId) {
@@ -102,13 +106,30 @@ const Treasury: React.FC = () => {
           return r;
       }));
       setIsManualEntryOpen(false);
-      setManualForm({ ...manualForm, amount: 0, description: '' });
   };
 
-  const registerMovements = useMemo(() => {
-      if (!selectedRegisterForHistory) return [];
-      return movements.filter(m => m.cashRegisterId === selectedRegisterForHistory.id);
-  }, [movements, selectedRegisterForHistory]);
+  const handleAddCheck = () => {
+      if (!checkForm.number || !checkForm.amount) return;
+      const newCheck: Check = {
+          ...checkForm as Check,
+          id: `C-${Date.now()}`
+      };
+      setChecks([newCheck, ...checks]);
+      setIsCheckModalOpen(false);
+      setCheckForm({ number: '', bank: '', issuer: '', amount: 0, dueDate: new Date().toISOString().split('T')[0], type: 'FISICO', status: 'PENDING' });
+  };
+
+  const updateCheckStatus = (id: string, status: Check['status']) => {
+      setChecks(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+  };
+
+  const filteredChecks = useMemo(() => {
+      return checks.filter(c => checkFilter === 'ALL' || c.status === checkFilter);
+  }, [checks, checkFilter]);
+
+  const totalInChecks = useMemo(() => {
+      return checks.filter(c => c.status === 'PENDING').reduce((acc, curr) => acc + curr.amount, 0);
+  }, [checks]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 h-full flex flex-col bg-slate-50 overflow-hidden font-sans">
@@ -118,12 +139,12 @@ const Treasury: React.FC = () => {
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
               <Wallet className="text-indigo-600"/> Tesorería y Fondos
           </h2>
-          <p className="text-gray-400 text-xs font-black uppercase tracking-widest mt-1 italic">Control de Efectivo, Valores y Arqueos</p>
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mt-1 italic">Gestión de Efectivo y Valores</p>
         </div>
         <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
-            <button onClick={() => setActiveTab('CAJAS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CAJAS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Puntos de Efectivo</button>
+            <button onClick={() => setActiveTab('CAJAS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CAJAS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cajas</button>
             <button onClick={() => setActiveTab('CHEQUES')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CHEQUES' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cartera Valores</button>
-            <button onClick={() => setActiveTab('MOVIMIENTOS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'MOVIMIENTOS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Libro Diario</button>
+            <button onClick={() => setActiveTab('MOVIMIENTOS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'MOVIMIENTOS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Movimientos</button>
         </div>
       </div>
 
@@ -132,47 +153,121 @@ const Treasury: React.FC = () => {
           {activeTab === 'CAJAS' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in pb-10">
                   {registers.map(reg => (
-                      <div key={reg.id} className={`bg-white rounded-[2.5rem] p-8 border transition-all duration-300 relative group flex flex-col ${reg.isOpen ? 'border-gray-200 shadow-sm' : 'border-red-100 bg-red-50/20 grayscale-[0.3]'}`}>
+                      <div key={reg.id} className={`bg-white rounded-[2.5rem] p-8 border transition-all duration-300 flex flex-col ${reg.isOpen ? 'border-gray-200 shadow-sm' : 'border-red-100 bg-red-50/20'}`}>
                           <div className="flex justify-between items-start mb-8">
-                              <div className={`p-4 rounded-3xl transition-all ${reg.isOpen ? 'bg-indigo-50 text-indigo-600 shadow-lg shadow-indigo-100' : 'bg-red-100 text-red-600'}`}>
+                              <div className={`p-4 rounded-3xl ${reg.isOpen ? 'bg-indigo-50 text-indigo-600 shadow-lg' : 'bg-red-100 text-red-600'}`}>
                                   {reg.isOpen ? <Unlock size={28}/> : <LockKeyhole size={28}/>}
                               </div>
-                              <div className="text-right">
-                                  <h4 className="font-black text-slate-800 uppercase tracking-tight text-lg leading-none mb-1.5">{reg.name}</h4>
-                                  <span className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border ${reg.isOpen ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                                      {reg.isOpen ? 'OPERATIVA' : 'CERRADA'}
-                                  </span>
-                              </div>
+                              <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full border ${reg.isOpen ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                  {reg.isOpen ? 'OPERATIVA' : 'CERRADA'}
+                              </span>
                           </div>
-                          
-                          <div className="mb-10">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Saldo en Caja</p>
-                              <p className={`text-4xl font-black tracking-tighter ${reg.isOpen ? 'text-slate-900' : 'text-slate-400'}`}>
-                                  ${reg.balance.toLocaleString('es-AR')}
-                              </p>
-                          </div>
-
-                          <div className="mt-auto grid grid-cols-2 gap-3">
-                              <button 
-                                  onClick={() => { setManualForm({...manualForm, cashRegisterId: reg.id}); setIsManualEntryOpen(true); }}
-                                  disabled={!reg.isOpen}
-                                  className={`py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${reg.isOpen ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'}`}>
-                                  <Plus size={14}/> Movimiento
-                              </button>
-                              <button 
-                                onClick={() => setSelectedRegisterForHistory(reg)}
-                                className="bg-slate-100 text-slate-500 hover:bg-white hover:text-indigo-600 border border-slate-200 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2">
-                                  <History size={16}/> Historial
+                          <h4 className="font-black text-slate-800 uppercase tracking-tight text-lg leading-none mb-4">{reg.name}</h4>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo en Caja</p>
+                          <p className={`text-4xl font-black tracking-tighter mb-10 ${reg.isOpen ? 'text-slate-900' : 'text-slate-400'}`}>
+                              ${reg.balance.toLocaleString('es-AR')}
+                          </p>
+                          <div className="mt-auto flex flex-col gap-2">
+                              <button onClick={() => { setManualForm({...manualForm, cashRegisterId: reg.id}); setIsManualEntryOpen(true); }} disabled={!reg.isOpen} className="w-full bg-slate-900 text-white py-3 rounded-2xl font-black text-[10px] uppercase shadow-xl disabled:opacity-30">Nuevo Movimiento</button>
+                              <button onClick={() => toggleRegisterStatus(reg.id)} className={`w-full py-2 rounded-xl font-black text-[9px] uppercase border transition-all ${reg.isOpen ? 'text-red-400 border-red-100 hover:bg-red-50' : 'text-green-600 border-green-200'}`}>
+                                  {reg.isOpen ? 'Cerrar Caja' : 'Abrir Caja'}
                               </button>
                           </div>
-
-                          <button 
-                            onClick={() => toggleRegisterStatus(reg.id)}
-                            className={`mt-4 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest border transition-all flex items-center justify-center gap-2 ${reg.isOpen ? 'text-red-400 border-red-100 hover:bg-red-50' : 'text-green-600 border-green-200 bg-green-50 hover:bg-green-100'}`}>
-                              {reg.isOpen ? <><XCircle size={14}/> Realizar Arqueo y Cerrar</> : <><CheckCircle2 size={14}/> Abrir Punto de Venta</>}
-                          </button>
                       </div>
                   ))}
+              </div>
+          )}
+
+          {activeTab === 'CHEQUES' && (
+              <div className="flex flex-col space-y-6 animate-fade-in pb-10 h-full">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="bg-indigo-600 p-6 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
+                          <Landmark className="absolute -right-4 -bottom-4 opacity-10" size={100}/>
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Total en Cartera</p>
+                          <h3 className="text-3xl font-black tracking-tighter mt-1">${totalInChecks.toLocaleString('es-AR')}</h3>
+                          <p className="text-[9px] font-bold mt-2 uppercase">Vencimientos Próximos: 3</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col justify-center gap-4">
+                          <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Filtro de Estado</label>
+                          <div className="flex gap-2">
+                              {(['PENDING', 'DEPOSITED', 'REJECTED', 'ALL'] as const).map(f => (
+                                  <button key={f} onClick={() => setCheckFilter(f)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border transition-all ${checkFilter === f ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}>
+                                      {f === 'PENDING' ? 'En Cartera' : f === 'DEPOSITED' ? 'Depositado' : f === 'REJECTED' ? 'Rechazado' : 'Todo'}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                      <div className="md:col-span-2 flex items-center justify-end pr-2">
+                          <button onClick={() => setIsCheckModalOpen(true)} className="bg-slate-900 text-white px-10 py-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
+                              <Plus size={20} className="text-green-400"/> Recibir Nuevo Valor
+                          </button>
+                      </div>
+                  </div>
+
+                  <div className="bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col flex-1">
+                      <div className="overflow-x-auto custom-scrollbar">
+                          <table className="w-full text-left">
+                              <thead className="bg-slate-50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b">
+                                  <tr>
+                                      <th className="px-8 py-5">Tipo / Nº de Cheque</th>
+                                      <th className="px-8 py-5">Banco / Emisor</th>
+                                      <th className="px-8 py-5">Vencimiento</th>
+                                      <th className="px-8 py-5 text-right">Monto</th>
+                                      <th className="px-8 py-5 text-center">Gestión</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                  {filteredChecks.length === 0 ? (
+                                      <tr><td colSpan={5} className="py-24 text-center text-slate-300 font-black uppercase tracking-widest">Sin valores en esta categoría</td></tr>
+                                  ) : filteredChecks.map(check => (
+                                      <tr key={check.id} className="hover:bg-slate-50/50 transition-colors group">
+                                          <td className="px-8 py-6">
+                                              <div className="flex items-center gap-4">
+                                                  <div className={`p-2.5 rounded-xl ${check.type === 'ECHEQ' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                      {check.type === 'ECHEQ' ? <ECheqIcon size={20}/> : <Banknote size={20}/>}
+                                                  </div>
+                                                  <div>
+                                                      <p className="font-black text-slate-800 text-sm uppercase tracking-tight">{check.number}</p>
+                                                      <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-widest border border-slate-200">{check.type}</span>
+                                                  </div>
+                                              </div>
+                                          </td>
+                                          <td className="px-8 py-6">
+                                              <p className="font-black text-slate-600 text-xs uppercase leading-none mb-1">{check.bank}</p>
+                                              <p className="text-[10px] text-slate-400 font-bold uppercase">{check.issuer}</p>
+                                          </td>
+                                          <td className="px-8 py-6">
+                                              <div className="flex items-center gap-2 text-slate-500 text-xs font-bold">
+                                                  <Calendar size={14} className="text-slate-300"/>
+                                                  {check.dueDate}
+                                              </div>
+                                          </td>
+                                          <td className="px-8 py-6 text-right">
+                                              <p className="text-xl font-black text-slate-900 tracking-tighter">${check.amount.toLocaleString('es-AR')}</p>
+                                          </td>
+                                          <td className="px-8 py-6">
+                                              <div className="flex items-center justify-center gap-2">
+                                                  {check.status === 'PENDING' && (
+                                                      <>
+                                                        <button onClick={() => updateCheckStatus(check.id, 'DEPOSITED')} className="p-2.5 text-green-600 bg-green-50 hover:bg-green-600 hover:text-white rounded-xl transition-all border border-green-100" title="Marcar como Depositado">
+                                                            <Landmark size={16}/>
+                                                        </button>
+                                                        <button onClick={() => updateCheckStatus(check.id, 'REJECTED')} className="p-2.5 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-100" title="Rechazado">
+                                                            <AlertTriangle size={16}/>
+                                                        </button>
+                                                      </>
+                                                  )}
+                                                  <button onClick={() => setChecks(checks.filter(c => c.id !== check.id))} className="p-2.5 text-slate-300 hover:text-red-500 transition-all">
+                                                      <Trash2 size={16}/>
+                                                  </button>
+                                              </div>
+                                          </td>
+                                      </tr>
+                                  ))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
               </div>
           )}
 
@@ -188,7 +283,7 @@ const Treasury: React.FC = () => {
                       <table className="w-full text-left">
                           <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em] sticky top-0">
                               <tr>
-                                  <th className="px-8 py-5">Fecha / Auditoría</th>
+                                  <th className="px-8 py-5">Fecha</th>
                                   <th className="px-8 py-5">Caja</th>
                                   <th className="px-8 py-5">Concepto</th>
                                   <th className="px-8 py-5">Medio</th>
@@ -197,7 +292,7 @@ const Treasury: React.FC = () => {
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                               {movements.length === 0 ? (
-                                  <tr><td colSpan={5} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">No se registran movimientos en el período</td></tr>
+                                  <tr><td colSpan={5} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">No se registran movimientos</td></tr>
                               ) : movements.map(m => (
                                   <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${m.description.includes('***') ? 'bg-slate-50/50 italic' : ''}`}>
                                       <td className="px-8 py-5 text-[11px] font-bold text-slate-400">{m.date}</td>
@@ -220,10 +315,63 @@ const Treasury: React.FC = () => {
           )}
       </div>
 
-      {/* MODAL: MOVIMIENTO MANUAL */}
-      {isManualEntryOpen && (
+      {/* MODAL: CHEQUE / E-CHEQ */}
+      {isCheckModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                  <div className="p-8 bg-indigo-600 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-white/20 rounded-2xl shadow-lg"><Landmark size={24}/></div>
+                          <div>
+                              <h3 className="font-black uppercase tracking-tighter text-xl">Ingreso de Valor</h3>
+                              <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mt-1">Gestión de Cartera</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsCheckModalOpen(false)}><X size={28}/></button>
+                  </div>
+                  <div className="p-10 space-y-6 bg-slate-50/50">
+                      <div className="grid grid-cols-2 gap-4">
+                          <button onClick={() => setCheckForm({...checkForm, type: 'FISICO'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${checkForm.type === 'FISICO' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>Cheque Físico</button>
+                          <button onClick={() => setCheckForm({...checkForm, type: 'ECHEQ'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${checkForm.type === 'ECHEQ' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>E-Cheq Digital</button>
+                      </div>
+                      <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Nº de Cheque</label>
+                                  <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={checkForm.number} onChange={e => setCheckForm({...checkForm, number: e.target.value})} />
+                              </div>
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Banco</label>
+                                  <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={checkForm.bank} onChange={e => setCheckForm({...checkForm, bank: e.target.value})} />
+                              </div>
+                          </div>
+                          <div>
+                              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Librador / Emisor</label>
+                              <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" value={checkForm.issuer} onChange={e => setCheckForm({...checkForm, issuer: e.target.value})} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe ($)</label>
+                                  <input type="number" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-black text-xl text-indigo-600" value={checkForm.amount || ''} onChange={e => setCheckForm({...checkForm, amount: parseFloat(e.target.value) || 0})} />
+                              </div>
+                              <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Vencimiento</label>
+                                  <input type="date" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold" value={checkForm.dueDate} onChange={e => setCheckForm({...checkForm, dueDate: e.target.value})} />
+                              </div>
+                          </div>
+                      </div>
+                      <button onClick={handleAddCheck} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
+                          <Save size={20}/> Registrar en Cartera
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL MOVIMIENTO (EXISTENTE) */}
+      {isManualEntryOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-lg overflow-hidden flex flex-col">
                   <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
                       <div className="flex items-center gap-4">
                           <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><ArrowRightLeft size={24}/></div>
@@ -232,108 +380,28 @@ const Treasury: React.FC = () => {
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Ingreso / Egreso a Caja</p>
                           </div>
                       </div>
-                      <button onClick={() => setIsManualEntryOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                      <button onClick={() => setIsManualEntryOpen(false)}><X size={28}/></button>
                   </div>
-                  <div className="p-10 space-y-8 bg-slate-50/50">
+                  <div className="p-10 space-y-6 bg-slate-50/50">
                       <div className="grid grid-cols-2 gap-4">
-                          <button onClick={() => setManualForm({...manualForm, type: 'INCOME'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'INCOME' ? 'border-green-600 bg-green-50 text-green-700 shadow-md shadow-green-100' : 'border-gray-200 bg-white text-gray-400'}`}>Ingreso (+)</button>
-                          <button onClick={() => setManualForm({...manualForm, type: 'EXPENSE'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'EXPENSE' ? 'border-red-600 bg-red-50 text-red-700 shadow-md shadow-red-100' : 'border-gray-200 bg-white text-gray-400'}`}>Egreso (-)</button>
+                          <button onClick={() => setManualForm({...manualForm, type: 'INCOME'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'INCOME' ? 'border-green-600 bg-green-50 text-green-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>Ingreso (+)</button>
+                          <button onClick={() => setManualForm({...manualForm, type: 'EXPENSE'})} className={`py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${manualForm.type === 'EXPENSE' ? 'border-red-600 bg-red-50 text-red-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>Egreso (-)</button>
                       </div>
                       <div className="space-y-4">
-                          <div>
-                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Detalle de la Operación</label>
-                              <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all uppercase" placeholder="Ej: Pago Flete, Venta Mostrador..." value={manualForm.description} onChange={e => setManualForm({...manualForm, description: e.target.value.toUpperCase()})} />
-                          </div>
-                          <div>
-                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe Final ($)</label>
-                              <input type="number" className="w-full p-5 bg-white border border-gray-200 rounded-3xl outline-none font-black text-3xl text-slate-900 focus:ring-2 focus:ring-indigo-500 transition-all" value={manualForm.amount || ''} onChange={e => setManualForm({...manualForm, amount: parseFloat(e.target.value) || 0})} placeholder="0.00" />
-                          </div>
+                          <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase" placeholder="Descripción..." value={manualForm.description} onChange={e => setManualForm({...manualForm, description: e.target.value.toUpperCase()})} />
+                          <input type="number" className="w-full p-5 bg-white border border-gray-200 rounded-3xl outline-none font-black text-3xl text-slate-900" value={manualForm.amount || ''} onChange={e => setManualForm({...manualForm, amount: parseFloat(e.target.value) || 0})} placeholder="0.00" />
                           <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Caja</label>
-                                  <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.cashRegisterId} onChange={e => setManualForm({...manualForm, cashRegisterId: e.target.value})}>
-                                      {registers.map(r => <option key={r.id} value={r.id} disabled={!r.isOpen}>{r.name} {!r.isOpen ? '(CERRADA)' : ''}</option>)}
-                                  </select>
-                              </div>
-                              <div>
-                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Medio</label>
-                                  <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.paymentMethod} onChange={e => setManualForm({...manualForm, paymentMethod: e.target.value as any})}>
-                                      <option value="EFECTIVO">Efectivo</option>
-                                      <option value="TRANSFERENCIA">Transferencia</option>
-                                      <option value="MERCADO_PAGO">Mercado Pago</option>
-                                  </select>
-                              </div>
+                              <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.cashRegisterId} onChange={e => setManualForm({...manualForm, cashRegisterId: e.target.value})}>
+                                  {registers.map(r => <option key={r.id} value={r.id} disabled={!r.isOpen}>{r.name}</option>)}
+                              </select>
+                              <select className="w-full p-3 bg-white border border-gray-200 rounded-xl font-black text-xs outline-none" value={manualForm.paymentMethod} onChange={e => setManualForm({...manualForm, paymentMethod: e.target.value as any})}>
+                                  <option value="EFECTIVO">Efectivo</option>
+                                  <option value="TRANSFERENCIA">Transferencia</option>
+                                  <option value="MERCADO_PAGO">Mercado Pago</option>
+                              </select>
                           </div>
                       </div>
-                      <button onClick={handleAddMovement} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all active:scale-95">Validar y Registrar</button>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* DRAWER: HISTORIAL DETALLADO POR CAJA */}
-      {selectedRegisterForHistory && (
-          <div className="fixed inset-0 z-[250] flex justify-end bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col animate-slide-in-right">
-                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                      <div className="flex items-center gap-6">
-                          <div className="w-16 h-16 bg-white/10 rounded-[1.8rem] flex items-center justify-center text-white shadow-xl">
-                              <History size={32}/>
-                          </div>
-                          <div>
-                              <h3 className="text-2xl font-black uppercase tracking-tighter">{selectedRegisterForHistory.name}</h3>
-                              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Historial de Operaciones Localizadas</p>
-                          </div>
-                      </div>
-                      <button onClick={() => setSelectedRegisterForHistory(null)} className="p-3 hover:bg-white/10 rounded-2xl transition-all"><X size={32}/></button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between">
-                          <div>
-                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Saldo en este Punto</p>
-                              <p className="text-4xl font-black text-slate-900 tracking-tighter">${selectedRegisterForHistory.balance.toLocaleString('es-AR')}</p>
-                          </div>
-                          <div className={`px-4 py-2 rounded-2xl border font-black text-[10px] uppercase tracking-widest ${selectedRegisterForHistory.isOpen ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                              {selectedRegisterForHistory.isOpen ? 'OPERATIVA' : 'CERRADA'}
-                          </div>
-                      </div>
-
-                      <div className="bg-white rounded-[2rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                          <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Scroll size={14}/> Movimientos del Punto</h4>
-                          </div>
-                          <div className="overflow-x-auto">
-                              <table className="w-full text-left">
-                                  <thead className="bg-white text-[9px] font-black text-gray-400 uppercase tracking-widest border-b">
-                                      <tr>
-                                          <th className="px-6 py-4">Fecha</th>
-                                          <th className="px-6 py-4">Detalle</th>
-                                          <th className="px-6 py-4 text-right">Monto</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-50 text-[11px]">
-                                      {registerMovements.length === 0 ? (
-                                          <tr><td colSpan={3} className="py-20 text-center text-gray-300 font-black uppercase">Sin registros en este punto de efectivo</td></tr>
-                                      ) : registerMovements.map(m => (
-                                          <tr key={m.id} className={`hover:bg-slate-50 transition-colors ${m.description.includes('***') ? 'bg-slate-50 italic' : ''}`}>
-                                              <td className="px-6 py-4 font-bold text-gray-400">{m.date.split(',')[1] || m.date}</td>
-                                              <td className="px-6 py-4 font-black text-slate-700 uppercase">{m.description}</td>
-                                              <td className={`px-6 py-4 text-right font-black ${m.amount === 0 ? 'text-slate-300' : m.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>
-                                                  {m.amount === 0 ? '-' : (m.type === 'INCOME' ? '+' : '-') + '$' + m.amount.toLocaleString('es-AR')}
-                                              </td>
-                                          </tr>
-                                      ))}
-                                  </tbody>
-                              </table>
-                          </div>
-                      </div>
-                  </div>
-                  
-                  <div className="p-8 border-t border-gray-100 bg-white">
-                      <button onClick={() => window.print()} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3">
-                          <Printer size={18}/> Imprimir Arqueo de Punto
-                      </button>
+                      <button onClick={handleAddMovement} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all">Validar y Registrar</button>
                   </div>
               </div>
           </div>

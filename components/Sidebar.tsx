@@ -1,213 +1,137 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React from 'react';
 import { 
-    LayoutDashboard, PackageSearch, Receipt, Bot, Settings, LogOut, Wrench, 
-    ChevronDown, Users, ClipboardList, FileSpreadsheet, 
-    Truck, Wallet, Calculator, PieChart, Database, Store, FileUp, ShieldCheck, 
-    ShoppingCart, ListOrdered, Printer, Globe, CloudCog, AlertTriangle, 
-    FileBarChart2, Tag, CalendarDays, Landmark, Shield, ArrowLeftRight, Layers,
-    Bell, DollarSign, RefreshCw, Star, HardDrive, LayoutTemplate, Building2,
-    BarChart3, BrainCircuit, Sparkles, ShieldAlert, RotateCcw
+    LayoutDashboard, Database, Receipt, ClipboardList, 
+    FileSpreadsheet, Users, Truck, Wallet, Calculator, 
+    TrendingUp, FileBarChart2, HardDrive, Store, Bot, 
+    Layers, Zap, Shield, ShoppingCart, Globe, Tag, 
+    Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
+    Smartphone, Heart, ShoppingBag, Laptop
 } from 'lucide-react';
-import { ViewState, User, Role, CompanyConfig } from '../types';
+import { ViewState, User } from '../types';
 
 interface SidebarProps {
-  currentView: ViewState;
-  onNavigate: (view: ViewState) => void;
-  user?: User | null;
-  onLogout?: () => void;
+    activeView: ViewState;
+    onNavigate: (view: ViewState) => void;
+    user: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user, onLogout }) => {
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [syncKey, setSyncKey] = useState(0); 
-
-  const companyConfig: CompanyConfig = useMemo(() => {
-    const saved = localStorage.getItem('company_config');
-    return saved ? JSON.parse(saved) : {};
-  }, [currentView, syncKey]); 
-
-  useEffect(() => {
-    const handleConfigUpdate = () => {
-        setSyncKey(prev => prev + 1);
-    };
-
-    window.addEventListener('company_config_updated', handleConfigUpdate);
-    window.addEventListener('storage', handleConfigUpdate); 
-
-    return () => {
-        window.removeEventListener('company_config_updated', handleConfigUpdate);
-        window.removeEventListener('storage', handleConfigUpdate);
-    };
-  }, []);
-
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    if (user.id === '1' || user.roleId === 'admin') return true;
-    const savedRoles = localStorage.getItem('ferrecloud_roles');
-    if (!savedRoles) return false;
-    const roles: Role[] = JSON.parse(savedRoles);
-    const userRole = roles.find(r => r.id === user.roleId);
-    if (!userRole) return false;
-    return userRole.permissions.includes('ALL') || userRole.permissions.includes(permission);
-  };
-
-  const NavDropdown = ({ label, icon: Icon, children, id }: { label: string, icon: any, children?: React.ReactNode, id: string }) => (
-    <div 
-        className="relative group"
-        onMouseEnter={() => setOpenMenu(id)}
-        onMouseLeave={() => setOpenMenu(null)}
+const NavItem: React.FC<{ view: ViewState, label: string, icon: any, active: boolean, onClick: () => void }> = ({ label, icon: Icon, active, onClick }) => (
+    <button 
+        onClick={onClick}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+            active 
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+            : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'
+        }`}
     >
-        <button className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${openMenu === id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}>
-            <Icon size={18} />
-            <span className="hidden lg:inline">{label}</span>
-            <ChevronDown size={14} className={`transition-transform ${openMenu === id ? 'rotate-180' : ''}`} />
-        </button>
-        {openMenu === id && (
-            <div className="absolute top-full left-0 mt-1 w-56 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl py-3 z-[100] animate-fade-in">
-                {children}
-            </div>
-        )}
-    </div>
-  );
+        <Icon size={18} className={active ? 'text-white' : 'group-hover:text-indigo-600'} />
+        <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+    </button>
+);
 
-  const DropdownItem = ({ view, label, icon: Icon, perm }: { view: ViewState, label: string, icon: any, perm?: string }) => {
-    if (perm && !hasPermission(perm)) return null;
+const NavDropdown: React.FC<{ id: string, label: string, icon: any, children: React.ReactNode }> = ({ label, icon: Icon, children }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
     return (
-        <button
-            onClick={() => { onNavigate(view); setOpenMenu(null); }}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${currentView === view ? 'bg-ferre-orange text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
-        >
-            <Icon size={16} />
-            <span className="font-medium">{label}</span>
-        </button>
-    );
-  };
-
-  return (
-    <header className="h-16 bg-slate-950 text-white border-b border-slate-800 flex items-center justify-between px-6 sticky top-0 z-[100] shadow-2xl shrink-0">
-      <div className="flex items-center gap-6">
-        <div 
-            onClick={() => onNavigate(ViewState.DASHBOARD)}
-            className="flex items-center gap-3 cursor-pointer group"
-        >
-            {companyConfig.logo ? (
-                <div className="h-10 flex items-center max-w-[200px]">
-                    <img 
-                        src={companyConfig.logo} 
-                        alt={companyConfig.fantasyName || 'Logo'} 
-                        className="h-full w-auto object-contain transition-transform group-hover:scale-105"
-                    />
-                    <span className="font-black text-sm tracking-tighter uppercase ml-3 hidden xl:block border-l border-slate-700 pl-3">
-                        {companyConfig.fantasyName || 'Bruzzone'}
-                    </span>
+        <div className="space-y-1">
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-all group"
+            >
+                <div className="flex items-center gap-3">
+                    <Icon size={18} className="group-hover:text-indigo-600" />
+                    <span className="text-xs font-black uppercase tracking-widest">{label}</span>
                 </div>
-            ) : (
-                <>
-                    <div className="bg-ferre-orange p-1.5 rounded-lg group-hover:scale-110 transition-transform">
-                        <Wrench size={20} className="text-white" />
+                <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && <div className="pl-4 space-y-1">{children}</div>}
+        </div>
+    );
+};
+
+const DropdownItem: React.FC<{ view: ViewState, label: string, icon: any, onClick: () => void, active: boolean }> = ({ label, icon: Icon, onClick, active }) => (
+    <button 
+        onClick={onClick}
+        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+            active ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+        }`}
+    >
+        <Icon size={14} />
+        {label}
+    </button>
+);
+
+const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
+    const handleNav = (view: ViewState) => onNavigate(view);
+
+    return (
+        <div className="w-64 bg-white border-r border-slate-200 h-full flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+            <div className="p-6 border-b border-slate-100">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-ferre-orange">
+                        <Zap size={24} fill="currentColor" />
                     </div>
-                    <span className="font-black text-lg tracking-tighter uppercase hidden xl:block">
-                        {companyConfig.fantasyName || 'FerreCloud'}
-                    </span>
-                </>
-            )}
-        </div>
-
-        <nav className="flex items-center gap-1">
-            <button 
-                onClick={() => onNavigate(ViewState.DASHBOARD)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentView === ViewState.DASHBOARD ? 'bg-ferre-orange text-white' : 'text-slate-400 hover:text-white'}`}
-            >
-                <LayoutDashboard size={18} />
-                <span className="hidden xl:inline">Escritorio</span>
-            </button>
-
-            <NavDropdown id="inteligencia" label="Analítica" icon={BrainCircuit}>
-                <DropdownItem view={ViewState.REPORTS} label="Reportes Avanzados" icon={BarChart3} perm="ACCOUNTING_VIEW" />
-                <DropdownItem view={ViewState.PRICE_AUDIT} label="Auditoría de Precios" icon={ShieldAlert} perm="ACCOUNTING_VIEW" />
-                <DropdownItem view={ViewState.MARKETING} label="Marketing & Fidelidad" icon={Sparkles} perm="CLIENTS_VIEW" />
-                <DropdownItem view={ViewState.AI_ASSISTANT} label="FerreBot IA" icon={Bot} perm="DASHBOARD_VIEW" />
-                <DropdownItem view={ViewState.STATISTICS} label="Estadísticas Rápidas" icon={PieChart} perm="ACCOUNTING_VIEW" />
-            </NavDropdown>
-
-            <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
-                <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} perm="POS_ACCESS" />
-                <DropdownItem view={ViewState.SALES_ORDERS} label="Órdenes de Pedido" icon={ListOrdered} perm="POS_ACCESS" />
-                <DropdownItem view={ViewState.CREDIT_NOTES} label="Notas de Crédito" icon={RotateCcw} perm="POS_ACCESS" />
-                <DropdownItem view={ViewState.ONLINE_SALES} label="Ventas Online" icon={Globe} perm="POS_ACCESS" />
-                <DropdownItem view={ViewState.REMITOS} label="Remitos / Cta Cte" icon={ClipboardList} perm="REMITOS_VIEW" />
-                <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos" icon={Landmark} perm="CLIENTS_VIEW" />
-                <DropdownItem view={ViewState.CLIENTS} label="Fichero Clientes" icon={Users} perm="CLIENTS_VIEW" />
-                <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} perm="POS_ACCESS" />
-            </NavDropdown>
-
-            <NavDropdown id="compras" label="Compras" icon={Truck}>
-                <DropdownItem view={ViewState.PURCHASES} label="Cargar Compras" icon={Truck} perm="PURCHASES_VIEW" />
-                <DropdownItem view={ViewState.PRICE_UPDATES} label="Listas de Precios" icon={Layers} perm="STOCK_EDIT" />
-                <DropdownItem view={ViewState.PROVIDERS} label="Proveedores" icon={Users} perm="PURCHASES_VIEW" />
-                <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos" icon={ShoppingCart} perm="PURCHASES_VIEW" />
-                <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} perm="STOCK_VIEW" />
-            </NavDropdown>
-
-            <NavDropdown id="stock" label="Stock" icon={PackageSearch}>
-                <DropdownItem view={ViewState.INVENTORY} label="Artículos" icon={PackageSearch} perm="STOCK_VIEW" />
-                <DropdownItem view={ViewState.MASS_PRODUCT_UPDATE} label="Cambios Masivos" icon={Layers} perm="STOCK_EDIT" />
-                <DropdownItem view={ViewState.STOCK_TRANSFERS} label="Traslados" icon={ArrowLeftRight} perm="STOCK_EDIT" />
-                <DropdownItem view={ViewState.LABEL_PRINTING} label="Etiquetas" icon={Tag} perm="STOCK_VIEW" />
-            </NavDropdown>
-
-            <NavDropdown id="finanzas" label="Finanzas" icon={Wallet}>
-                <DropdownItem view={ViewState.TREASURY} label="Tesoreria" icon={Wallet} perm="TREASURY_VIEW" />
-                <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={CalendarDays} perm="TREASURY_VIEW" />
-                <DropdownItem view={ViewState.CURRENCIES} label="Monedas / Divisas" icon={DollarSign} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad" icon={Calculator} perm="ACCOUNTING_VIEW" />
-                <DropdownItem view={ViewState.EMPLOYEES} label="Personal" icon={Users} perm="TREASURY_EDIT" />
-            </NavDropdown>
-
-            <NavDropdown id="config" label="Configuración" icon={Settings}>
-                <DropdownItem view={ViewState.CONFIG_PANEL} label="Panel Maestro" icon={Settings} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.COMPANY_SETTINGS} label="Mi Empresa" icon={Building2} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.AFIP_CONFIG} label="Enlace ARCA/AFIP" icon={ShieldCheck} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.USERS} label="Usuarios y Roles" icon={Shield} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.BRANCHES} label="Sucursales" icon={Store} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.PRINT_CONFIG} label="Formatos Impresión" icon={LayoutTemplate} perm="CONFIG_ACCESS" />
-                <DropdownItem view={ViewState.BACKUP} label="Base de Datos" icon={HardDrive} perm="CONFIG_ACCESS" />
-            </NavDropdown>
-        </nav>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="hidden lg:flex items-center gap-4 bg-slate-900 px-4 py-1.5 rounded-2xl border border-slate-800">
-            <div className="flex flex-col items-end leading-none">
-                <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-none mb-1">Dólar ARCA</span>
-                <span className="text-xs font-black text-green-400">$980.50</span>
+                    <div>
+                        <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Bruzzone</h1>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Cloud System</p>
+                    </div>
+                </div>
+                
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xs uppercase">
+                            {user?.name.charAt(0) || 'U'}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-none mb-1">{user?.name || 'Usuario'}</p>
+                            <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest">En Línea</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className="w-px h-6 bg-slate-800"></div>
-            <div className="flex flex-col items-end leading-none">
-                <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest leading-none mb-1">Sucursal</span>
-                <span className="text-xs font-black text-indigo-400">Central</span>
+
+            <nav className="flex-1 p-4 space-y-1">
+                <NavItem view={ViewState.DASHBOARD} label="Escritorio" icon={LayoutDashboard} active={activeView === ViewState.DASHBOARD} onClick={() => handleNav(ViewState.DASHBOARD)} />
+                
+                <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
+                    <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />
+                    <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />
+                    <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />
+                    <DropdownItem view={ViewState.CLIENTS} label="Clientes" icon={Users} active={activeView === ViewState.CLIENTS} onClick={() => handleNav(ViewState.CLIENTS)} />
+                </NavDropdown>
+
+                <NavDropdown id="inventario" label="Stock" icon={Database}>
+                    <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />
+                    <DropdownItem view={ViewState.INITIAL_IMPORT} label="Carga Masiva" icon={FileUp} active={activeView === ViewState.INITIAL_IMPORT} onClick={() => handleNav(ViewState.INITIAL_IMPORT)} />
+                    <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />
+                    <DropdownItem view={ViewState.MASS_PRODUCT_UPDATE} label="Cambios Masivos" icon={Zap} active={activeView === ViewState.MASS_PRODUCT_UPDATE} onClick={() => handleNav(ViewState.MASS_PRODUCT_UPDATE)} />
+                </NavDropdown>
+
+                <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
+                <NavItem view={ViewState.TREASURY} label="Tesorería" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
+                <NavItem view={ViewState.ACCOUNTING} label="Contabilidad" icon={Calculator} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />
+                
+                <NavDropdown id="presencia" label="Presencia Digital" icon={Globe}>
+                    <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Gestión E-commerce" icon={Laptop} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />
+                    <DropdownItem view={ViewState.SHOP} label="Tienda Online (Publico)" icon={ShoppingBag} active={activeView === ViewState.SHOP} onClick={() => handleNav(ViewState.SHOP)} />
+                    <DropdownItem view={ViewState.PUBLIC_PORTAL} label="Portal Fidelidad" icon={Smartphone} active={activeView === ViewState.PUBLIC_PORTAL} onClick={() => handleNav(ViewState.PUBLIC_PORTAL)} />
+                    <DropdownItem view={ViewState.MARKETING} label="Promo & Puntos" icon={Heart} active={activeView === ViewState.MARKETING} onClick={() => handleNav(ViewState.MARKETING)} />
+                </NavDropdown>
+
+                <NavItem view={ViewState.AI_ASSISTANT} label="FerreBot IA" icon={Bot} active={activeView === ViewState.AI_ASSISTANT} onClick={() => handleNav(ViewState.AI_ASSISTANT)} />
+                <NavItem view={ViewState.CONFIG_PANEL} label="Configuración" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
+            </nav>
+
+            <div className="p-4 mt-auto">
+                <div className="bg-indigo-900 rounded-2xl p-4 text-white relative overflow-hidden group cursor-pointer" onClick={() => handleNav(ViewState.SHOP)}>
+                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform"><Globe size={80}/></div>
+                    <p className="text-[8px] font-black uppercase tracking-widest text-indigo-300 mb-1">Acceso Rápido Clientes</p>
+                    <h4 className="text-xs font-black uppercase tracking-tighter">Mi Tienda Online</h4>
+                    <ArrowRight size={14} className="mt-3 text-indigo-400 group-hover:translate-x-2 transition-transform" />
+                </div>
             </div>
         </div>
-
-        <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
-            <div className="text-right hidden sm:block">
-                <p className="text-xs font-black uppercase tracking-tight leading-none">{user?.name || 'Usuario'}</p>
-                <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">
-                    {user?.roleId === 'admin' ? 'Administrador' : 'Vendedor'}
-                </p>
-            </div>
-            <button 
-                onClick={onLogout}
-                className="p-2 text-slate-500 hover:text-red-400 transition-colors"
-                title="Cerrar Sesión"
-            >
-                <LogOut size={18} />
-            </button>
-        </div>
-      </div>
-    </header>
-  );
+    );
 };
 
 export default Sidebar;
