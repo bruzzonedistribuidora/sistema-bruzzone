@@ -214,7 +214,7 @@ const PublicPortal: React.FC = () => {
                                 type="button"
                                 onClick={handleCloudSync}
                                 className="w-full bg-white/5 border border-white/10 text-slate-400 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-white/10 transition-all">
-                                <CloudDownload size={20}/> Sincronizar con Nube (Modo Demo)
+                                <DownloadCloud size={20}/> Sincronizar con Nube (Modo Demo)
                             </button>
                         </div>
                     </form>
