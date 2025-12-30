@@ -15,7 +15,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onNavigate }) => {
         { 
             id: ViewState.COMPANY_SETTINGS, 
             label: 'Mi Empresa e Impuestos', 
-            desc: 'Razón social, logo, datos fiscales y sistemas de financiación.', 
+            desc: 'Configuración fiscal, logos y sistemas de financiación (Nave, MP, etc).', 
             icon: Building2, 
             color: 'bg-indigo-500' 
         },
@@ -63,12 +63,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onNavigate }) => {
                     <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
                         <Settings size={32} className="text-indigo-600"/> Panel de Control Maestro
                     </h2>
-                    <p className="text-gray-400 font-medium mt-2">Configuración global para la gestión de los 140.000 artículos y operación fiscal.</p>
+                    <p className="text-gray-400 font-medium mt-2">Configuración global para la operación comercial y fiscal.</p>
                 </div>
                 <div className="flex gap-4">
                     <div className="bg-green-50 px-6 py-2 rounded-2xl border border-green-100 flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-xs font-black text-green-700 uppercase tracking-widest">SISTEMA ONLINE</span>
+                        <span className="text-xs font-black text-green-700 uppercase tracking-widest">SISTEMA OPERATIVO</span>
                     </div>
                 </div>
             </div>
@@ -98,8 +98,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onNavigate }) => {
             <div className="bg-slate-900 rounded-[3rem] p-10 text-white flex flex-col lg:flex-row justify-between items-center gap-10 shadow-2xl relative overflow-hidden shrink-0">
                 <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Key size={180}/></div>
                 <div className="relative z-10 max-w-lg">
-                    <h4 className="text-2xl font-black uppercase tracking-tighter mb-4">Herramientas de Mantenimiento</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed italic font-medium">Procesamiento masivo de datos para los 140k artículos. Use con precaución.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tighter mb-4">Mantenimiento de Datos</h4>
+                    <p className="text-slate-400 text-sm leading-relaxed italic font-medium">Herramientas críticas para el procesamiento masivo del catálogo de 140.000 artículos.</p>
                 </div>
                 <div className="relative z-10 flex flex-wrap justify-center gap-3">
                     <button onClick={() => onNavigate(ViewState.PRICE_UPDATES)} className="bg-white/10 hover:bg-white/20 border border-white/10 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Sincronizar Costos</button>
