@@ -8,7 +8,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
     LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './Sidebar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import POS from './components/POS';
@@ -35,7 +35,7 @@ import OnlineSales from './components/OnlineSales';
 import EcommerceAdmin from './components/EcommerceAdmin';
 import PublicPortal from './components/PublicPortal';
 import Shop from './components/Shop';
-import InitialImport from './components/InitialImport';
+import InitialImport from './InitialImport';
 import CustomerPortal from './components/CustomerPortal';
 import Remitos from './components/Remitos';
 import Presupuestos from './components/Presupuestos';
