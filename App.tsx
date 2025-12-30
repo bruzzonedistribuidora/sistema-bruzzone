@@ -46,7 +46,6 @@ import StockTransfers from './components/StockTransfers';
 import Login from './components/Login';
 import { ViewState, User, Client, InvoiceItem } from './types';
 
-// Mapeo exhaustivo de iconos para las pestañas y el lanzador
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
     [ViewState.INVENTORY]: { icon: Database, label: "Inventario Maestro", color: "bg-indigo-500" },
@@ -89,7 +88,7 @@ const App: React.FC = () => {
 
   const handleNavigate = (view: ViewState) => {
     if (!openViews.includes(view)) {
-        setOpenViews([...openViews, view]);
+        setOpenViews(prev => [...prev, view]);
     }
     setActiveView(view);
     setIsQuickNavOpen(false);
@@ -111,9 +110,7 @@ const App: React.FC = () => {
     const items = Object.entries(ViewState)
         .filter(([_, value]) => value !== ViewState.LOGIN && value !== ViewState.CUSTOMER_PORTAL)
         .map(([_, value]) => ({
-            // --- FIX: Explicitly cast 'value' as ViewState to resolve 'unknown' type assignment to key prop errors ---
             id: value as ViewState,
-            // --- FIX: Explicitly cast 'value' to string and use parentheses for spread evaluation to avoid unexpected token errors ---
             ...(VIEW_CONFIG[value as string] || { icon: Package, label: (value as string).replace(/_/g, ' '), color: "bg-slate-400" })
         }));
     
@@ -149,11 +146,11 @@ const App: React.FC = () => {
       case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
       case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
       case ViewState.SHOP: return <Shop />;
-      case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => setActiveView(ViewState.INVENTORY)} />;
+      case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
       case ViewState.PURCHASES: return <Purchases />;
-      case ViewState.REMITOS: return <Remitos onBillRemitos={(items) => { setItemsToBill(items); setActiveView(ViewState.POS); }} />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={(items) => { setItemsToBill(items); setActiveView(ViewState.POS); }} />;
+      case ViewState.REMITOS: return <Remitos onBillRemitos={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.CREDIT_NOTES: return <CreditNotes />;
       case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
@@ -170,7 +167,6 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
-        {/* TAB BAR SUPERIOR MEJORADA */}
         <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
             {openViews.map((view) => {
                 const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
@@ -204,7 +200,6 @@ const App: React.FC = () => {
                 );
             })}
             
-            {/* BOTÓN + MEJORADO */}
             <button 
                 onClick={() => setIsQuickNavOpen(!isQuickNavOpen)}
                 className={`p-2 rounded-lg ml-2 transition-all ${isQuickNavOpen ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
@@ -214,7 +209,6 @@ const App: React.FC = () => {
             </button>
         </header>
 
-        {/* LANZADOR RÁPIDO (MODAL FLOTANTE) */}
         {isQuickNavOpen && (
             <div className="absolute top-16 left-6 w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[100] flex flex-col animate-fade-in max-h-[500px] overflow-hidden">
                 <div className="p-4 bg-slate-900">
