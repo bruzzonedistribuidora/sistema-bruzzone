@@ -44,7 +44,7 @@ import CreditNotes from './CreditNotes';
 import MassProductUpdate from './MassProductUpdate';
 import StockTransfers from './StockTransfers';
 import Login from './Login';
-import { ViewState, User, Client, InvoiceItem } from './types';
+import { ViewState, User, Client, InvoiceItem } from '../types'; // bien
 
 // Mapeo exhaustivo de iconos para las pestañas y el lanzador
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
