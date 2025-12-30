@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useRef } from 'react';
 import { 
     Globe, Search, Star, Percent,
-    Eye, EyeOff, Package
+    Eye, EyeOff, Package, Camera, Upload, X, Image as ImageIcon
 } from 'lucide-react';
 import { Product } from '../types';
 
@@ -11,6 +12,7 @@ const EcommerceAdmin: React.FC = () => {
     );
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMode, setFilterMode] = useState<'ALL' | 'PUBLISHED' | 'OFFERS'>('ALL');
+    const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     const filtered = useMemo(() => {
         return products.filter(p => {
@@ -39,6 +41,18 @@ const EcommerceAdmin: React.FC = () => {
         setProducts(newProducts);
         localStorage.setItem('ferrecloud_products', JSON.stringify(newProducts));
         window.dispatchEvent(new Event('storage'));
+    };
+
+    const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            handleUpdateProduct(id, { imageUrl: base64 });
+        };
+        reader.readAsDataURL(file);
     };
 
     return (
@@ -98,10 +112,46 @@ const EcommerceAdmin: React.FC = () => {
                             </div>
                         ) : filtered.map(p => (
                             <div key={p.id} className={`p-6 rounded-[2.5rem] border-2 transition-all flex flex-col md:flex-row items-center gap-6 ${p.ecommerce?.isPublished ? 'border-indigo-100 bg-indigo-50/20 shadow-sm' : 'border-slate-50 bg-white opacity-60 hover:opacity-100'}`}>
-                                <div className="flex-1 flex items-center gap-6 min-w-0">
-                                    <div className={`p-4 rounded-3xl shrink-0 ${p.ecommerce?.isPublished ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                        <Package size={28}/>
+                                
+                                {/* CARGA DE IMAGEN */}
+                                <div className="shrink-0 relative group">
+                                    <input 
+                                        type="file" 
+                                        // --- FIX: Wrapped the assignment in braces to return void, fixing type assignment error ---
+                                        ref={el => { fileInputRefs.current[p.id] = el; }}
+                                        className="hidden" 
+                                        accept="image/*"
+                                        onChange={(e) => handleImageUpload(p.id, e)}
+                                    />
+                                    <div 
+                                        onClick={() => fileInputRefs.current[p.id]?.click()}
+                                        className={`w-32 h-32 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${p.ecommerce?.imageUrl ? 'border-indigo-200 bg-white' : 'border-slate-200 bg-slate-50 hover:border-indigo-400'}`}
+                                    >
+                                        {p.ecommerce?.imageUrl ? (
+                                            <div className="relative w-full h-full">
+                                                <img src={p.ecommerce.imageUrl} className="w-full h-full object-cover" alt={p.name} />
+                                                <div className="absolute inset-0 bg-indigo-600/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                    <Camera className="text-white" size={24}/>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Camera className="text-slate-300 mb-1" size={24}/>
+                                                <span className="text-[8px] font-black text-slate-400 uppercase">Cargar Foto</span>
+                                            </>
+                                        )}
                                     </div>
+                                    {p.ecommerce?.imageUrl && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateProduct(p.id, { imageUrl: null }); }}
+                                            className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                                        >
+                                            <X size={12}/>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 flex items-center gap-6 min-w-0">
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-black text-slate-800 uppercase text-lg leading-tight truncate">{p.name}</h4>
                                         <div className="flex items-center gap-3 mt-1">
