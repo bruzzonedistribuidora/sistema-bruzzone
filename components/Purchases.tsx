@@ -4,7 +4,7 @@ import {
     Truck, Plus, Search, FileText, X, Save, RefreshCw, 
     Trash2, ShoppingBag, Package, AlertTriangle, Eye, Upload, 
     CheckCircle, Wand2, Sparkles, PlusCircle, Calculator,
-    Receipt, Tag, Store, DollarSign, ArrowRight, History, Info
+    Receipt, Tag, Store, DollarSign, ArrowRight, History, Info, Minus
 } from 'lucide-react';
 import { Purchase, Provider, Product, PurchaseItem, CompanyConfig } from '../types';
 import { analyzeInvoice, searchVirtualInventory } from '../services/geminiService';
@@ -19,9 +19,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [isNewPurchaseModalOpen, setIsNewPurchaseModalOpen] = useState(false);
   const [purchaseMode, setPurchaseMode] = useState<'IA' | 'MANUAL'>('IA');
+  const [productSearch, setProductSearch] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
   
   const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
-  const [products, setProducts] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
+  const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
   const [purchases, setPurchases] = useState<Purchase[]>(() => JSON.parse(localStorage.getItem('ferrecloud_purchases') || '[]'));
   
   const [aiResult, setAiResult] = useState<any>(null);
@@ -32,6 +34,18 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   useEffect(() => {
       localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
   }, [purchases]);
+
+  // Lógica de búsqueda mejorada
+  const filteredProducts = useMemo(() => {
+    const term = productSearch.toLowerCase().trim();
+    if (!term) return [];
+    return products.filter(p => 
+        p.name.toLowerCase().includes(term) || 
+        p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
+        p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
+        p.barcodes.some(c => c.toLowerCase().includes(term))
+    ).slice(0, 10);
+  }, [productSearch, products]);
 
   const handleAiInvoiceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -58,6 +72,18 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       setManualItems([...manualItems, { descripcion: '', cantidad: 1, costoUnitario: 0, subtotal: 0 }]);
   };
 
+  const addExistingProductToPurchase = (p: Product) => {
+    setManualItems(prev => [...prev, {
+        productId: p.id,
+        descripcion: p.name,
+        cantidad: 1,
+        costoUnitario: p.listCost,
+        subtotal: p.listCost
+    }]);
+    setProductSearch('');
+    setShowSearchResults(false);
+  };
+
   const handleSavePurchase = () => {
       const itemsToProcess = purchaseMode === 'IA' ? aiResult.items : manualItems;
       const total = itemsToProcess.reduce((acc: number, i: any) => acc + (parseFloat(i.subtotal) || 0), 0);
@@ -77,7 +103,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       setIsNewPurchaseModalOpen(false);
       setAiResult(null);
       setManualItems([]);
-      alert("Compra cargada exitosamente. El stock ha sido actualizado simule-mente.");
+      alert("Compra cargada exitosamente.");
   };
 
   return (
@@ -94,6 +120,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                     onClick={() => {
                         if (tab.id === 'MANUAL_ENTRY') {
                             setPurchaseMode('MANUAL');
+                            setManualItems([]);
                             setIsNewPurchaseModalOpen(true);
                         } else {
                             setActiveTab(tab.id);
@@ -119,7 +146,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <Wand2 size={120}/>
                     </div>
                     <h3 className="text-xl font-black uppercase tracking-tight mb-2">Carga con IA</h3>
-                    <p className="text-indigo-100 text-xs font-medium leading-relaxed mb-6">Sube una foto de la factura y FerreBot detectará automáticamente todos los artículos y precios.</p>
+                    <p className="text-indigo-100 text-xs font-medium leading-relaxed mb-6">Sincroniza costos escaneando la factura del proveedor.</p>
                     <input type="file" ref={invoiceFileRef} className="hidden" accept="image/*,application/pdf" onChange={handleAiInvoiceUpload} />
                     <button 
                         onClick={() => invoiceFileRef.current?.click()}
@@ -134,9 +161,9 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Compras del Mes</p>
                         <h4 className="text-3xl font-black text-slate-800">${purchases.reduce((a,c) => a + c.total, 0).toLocaleString()}</h4>
                     </div>
-                    <div className="pt-4 border-t mt-4 flex justify-between items-center">
-                        <span className="text-[9px] font-black text-indigo-600 uppercase">Ver Reporte Detallado</span>
-                        <ArrowRight size={16} className="text-indigo-600"/>
+                    <div className="pt-4 border-t mt-4 flex justify-between items-center text-indigo-600 font-black text-[9px] uppercase tracking-widest">
+                        <span>Reporte Analítico</span>
+                        <ArrowRight size={14}/>
                     </div>
                 </div>
 
@@ -145,10 +172,10 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                         <div className="p-3 bg-indigo-500 rounded-2xl"><Truck size={24}/></div>
                         <div>
                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Proveedores</p>
-                            <p className="text-lg font-black">{providers.length} Registrados</p>
+                            <p className="text-lg font-black">{providers.length} Entidades</p>
                         </div>
                     </div>
-                    <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">Administrar Fichero</button>
+                    <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Administrar Fichero</button>
                 </div>
           </div>
 
@@ -166,7 +193,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-[11px]">
                       {purchases.length === 0 ? (
-                          <tr><td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest">No hay compras cargadas</td></tr>
+                          <tr><td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin compras registradas</td></tr>
                       ) : purchases.map(p => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                               <td className="px-8 py-5 font-black text-slate-800">{p.id}</td>
@@ -174,7 +201,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                               <td className="px-8 py-5 font-bold text-slate-400">{p.date}</td>
                               <td className="px-8 py-5 text-right font-black text-slate-900">${p.total.toLocaleString()}</td>
                               <td className="px-8 py-5 text-center">
-                                  <span className="px-3 py-1 rounded-full text-[8px] font-black bg-yellow-50 text-yellow-700 border border-yellow-100 uppercase">Pendiente</span>
+                                  <span className="px-3 py-1 rounded-full text-[8px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">Cargado</span>
                               </td>
                               <td className="px-8 py-5 text-right"><button className="p-2 text-slate-300 hover:text-indigo-600"><Eye size={18}/></button></td>
                           </tr>
@@ -184,16 +211,15 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
           </div>
       </div>
 
-      {/* MODAL DE CARGA (IA O MANUAL) */}
       {isNewPurchaseModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
                   <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-4">
-                          <div className="p-3 bg-indigo-50 rounded-2xl shadow-lg"><PlusCircle size={24}/></div>
+                          <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><PlusCircle size={24}/></div>
                           <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{purchaseMode === 'IA' ? 'Revisión de Factura IA' : 'Nueva Compra Manual'}</h3>
-                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Ingreso de mercadería al Almacén Maestro</p>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{purchaseMode === 'IA' ? 'Confirmación de Factura IA' : 'Nueva Carga Manual'}</h3>
+                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Suministro de Inventario</p>
                           </div>
                       </div>
                       <button onClick={() => setIsNewPurchaseModalOpen(false)}><X size={28}/></button>
@@ -202,31 +228,62 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                   <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Datos del Proveedor</label>
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Proveedor</label>
                               <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold uppercase text-xs" value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)}>
-                                  <option value="">{purchaseMode === 'IA' ? aiResult?.nombreEmisor : '-- Seleccione Proveedor --'}</option>
+                                  <option value="">{purchaseMode === 'IA' ? aiResult?.nombreEmisor : '-- SELECCIONE PROVEEDOR --'}</option>
                                   {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                               </select>
-                              {purchaseMode === 'IA' && (
-                                  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold uppercase flex items-center gap-2">
-                                      <Info size={14}/> CUIT Detectado: {aiResult?.cuitEmisor}
+                          </div>
+                          
+                          {purchaseMode === 'MANUAL' && (
+                              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 relative">
+                                  <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-2">Añadir Artículos por SKU / Prov / EAN</label>
+                                  <div className="relative">
+                                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20}/>
+                                      <input 
+                                          type="text" 
+                                          placeholder="Buscar producto a ingresar..."
+                                          className="w-full pl-12 p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold uppercase text-xs"
+                                          value={productSearch}
+                                          onFocus={() => setShowSearchResults(true)}
+                                          onChange={e => setProductSearch(e.target.value)}
+                                      />
+                                      {showSearchResults && productSearch.length > 0 && (
+                                          <div className="absolute top-full left-0 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] mt-2 overflow-hidden">
+                                              {filteredProducts.map(p => (
+                                                  <button key={p.id} onClick={() => addExistingProductToPurchase(p)} className="w-full p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center group">
+                                                      <div className="text-left">
+                                                          <p className="font-black text-slate-800 uppercase text-xs">{p.name}</p>
+                                                          <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase">
+                                                              <span>INT: {p.internalCodes[0]}</span>
+                                                              <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
+                                                          </div>
+                                                      </div>
+                                                      <Plus size={16} className="text-indigo-400 group-hover:scale-125 transition-transform"/>
+                                                  </button>
+                                              ))}
+                                          </div>
+                                      )}
                                   </div>
-                              )}
-                          </div>
-                          <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col justify-center">
-                              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Comprobante</p>
-                              <p className="text-5xl font-black tracking-tighter leading-none">
-                                  ${purchaseMode === 'IA' ? aiResult.total?.toLocaleString() : manualItems.reduce((a,c) => a + (parseFloat(c.subtotal) || 0), 0).toLocaleString()}
-                              </p>
-                          </div>
+                              </div>
+                          )}
+
+                          {purchaseMode === 'IA' && (
+                              <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col justify-center">
+                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Detectado</p>
+                                  <p className="text-5xl font-black tracking-tighter leading-none">${aiResult.total?.toLocaleString()}</p>
+                              </div>
+                          )}
                       </div>
 
                       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
                           <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-                              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Detalle de Ítems</h4>
-                              <button onClick={handleAddManualItem} className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1 hover:underline">
-                                  <Plus size={14}/> Agregar Ítem
-                              </button>
+                              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Detalle de Comprobante</h4>
+                              {purchaseMode === 'MANUAL' && (
+                                <button onClick={handleAddManualItem} className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1 hover:underline">
+                                    <PlusCircle size={14}/> Nuevo Ítem Libre
+                                </button>
+                              )}
                           </div>
                           <table className="w-full text-left">
                               <thead className="bg-white text-[8px] font-black text-gray-400 uppercase border-b">
@@ -295,11 +352,17 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                       </div>
                   </div>
 
-                  <div className="p-8 bg-white border-t border-gray-100 flex justify-end gap-4 shrink-0">
-                      <button onClick={() => setIsNewPurchaseModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                      <button onClick={handleSavePurchase} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
-                          <CheckCircle size={18}/> Procesar Ingreso
-                      </button>
+                  <div className="p-8 bg-white border-t border-gray-100 flex justify-between items-center shrink-0">
+                      <div className="text-left">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Comprobante</p>
+                          <p className="text-3xl font-black text-slate-900">${(purchaseMode === 'IA' ? aiResult.total : manualItems.reduce((a,c) => a + (parseFloat(c.subtotal) || 0), 0)).toLocaleString()}</p>
+                      </div>
+                      <div className="flex gap-3">
+                        <button onClick={() => setIsNewPurchaseModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
+                        <button onClick={handleSavePurchase} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
+                            <CheckCircle size={18}/> Procesar Ingreso
+                        </button>
+                      </div>
                   </div>
               </div>
           </div>
