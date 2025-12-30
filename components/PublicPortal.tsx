@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
-import Inventory from './components/Inventory';
+import Inventory from './Inventory';
 import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
