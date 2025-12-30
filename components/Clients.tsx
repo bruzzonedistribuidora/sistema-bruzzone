@@ -7,7 +7,7 @@ import {
     CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
     ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
     Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil, ArrowLeft,
-    UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp, Columns, Table as TableIcon, Hash, Tag, Notebook, Percent
+    UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp, Columns, Table as TableIcon, Hash, Tag, Notebook, Percent, Settings2
 } from 'lucide-react';
 import { Client, CurrentAccountMovement, CompanyConfig, TaxCondition } from '../types';
 import { fetchCompanyByCuit } from '../services/geminiService';
@@ -103,27 +103,41 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       }
       const currentCuits = new Set(clients.map(c => c.cuit.replace(/[^0-9]/g, '')));
       const newClients: Client[] = [];
-      importRows.forEach((row, index) => {
+      
+      // Saltamos la primera fila si es de encabezado
+      const dataRows = importRows.slice(1);
+
+      dataRows.forEach((row, index) => {
           const name = row[importMapping.name];
           const cuit = row[importMapping.cuit];
-          if (!name || !cuit || name.toLowerCase() === 'nombre' || name.toLowerCase() === 'razon social') return;
+          if (!name || !cuit) return;
+
           const cleanCuit = cuit.replace(/[^0-9]/g, '');
           if (!currentCuits.has(cleanCuit)) {
               newClients.push({
-                  ...clientForm,
-                  id: `cli-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                  id: `cli-${Date.now()}-${index}`,
                   name: name.toUpperCase(),
                   cuit: cuit,
                   phone: importMapping.phone !== undefined ? row[importMapping.phone] : '',
                   address: importMapping.address !== undefined ? row[importMapping.address] : '',
                   email: importMapping.email !== undefined ? row[importMapping.email] : '',
-                  balance: 0, points: 0, portalEnabled: true,
+                  balance: 0, 
+                  limit: 100000,
+                  points: 0, 
+                  portalEnabled: true,
+                  taxCondition: 'Consumidor Final',
                   portalHash: `p-${Math.random().toString(36).substr(2, 6)}`
               } as Client);
               currentCuits.add(cleanCuit);
           }
       });
-      setClients([...newClients, ...clients]);
+
+      if (newClients.length === 0) {
+          alert("No se encontraron clientes nuevos para importar (o ya existen en el sistema).");
+      } else {
+          setClients([...newClients, ...clients]);
+          alert(`¡Importación exitosa! Se agregaron ${newClients.length} clientes.`);
+      }
       setIsImportMappingOpen(false);
   };
 
@@ -162,33 +176,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
     }
   };
 
-  const handleRegisterReceipt = () => {
-    if (!selectedClient || receiptForm.amount <= 0) return;
-    const newBalance = selectedClient.balance - receiptForm.amount;
-    const newMovement: CurrentAccountMovement = {
-        id: `REC-${Date.now().toString().slice(-6)}`,
-        clientId: selectedClient.id,
-        date: new Date().toLocaleDateString(),
-        voucherType: 'RECIBO DE PAGO',
-        description: `Cobranza vía ${receiptForm.method}. ${receiptForm.notes}`,
-        debit: 0,
-        credit: receiptForm.amount,
-        balance: newBalance
-    };
-    setMovements([newMovement, ...movements]);
-    setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, balance: newBalance } : c));
-    setIsReceiptModalOpen(false);
-  };
-
   const filteredClients = clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.cuit.includes(searchTerm));
-
-  const CLIENT_FIELDS = [
-      { key: 'name', label: 'Nombre / Razón Social', required: true },
-      { key: 'cuit', label: 'CUIT / DNI', required: true },
-      { key: 'phone', label: 'Teléfono', required: false },
-      { key: 'address', label: 'Dirección', required: false },
-      { key: 'email', label: 'Email', required: false }
-  ];
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden">
@@ -206,7 +194,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
             </div>
             <div className="flex gap-3">
                 <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest active:scale-95">
-                    <FileUp size={20} /> Importar
+                    <FileUp size={20} /> Importar CSV
                 </button>
                 <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', balance: 0, limit: 100000, points: 0, portalEnabled: true, taxCondition: 'Consumidor Final', currency: 'ARS'}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
                     <Plus size={20} /> Nuevo Cliente
@@ -256,6 +244,83 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                 </table>
             </div>
         </div>
+
+        {/* MODAL: MAPEO DE IMPORTACIÓN */}
+        {isImportMappingOpen && (
+            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+                <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="p-8 bg-indigo-900 text-white flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white/10 rounded-2xl shadow-lg"><Settings2 size={24}/></div>
+                            <div>
+                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Mapeo de Columnas</h3>
+                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Vincula tu archivo con los campos del sistema</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsImportMappingOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[
+                                { key: 'name', label: 'Nombre / Razón Social', required: true },
+                                { key: 'cuit', label: 'CUIT / DNI', required: true },
+                                { key: 'phone', label: 'Teléfono / WhatsApp', required: false },
+                                { key: 'address', label: 'Dirección', required: false },
+                                { key: 'email', label: 'E-mail', required: false }
+                            ].map(field => (
+                                <div key={field.key} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex justify-between">
+                                        {field.label} {field.required && <span className="text-red-500">* Requerido</span>}
+                                    </label>
+                                    <select 
+                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                                        value={importMapping[field.key] ?? ''}
+                                        onChange={e => setImportMapping({...importMapping, [field.key]: parseInt(e.target.value)})}
+                                    >
+                                        <option value="">-- Seleccionar Columna --</option>
+                                        {importRows[0]?.map((header, i) => (
+                                            <option key={i} value={i}>{header || `Columna ${i + 1}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div className="p-4 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">Vista previa del archivo (primeras 5 filas)</div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-[10px]">
+                                    <thead className="bg-slate-50 border-b">
+                                        <tr>
+                                            {importRows[0]?.map((h, i) => (
+                                                <th key={i} className="px-4 py-3 border-r font-black text-slate-400">{h || `Col ${i+1}`}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {importRows.slice(1, 6).map((row, i) => (
+                                            <tr key={i} className="hover:bg-slate-50">
+                                                {row.map((cell, j) => (
+                                                    <td key={j} className="px-4 py-2.5 border-r font-medium text-slate-600 truncate max-w-[150px]">{cell}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-8 bg-white border-t border-gray-100 flex justify-end gap-4 shrink-0">
+                        <button onClick={() => setIsImportMappingOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
+                        <button onClick={confirmImport} className="bg-indigo-600 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3">
+                            <CheckCircle size={18}/> Procesar Importación ({importRows.length - 1} filas)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {isNewClientModalOpen && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
