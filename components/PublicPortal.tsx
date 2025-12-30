@@ -34,7 +34,7 @@ import PriceAudit from './PriceAudit';
 import OnlineSales from './OnlineSales';
 import EcommerceAdmin from './EcommerceAdmin';
 import PublicPortal from './PublicPortal';
-import Shop from './components/Shop';
+import Shop from './Shop';
 import InitialImport from './InitialImport';
 import CustomerPortal from './CustomerPortal';
 import Remitos from './Remitos';
