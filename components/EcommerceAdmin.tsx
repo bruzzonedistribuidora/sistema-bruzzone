@@ -1,216 +1,511 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { 
-    Globe, Search, Star, Percent,
-    Eye, EyeOff, Package, Camera, Upload, X, Image as ImageIcon
-} from 'lucide-react';
-import { Product } from '../types';
+export enum ViewState {
+  LOGIN = 'LOGIN',
+  DASHBOARD = 'DASHBOARD',
+  INVENTORY = 'INVENTORY',
+  MASS_PRODUCT_UPDATE = 'MASS_PRODUCT_UPDATE',
+  POS = 'POS',
+  REMITOS = 'REMITOS',
+  PRESUPUESTOS = 'PRESUPUESTOS',
+  CLIENTS = 'CLIENTS',
+  CLIENT_BALANCES = 'CLIENT_BALANCES',
+  PROVIDER_BALANCES = 'PROVIDER_BALANCES',
+  PURCHASES = 'PURCHASES',
+  PROVIDERS = 'PROVIDERS',
+  TREASURY = 'TREASURY',
+  ACCOUNTING = 'ACCOUNTING',
+  STATISTICS = 'STATISTICS',
+  REPORTS = 'REPORTS',
+  BACKUP = 'BACKUP',
+  BRANCHES = 'BRANCHES',
+  AI_ASSISTANT = 'AI_ASSISTANT',
+  PRICE_UPDATES = 'PRICE_UPDATES',
+  USERS = 'USERS',
+  REPLENISHMENT = 'REPLENISHMENT',
+  SHORTAGES = 'SHORTAGES',
+  SALES_ORDERS = 'SALES_ORDERS',
+  ONLINE_SALES = 'ONLINE_SALES',
+  PRINT_CONFIG = 'PRINT_CONFIG',
+  LABEL_PRINTING = 'LABEL_PRINTING',
+  COMPANY_SETTINGS = 'COMPANY_SETTINGS',
+  AFIP_CONFIG = 'AFIP_CONFIG',
+  CUSTOMER_PORTAL = 'CUSTOMER_PORTAL',
+  DAILY_MOVEMENTS = 'DAILY_MOVEMENTS',
+  EMPLOYEES = 'EMPLOYEES',
+  STOCK_TRANSFERS = 'STOCK_TRANSFERS',
+  CONFIG_PANEL = 'CONFIG_PANEL',
+  CURRENCIES = 'CURRENCIES',
+  MARKETING = 'MARKETING',
+  PRICE_AUDIT = 'PRICE_AUDIT',
+  CREDIT_NOTES = 'CREDIT_NOTES',
+  PUBLIC_PORTAL = 'PUBLIC_PORTAL',
+  SHOP = 'SHOP',
+  ECOMMERCE_ADMIN = 'ECOMMERCE_ADMIN',
+  INITIAL_IMPORT = 'INITIAL_IMPORT'
+}
 
-const EcommerceAdmin: React.FC = () => {
-    const [products, setProducts] = useState<Product[]>(() => 
-        JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
-    );
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterMode, setFilterMode] = useState<'ALL' | 'PUBLISHED' | 'OFFERS'>('ALL');
-    const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 
-    const filtered = useMemo(() => {
-        return products.filter(p => {
-            const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                p.internalCodes.some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-            if (filterMode === 'PUBLISHED') return matchesSearch && p.ecommerce?.isPublished;
-            if (filterMode === 'OFFERS') return matchesSearch && p.ecommerce?.isOffer;
-            return matchesSearch;
-        });
-    }, [products, searchTerm, filterMode]);
+export interface Product {
+  id: string;
+  internalCodes: string[];
+  barcodes: string[];
+  providerCodes: string[];
+  name: string;
+  brand: string;
+  provider: string;
+  description: string;
+  category: string;
+  measureUnitSale: string;
+  measureUnitPurchase: string;
+  conversionFactor: number;
+  purchaseCurrency: string;
+  saleCurrency: string;
+  vatRate: number;
+  listCost: number;
+  discounts: number[];
+  costAfterDiscounts: number;
+  profitMargin: number;
+  priceNeto: number;
+  priceFinal: number;
+  stock: number;
+  stockDetails: ProductStock[];
+  minStock: number;
+  desiredStock: number;
+  reorderPoint: number;
+  location: string;
+  ecommerce: {
+    mercadoLibre?: boolean;
+    tiendaNube?: boolean;
+    webPropia?: boolean;
+    isPublished?: boolean;
+    isOffer?: boolean;
+    offerPrice?: number | null;
+    isFeatured?: boolean;
+    imageUrl?: string;
+  };
+  isCombo: boolean;
+  comboItems: ComboItem[];
+  lastProviders?: { name: string; date: string; price: number }[];
+}
 
-    const stats = useMemo(() => ({
-        total: products.length,
-        published: products.filter(p => p.ecommerce?.isPublished).length,
-        offers: products.filter(p => p.ecommerce?.isOffer).length,
-        featured: products.filter(p => p.ecommerce?.isFeatured).length
-    }), [products]);
+export interface ProductStock {
+  branchId: string;
+  branchName: string;
+  quantity: number;
+}
 
-    const handleUpdateProduct = (id: string, updates: any) => {
-        const newProducts = products.map(p => {
-            if (p.id === id) {
-                return { ...p, ecommerce: { ...(p.ecommerce || {}), ...updates } };
-            }
-            return p;
-        });
-        setProducts(newProducts);
-        localStorage.setItem('ferrecloud_products', JSON.stringify(newProducts));
-        window.dispatchEvent(new Event('storage'));
-    };
+export interface ComboItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+}
 
-    const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+export interface Brand {
+  id: string;
+  name: string;
+}
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const base64 = event.target?.result as string;
-            handleUpdateProduct(id, { imageUrl: base64 });
-        };
-        reader.readAsDataURL(file);
-    };
+export interface Category {
+  id: string;
+  name: string;
+}
 
-    return (
-        <div className="p-6 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl">
-                        <Globe size={32}/>
-                    </div>
-                    <div>
-                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">Administrador de Tienda</h2>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Gestiona qué artículos ven tus clientes en la web</p>
-                    </div>
-                </div>
+export interface Provider {
+  id: string;
+  name: string;
+  cuit: string;
+  contact: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  balance: number;
+  defaultDiscounts: [number, number, number];
+  taxCondition?: TaxCondition;
+  orderPhone?: string;
+  orderEmail?: string;
+}
 
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100 text-center">
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Publicados</p>
-                        <p className="text-lg font-black text-indigo-600">{stats.published}</p>
-                    </div>
-                    <div className="bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100 text-center">
-                        <p className="text-[8px] font-black text-slate-400 uppercase">En Oferta</p>
-                        <p className="text-lg font-black text-orange-500">{stats.offers}</p>
-                    </div>
-                    <div className="bg-slate-50 px-5 py-2.5 rounded-2xl border border-slate-100 text-center">
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Destacados</p>
-                        <p className="text-lg font-black text-yellow-500">{stats.featured}</p>
-                    </div>
-                </div>
-            </div>
+export interface Client {
+  id: string;
+  name: string;
+  cuit: string;
+  dni?: string;
+  phone: string;
+  address: string;
+  balance: number;
+  limit: number;
+  points: number;
+  number?: string;
+  razonSocial?: string;
+  fantasyName?: string;
+  taxCondition?: TaxCondition;
+  locality?: string;
+  email?: string;
+  description?: string;
+  specialDiscount?: number;
+  currency?: string;
+  contactName?: string;
+  portalEnabled?: boolean;
+  portalHash?: string;
+}
 
-            <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm shrink-0">
-                <div className="relative flex-1 group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={18}/>
-                    <input 
-                        type="text" 
-                        placeholder="Buscar por nombre o SKU para publicar..." 
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex bg-slate-100 rounded-2xl p-1 shrink-0">
-                    <button onClick={() => setFilterMode('ALL')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === 'ALL' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400'}`}>Todos</button>
-                    <button onClick={() => setFilterMode('PUBLISHED')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === 'PUBLISHED' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>En Tienda</button>
-                    <button onClick={() => setFilterMode('OFFERS')} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${filterMode === 'OFFERS' ? 'bg-white text-orange-500 shadow-md' : 'text-gray-400'}`}>Ofertas</button>
-                </div>
-            </div>
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  roleId: string;
+  active: boolean;
+  lastLogin: string;
+  branchId: string;
+}
 
-            <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                    <div className="grid grid-cols-1 gap-4">
-                        {filtered.length === 0 ? (
-                            <div className="py-24 text-center text-slate-300 font-black uppercase tracking-widest opacity-30">
-                                <Package size={64} className="mx-auto mb-4"/>
-                                Sin resultados
-                            </div>
-                        ) : filtered.map(p => (
-                            <div key={p.id} className={`p-6 rounded-[2.5rem] border-2 transition-all flex flex-col md:flex-row items-center gap-6 ${p.ecommerce?.isPublished ? 'border-indigo-100 bg-indigo-50/20 shadow-sm' : 'border-slate-50 bg-white opacity-60 hover:opacity-100'}`}>
-                                
-                                {/* CARGA DE IMAGEN */}
-                                <div className="shrink-0 relative group">
-                                    <input 
-                                        type="file" 
-                                        // --- FIX: Wrapped the assignment in braces to return void, fixing type assignment error ---
-                                        ref={el => { fileInputRefs.current[p.id] = el; }}
-                                        className="hidden" 
-                                        accept="image/*"
-                                        onChange={(e) => handleImageUpload(p.id, e)}
-                                    />
-                                    <div 
-                                        onClick={() => fileInputRefs.current[p.id]?.click()}
-                                        className={`w-32 h-32 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${p.ecommerce?.imageUrl ? 'border-indigo-200 bg-white' : 'border-slate-200 bg-slate-50 hover:border-indigo-400'}`}
-                                    >
-                                        {p.ecommerce?.imageUrl ? (
-                                            <div className="relative w-full h-full">
-                                                <img src={p.ecommerce.imageUrl} className="w-full h-full object-cover" alt={p.name} />
-                                                <div className="absolute inset-0 bg-indigo-600/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                    <Camera className="text-white" size={24}/>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <Camera className="text-slate-300 mb-1" size={24}/>
-                                                <span className="text-[8px] font-black text-slate-400 uppercase">Cargar Foto</span>
-                                            </>
-                                        )}
-                                    </div>
-                                    {p.ecommerce?.imageUrl && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleUpdateProduct(p.id, { imageUrl: null }); }}
-                                            className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
-                                        >
-                                            <X size={12}/>
-                                        </button>
-                                    )}
-                                </div>
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  permissions: string[];
+}
 
-                                <div className="flex-1 flex items-center gap-6 min-w-0">
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-slate-800 uppercase text-lg leading-tight truncate">{p.name}</h4>
-                                        <div className="flex items-center gap-3 mt-1">
-                                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase">{p.internalCodes[0]}</span>
-                                            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{p.brand}</span>
-                                        </div>
-                                    </div>
-                                </div>
+export interface Branch {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  phone: string;
+  manager: string;
+  type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL';
+  active: boolean;
+}
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto shrink-0">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Publicar</p>
-                                        <button 
-                                            onClick={() => handleUpdateProduct(p.id, { isPublished: !p.ecommerce?.isPublished })}
-                                            className={`p-3 rounded-2xl transition-all ${p.ecommerce?.isPublished ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-300 hover:bg-indigo-50'}`}>
-                                            {p.ecommerce?.isPublished ? <Eye size={20}/> : <EyeOff size={20}/>}
-                                        </button>
-                                    </div>
+export interface InvoiceItem {
+  product: Product;
+  quantity: number;
+  appliedPrice: number;
+  subtotal: number;
+}
 
-                                    <div className="flex flex-col items-center gap-2">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Oferta</p>
-                                        <button 
-                                            onClick={() => handleUpdateProduct(p.id, { isOffer: !p.ecommerce?.isOffer, offerPrice: !p.ecommerce?.isOffer ? p.priceFinal * 0.9 : null })}
-                                            className={`p-3 rounded-2xl transition-all ${p.ecommerce?.isOffer ? 'bg-orange-500 text-white shadow-lg' : 'bg-slate-100 text-slate-300 hover:bg-orange-50'}`}>
-                                            <Percent size={20}/>
-                                        </button>
-                                    </div>
+export interface Remito {
+  id: string;
+  clientId: string;
+  clientName: string;
+  items: RemitoItem[];
+  date: string;
+  status: 'PENDING' | 'BILLED';
+}
 
-                                    <div className="flex flex-col items-center gap-2">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Portada</p>
-                                        <button 
-                                            onClick={() => handleUpdateProduct(p.id, { isFeatured: !p.ecommerce?.isFeatured })}
-                                            className={`p-3 rounded-2xl transition-all ${p.ecommerce?.isFeatured ? 'bg-yellow-400 text-slate-900 shadow-lg' : 'bg-slate-100 text-slate-300 hover:bg-yellow-50'}`}>
-                                            <Star size={20} className={p.ecommerce?.isFeatured ? 'fill-slate-900' : ''}/>
-                                        </button>
-                                    </div>
+export interface RemitoItem {
+  product: Product;
+  quantity: number;
+  historicalPrice: number;
+}
 
-                                    <div className="flex col-span-2 md:col-span-1 flex-col gap-1 min-w-[120px]">
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Precio Web</p>
-                                        <div className="relative">
-                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
-                                            <input 
-                                                type="number" 
-                                                className={`w-full pl-6 p-2 rounded-xl text-xs font-black outline-none border transition-all ${p.ecommerce?.isOffer ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-100 text-slate-900'}`}
-                                                value={p.ecommerce?.isOffer ? (p.ecommerce?.offerPrice || 0) : p.priceFinal}
-                                                readOnly={!p.ecommerce?.isOffer}
-                                                onChange={e => handleUpdateProduct(p.id, { offerPrice: parseFloat(e.target.value) })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+export interface Budget {
+  id: string;
+  clientName: string;
+  date: string;
+  validUntil: string;
+  items: InvoiceItem[];
+  total: number;
+  status: 'OPEN' | 'CLOSED';
+}
 
-export default EcommerceAdmin;
+export interface CashRegister {
+  id: string;
+  name: string;
+  balance: number;
+  isOpen: boolean;
+}
+
+export interface Check {
+  id: string;
+  number: string;
+  bank: string;
+  issuer: string;
+  amount: number;
+  dueDate: string;
+  status: 'PENDING' | 'DEPOSITED' | 'REJECTED';
+  type: 'FISICO' | 'ECHEQ';
+}
+
+export interface TreasuryMovement {
+  id: string;
+  date: string;
+  type: 'INCOME' | 'EXPENSE';
+  subtype: string;
+  paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO';
+  amount: number;
+  description: string;
+  cashRegisterId: string;
+}
+
+export interface Purchase {
+  id: string;
+  providerId: string;
+  providerName: string;
+  date: string;
+  type: string;
+  items: number;
+  total: number;
+  status: 'PENDING' | 'COMPLETED';
+}
+
+export interface PurchaseItem {
+  descripcion: string;
+  cantidad: number;
+  costoUnitario: number;
+  subtotal: number;
+}
+
+export interface CurrentAccountMovement {
+  id: string;
+  clientId?: string;
+  providerId?: string;
+  date: string;
+  voucherType: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface CompanyConfig {
+  name: string;
+  fantasyName: string;
+  cuit: string;
+  taxCondition: TaxCondition;
+  iibb: string;
+  startDate: string;
+  address: string;
+  city: string;
+  zipCode: string;
+  phone: string;
+  email: string;
+  web: string;
+  logo: string | null;
+  slogan: string;
+  whatsappNumber: string;
+  defaultProfitMargin: number;
+  paymentAccounts: PaymentAccount[];
+  paymentMethods: string[];
+  paymentSystems: PaymentSystem[];
+  loyalty?: LoyaltyConfig;
+  currencies?: CurrencyQuote[];
+}
+
+export interface PaymentAccount {
+  id: string;
+  type: 'BANK' | 'VIRTUAL_WALLET';
+  bankName: string;
+  alias: string;
+  cbu: string;
+  owner: string;
+  active: boolean;
+  qrImage?: string;
+}
+
+export interface PaymentSystem {
+  id: string;
+  name: string;
+  debitSurcharge: number;
+  ratesUrl: string;
+  creditInstallments: CreditInstallment[];
+}
+
+export interface CreditInstallment {
+  id: string;
+  installments: number;
+  surcharge: number;
+  label: string;
+}
+
+export interface LoyaltyConfig {
+  enabled: boolean;
+  pointsPerPeso: number;
+  minPointsToRedeem: number;
+  valuePerPoint: number;
+}
+
+export interface CurrencyQuote {
+  id: string;
+  name: string;
+  code: string;
+  value: number;
+  lastUpdate: string;
+}
+
+export interface PriceList {
+  id: string;
+  name: string;
+  type: 'BASE' | 'CUSTOM';
+  fixedMargin?: number;
+  active: boolean;
+}
+
+export interface ReplenishmentItem {
+  product: Product;
+  quantity: number;
+  selectedProviderId: string;
+  selectedProviderName: string;
+}
+
+export interface ReplenishmentOrder {
+  id: string;
+  date: string;
+  providerId: string;
+  providerName: string;
+  items: ReplenishmentItem[];
+  status: 'DRAFT' | 'SENT';
+  totalItems: number;
+  estimatedCost: number;
+  notes?: string;
+}
+
+export interface StockTransfer {
+  id: string;
+  date: string;
+  sourceBranchId: string;
+  sourceBranchName: string;
+  destBranchId: string;
+  destBranchName: string;
+  items: StockTransferItem[];
+  notes: string;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+}
+
+export interface StockTransferItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+}
+
+export interface SalesOrder {
+  id: string;
+  clientName: string;
+  date: string;
+  priority: 'NORMAL' | 'URGENTE';
+  status: SalesOrderStatus;
+  items: InvoiceItem[];
+  notes: string;
+  total: number;
+}
+
+export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
+
+export interface PrintTemplate {
+  id: string;
+  name: string;
+  paperSize: PaperSize;
+  orientation: 'VERTICAL' | 'HORIZONTAL';
+  positions: Record<string, Position>;
+}
+
+export interface Position {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
+export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
+export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
+
+export interface TableColumnConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+  width: number;
+}
+
+export interface OnlineOrder {
+  id: string;
+  platformId: string;
+  platform: OnlinePlatform;
+  date: string;
+  customer: {
+    name: string;
+    nickname?: string;
+    address: string;
+    city: string;
+    zipCode: string;
+    phone: string;
+    dni: string;
+  };
+  items: InvoiceItem[];
+  total: number;
+  shippingCost: number;
+  shippingMethod: string;
+  status: OnlineOrderStatus;
+  labelPrinted: boolean;
+  invoiced: boolean;
+  trackingCode: string;
+}
+
+export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WEB_PROPIA';
+export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+
+export interface DailyExpense {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  category: 'FIXED' | 'VARIABLE';
+  paymentMethod: string;
+  type: 'EXPENSE' | 'INCOME';
+  cashRegisterId: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  position: string;
+  baseSalary: number;
+  dni: string;
+  startDate: string;
+  active: boolean;
+  movements: EmployeeMovement[];
+}
+
+export interface EmployeeMovement {
+  id: string;
+  type: 'SALARY' | 'ADVANCE' | 'BONUS' | 'DEDUCTION';
+  amount: number;
+  description: string;
+  month: string;
+  date: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string;
+  discountType: 'PERCENT' | 'FIXED';
+  value: number;
+  validUntil: string;
+  usedCount: number;
+  active: boolean;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  targetSegment: string;
+  channel: 'WHATSAPP' | 'EMAIL' | 'SMS';
+  message: string;
+  sentDate: string;
+  reach: number;
+}
+
+export interface CreditNote {
+  id: string;
+  targetId: string;
+  targetName: string;
+  relatedVoucherId?: string;
+  date: string;
+  type: 'SALES' | 'PURCHASE';
+  items: InvoiceItem[];
+  reason: 'DEVOLUCION' | 'ERROR_PRECIO' | 'BONIFICACION' | 'OTROS';
+  returnToStock: boolean;
+  total: number;
+}
