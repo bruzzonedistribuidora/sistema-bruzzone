@@ -9,7 +9,7 @@ import {
     LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart
 } from 'lucide-react';
 import Sidebar from './Sidebar';
-import Dashboard from './components/Dashboard';
+import Dashboard from './Dashboard';
 import Inventory from './components/Inventory';
 import POS from './components/POS';
 import Purchases from './components/Purchases';
