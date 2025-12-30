@@ -8,7 +8,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
     LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart
 } from 'lucide-react';
-import Sidebar from './components/Sidebar';
+import Sidebar from './Sidebar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import POS from './components/POS';
