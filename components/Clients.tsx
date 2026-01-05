@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     User, Plus, Search, FileText, Globe, X, Copy, MessageCircle, Key, 
@@ -143,17 +142,17 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       setIsSearchingCuit(true);
       try {
           const data = await fetchCompanyByCuit(cleanCuit);
-          if (data && (data.razonSocial || data.name)) {
+          if (data && data.razonSocial) {
               setClientForm(prev => ({ 
                   ...prev, 
-                  name: (data.razonSocial || data.name || prev.name).toUpperCase(), 
-                  razonSocial: (data.razonSocial || data.name || prev.razonSocial).toUpperCase(),
-                  address: (data.domicilio || data.address || prev.address).toUpperCase(),
+                  name: data.razonSocial.toUpperCase(), 
+                  razonSocial: data.razonSocial.toUpperCase(),
+                  address: (data.domicilio || '').toUpperCase(),
                   taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition
               }));
               alert("✅ Datos sincronizados correctamente desde ARCA.");
           } else {
-              alert("❌ No se encontraron datos públicos para ese CUIT. Por favor, verifíquelo o cárguelo manualmente.");
+              alert("❌ No se encontraron datos para ese CUIT. Por favor, verifíquelo.");
           }
       } catch (err) { 
           console.error(err); 
