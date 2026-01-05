@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -8,19 +7,17 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // Marcamos como externas las librerías que se cargan vía CDN en el index.html
-      // Esto evita que Rollup intente buscarlas o empaquetarlas durante el build.
+      // Usamos strings exactos y expresiones regulares para capturar sub-rutas (como react/jsx-runtime)
       external: [
         'react',
         'react-dom',
+        'react/jsx-runtime',
         'lucide-react',
         '@google/genai',
-        'recharts'
+        'recharts',
+        /^react\/.*/,
+        /^react-dom\/.*/,
       ],
-      output: {
-        // Aseguramos que las importaciones se mantengan como rutas de módulos estándar
-        // para que el navegador pueda resolverlas con el importmap.
-        format: 'es'
-      }
     }
   },
   server: {
