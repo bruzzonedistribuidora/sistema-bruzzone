@@ -51,12 +51,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       points: 0, specialDiscount: 0, currency: 'ARS', contactName: '', portalEnabled: true
   });
 
-  const [receiptForm, setReceiptForm] = useState({
-      amount: 0,
-      method: companyConfig.paymentMethods?.[0] || 'EFECTIVO',
-      notes: ''
-  });
-
   useEffect(() => {
       if (initialClientId) {
           const c = clients.find(cl => cl.id === initialClientId);
@@ -104,7 +98,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       const currentCuits = new Set(clients.map(c => c.cuit.replace(/[^0-9]/g, '')));
       const newClients: Client[] = [];
       
-      // Saltamos la primera fila si es de encabezado
       const dataRows = importRows.slice(1);
 
       dataRows.forEach((row, index) => {
@@ -142,17 +135,32 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   };
 
   const handleSearchCuit = async () => {
-      if (!clientForm.cuit || clientForm.cuit.length < 8) return;
+      const cleanCuit = (clientForm.cuit || '').trim();
+      if (cleanCuit.length < 10) {
+          alert("Por favor, ingrese un CUIT válido para sincronizar.");
+          return;
+      }
       setIsSearchingCuit(true);
       try {
-          const data = await fetchCompanyByCuit(clientForm.cuit);
-          if (data) setClientForm(prev => ({ 
-              ...prev, 
-              name: data.name || data.razonSocial || prev.name, 
-              razonSocial: data.razonSocial || data.name || prev.razonSocial,
-              address: data.address || data.domicilio || prev.address 
-          }));
-      } catch (err) { console.error(err); } finally { setIsSearchingCuit(false); }
+          const data = await fetchCompanyByCuit(cleanCuit);
+          if (data && (data.razonSocial || data.name)) {
+              setClientForm(prev => ({ 
+                  ...prev, 
+                  name: (data.razonSocial || data.name || prev.name).toUpperCase(), 
+                  razonSocial: (data.razonSocial || data.name || prev.razonSocial).toUpperCase(),
+                  address: (data.domicilio || data.address || prev.address).toUpperCase(),
+                  taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition
+              }));
+              alert("✅ Datos sincronizados correctamente desde ARCA.");
+          } else {
+              alert("❌ No se encontraron datos públicos para ese CUIT. Por favor, verifíquelo o cárguelo manualmente.");
+          }
+      } catch (err) { 
+          console.error(err); 
+          alert("⚠️ Error al conectar con el servicio de IA. Intente nuevamente.");
+      } finally { 
+          setIsSearchingCuit(false); 
+      }
   };
 
   const handleSaveClient = () => {
@@ -367,7 +375,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CUIT / DNI</label>
                                         <div className="flex gap-2">
                                             <input type="text" className="flex-1 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold tracking-widest" value={clientForm.cuit} onChange={e => setClientForm({...clientForm, cuit: e.target.value})} placeholder="30-..." />
-                                            <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg" disabled={isSearchingCuit}>
+                                            <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center disabled:opacity-50" disabled={isSearchingCuit}>
                                                 {isSearchingCuit ? <RefreshCw className="animate-spin" size={20}/> : <Zap size={20}/>}
                                             </button>
                                         </div>
