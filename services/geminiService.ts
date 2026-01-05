@@ -154,9 +154,18 @@ export const askAssistant = async (history: string[], question: string): Promise
 export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Prompt más agresivo y específico para Argentina
+    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina. 
+    Busca en AFIP, CUITOnline, Dateas o el Boletín Oficial. 
+    Identifica:
+    1. Razón Social (Nombre legal completo).
+    2. Domicilio Fiscal (Si no lo encuentras, pon "No informado").
+    3. Condición de IVA (Debe ser: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'). Si no estás seguro, pon 'Responsable Inscripto'.
+    Devuelve estrictamente JSON.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Busca los datos oficiales de AFIP Argentina para el CUIT: "${cuit}". Identifica la razón social exacta, el domicilio fiscal y la condición de IVA. Devuelve JSON.`,
+      contents: prompt,
       config: { 
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -170,11 +179,14 @@ export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
                 description: "Debe ser uno de: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'"
             }
           },
-          required: ["razonSocial", "domicilio", "condicionIva"]
+          required: ["razonSocial"] // Solo la razón social es obligatoria para no fallar si falta el resto
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+
+    const result = JSON.parse(response.text || '{}');
+    if (!result.razonSocial) return null;
+    return result;
   } catch (error) { 
     console.error("Error fetching company by CUIT:", error);
     return null; 
