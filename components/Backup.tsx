@@ -1,385 +1,366 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-    Truck, Plus, Search, FileText, X, Save, RefreshCw, 
-    Trash2, ShoppingBag, Package, AlertTriangle, Eye, Upload, 
-    CheckCircle, Wand2, Sparkles, PlusCircle, Calculator,
-    Receipt, Tag, Store, DollarSign, ArrowRight, History, Info, Minus
+    Database, Cloud, HardDrive, RotateCcw, Download, CheckCircle, 
+    AlertTriangle, RefreshCw, Trash2, AlertOctagon, FileJson, 
+    Save, Eraser, Settings2, CheckSquare, Square, 
+    Package, Tag, Layers, ShoppingBag, ClipboardList, 
+    FileText, Users, Truck, Wallet, Landmark, UploadCloud, FileUp, X
 } from 'lucide-react';
-import { Purchase, Provider, Product, PurchaseItem, CompanyConfig } from '../types';
-import { analyzeInvoice, searchVirtualInventory } from '../services/geminiService';
 
-interface PurchasesProps {
-  defaultTab?: string;
-  onNavigateToPrices?: () => void;
-}
-
-const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigateToPrices }) => {
-  const [activeTab, setActiveTab] = useState(defaultTab);
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [isNewPurchaseModalOpen, setIsNewPurchaseModalOpen] = useState(false);
-  const [purchaseMode, setPurchaseMode] = useState<'IA' | 'MANUAL'>('IA');
-  const [productSearch, setProductSearch] = useState('');
-  const [showSearchResults, setShowSearchResults] = useState(false);
+const Backup: React.FC = () => {
+  const [lastBackup, setLastBackup] = useState(localStorage.getItem('ferrecloud_last_backup_date') || 'Nunca');
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const restoreFileRef = useRef<HTMLInputElement>(null);
   
-  const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
-  const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
-  const [purchases, setPurchases] = useState<Purchase[]>(() => JSON.parse(localStorage.getItem('ferrecloud_purchases') || '[]'));
-  
-  const [aiResult, setAiResult] = useState<any>(null);
-  const [manualItems, setManualItems] = useState<any[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string>('');
-  const invoiceFileRef = useRef<HTMLInputElement>(null);
+  // Estado para limpieza selectiva
+  const [selectedToReset, setSelectedToReset] = useState<Record<string, boolean>>({
+      products: false,
+      brands: false,
+      categories: false,
+      sales: false,
+      remitos: false,
+      budgets: false,
+      clients: false,
+      providers: false,
+      treasury: false
+  });
 
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
-  }, [purchases]);
+  const backups = [
+      { id: 1, date: '26/10/2023 20:00', size: '45 MB', type: 'Automático', location: 'Nube' },
+      { id: 2, date: '25/10/2023 19:45', size: '44 MB', type: 'Manual', location: 'Local' },
+      { id: 3, date: '24/10/2024 20:00', size: '43 MB', type: 'Automático', location: 'Nube' },
+  ];
 
-  // Lógica de búsqueda mejorada
-  const filteredProducts = useMemo(() => {
-    const term = productSearch.toLowerCase().trim();
-    if (!term) return [];
-    return products.filter(p => 
-        p.name.toLowerCase().includes(term) || 
-        p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
-        p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
-        p.barcodes.some(c => c.toLowerCase().includes(term))
-    ).slice(0, 10);
-  }, [productSearch, products]);
+  const resetOptions = [
+      { id: 'products', label: 'Artículos', icon: Package, key: 'ferrecloud_products' },
+      { id: 'brands', label: 'Marcas', icon: Tag, key: 'ferrecloud_brands' },
+      { id: 'categories', label: 'Categorías', icon: Layers, key: 'ferrecloud_categories' },
+      { id: 'sales', label: 'Ventas', icon: ShoppingBag, key: 'ferrecloud_sales_history' },
+      { id: 'remitos', label: 'Remitos', icon: ClipboardList, key: 'ferrecloud_remitos' },
+      { id: 'budgets', label: 'Presupuestos', icon: FileText, key: 'ferrecloud_budgets' },
+      { id: 'clients', label: 'Clientes', icon: Users, key: 'ferrecloud_clients' },
+      { id: 'providers', label: 'Proveedores', icon: Truck, key: 'ferrecloud_providers' },
+      { id: 'treasury', label: 'Caja y Fondos', icon: Wallet, key: 'ferrecloud_treasury_movements' },
+  ];
 
-  const handleAiInvoiceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const triggerFileDownload = () => {
+      const appData: Record<string, any> = {};
+      const keysToExport = [
+          'ferrecloud_products', 'ferrecloud_clients', 'ferrecloud_sales_history',
+          'ferrecloud_providers', 'ferrecloud_purchases', 'ferrecloud_employees',
+          'ferrecloud_price_templates', 'company_config', 'daily_movements',
+          'afip_backend_url', 'afip_sales_point', 'afip_environment',
+          'ferrecloud_roles', 'ferrecloud_users', 'ferrecloud_checks',
+          'ferrecloud_registers', 'ferrecloud_treasury_movements',
+          'ferrecloud_provider_movements', 'ferrecloud_movements',
+          'ferrecloud_manual_shortages', 'ferrecloud_remitos',
+          'ferrecloud_budgets', 'ferrecloud_sales_orders', 'ferrecloud_stock_transfers'
+      ];
+
+      keysToExport.forEach(key => {
+          const value = localStorage.getItem(key);
+          if (value) {
+              try { appData[key] = JSON.parse(value); } catch (e) { appData[key] = value; }
+          }
+      });
+
+      const jsonString = JSON.stringify(appData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `backup_completo_${timestamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+  };
+
+  const handleBackup = () => {
+      setIsBackingUp(true);
+      setTimeout(() => {
+          setIsBackingUp(false);
+          const now = new Date().toLocaleString();
+          setLastBackup(now);
+          localStorage.setItem('ferrecloud_last_backup_date', now);
+          triggerFileDownload();
+      }, 2000);
+  };
+
+  const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      setIsAiProcessing(true);
-      try {
-          const reader = new FileReader();
-          reader.onload = async (event) => {
-              const base64 = event.target?.result as string;
-              const analysis = await analyzeInvoice(base64, file.type);
-              setAiResult(analysis);
-              setPurchaseMode('IA');
-              setIsNewPurchaseModalOpen(true);
-              setIsAiProcessing(false);
-          };
-          reader.readAsDataURL(file);
-      } catch (err) {
-          alert("Error al analizar la factura.");
-          setIsAiProcessing(false);
+
+      if (!confirm("¡ATENCIÓN! La restauración sobrescribirá todos los datos actuales con los del archivo. ¿Deseas continuar?")) {
+          e.target.value = '';
+          return;
+      }
+
+      setIsRestoring(true);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          try {
+              const data = JSON.parse(event.target?.result as string);
+              if (typeof data !== 'object') throw new Error("Formato inválido");
+
+              // Iterar sobre las llaves del JSON y guardarlas en localStorage
+              Object.entries(data).forEach(([key, value]) => {
+                  if (typeof value === 'string') {
+                      localStorage.setItem(key, value);
+                  } else {
+                      localStorage.setItem(key, JSON.stringify(value));
+                  }
+              });
+
+              setTimeout(() => {
+                  setIsRestoring(false);
+                  alert("✅ Datos restaurados con éxito. El sistema se reiniciará para aplicar los cambios.");
+                  window.location.reload();
+              }, 1500);
+          } catch (err) {
+              setIsRestoring(false);
+              alert("❌ Error al restaurar: El archivo no tiene un formato de respaldo válido.");
+          }
+      };
+      reader.readAsText(file);
+  };
+
+  const toggleResetOption = (id: string) => {
+      setSelectedToReset(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSelectiveReset = () => {
+      const selectedKeys = Object.entries(selectedToReset)
+          .filter(([_, active]) => active)
+          .map(([id]) => id);
+
+      if (selectedKeys.length === 0) {
+          alert("Debe seleccionar al menos una categoría para borrar.");
+          return;
+      }
+
+      const confirmMsg = `¿ESTÁ SEGURO? Se borrarán todos los datos de: ${selectedKeys.map(k => k.toUpperCase()).join(', ')}. Esta acción no se puede deshacer.`;
+      
+      if (window.confirm(confirmMsg)) {
+          if (window.confirm("ÚLTIMA ADVERTENCIA: Los datos seleccionados serán eliminados permanentemente. ¿Proceder?")) {
+              selectedKeys.forEach(id => {
+                  const option = resetOptions.find(o => o.id === id);
+                  if (option) {
+                      localStorage.removeItem(option.key);
+                      // Casos especiales (llaves relacionadas)
+                      if (id === 'treasury') {
+                          localStorage.removeItem('ferrecloud_registers');
+                          localStorage.removeItem('ferrecloud_checks');
+                          localStorage.removeItem('daily_movements');
+                      }
+                      if (id === 'clients') {
+                          localStorage.removeItem('ferrecloud_movements');
+                      }
+                      if (id === 'providers') {
+                          localStorage.removeItem('ferrecloud_purchases');
+                          localStorage.removeItem('ferrecloud_provider_movements');
+                      }
+                  }
+              });
+              
+              alert("Limpieza selectiva completada. El sistema se reiniciará.");
+              window.location.reload();
+          }
       }
   };
 
-  const handleAddManualItem = () => {
-      setManualItems([...manualItems, { descripcion: '', cantidad: 1, costoUnitario: 0, subtotal: 0 }]);
-  };
-
-  const addExistingProductToPurchase = (p: Product) => {
-    setManualItems(prev => [...prev, {
-        productId: p.id,
-        descripcion: p.name,
-        cantidad: 1,
-        costoUnitario: p.listCost,
-        subtotal: p.listCost
-    }]);
-    setProductSearch('');
-    setShowSearchResults(false);
-  };
-
-  const handleSavePurchase = () => {
-      const itemsToProcess = purchaseMode === 'IA' ? aiResult.items : manualItems;
-      const total = itemsToProcess.reduce((acc: number, i: any) => acc + (parseFloat(i.subtotal) || 0), 0);
-      
-      const newPurchase: Purchase = {
-          id: purchaseMode === 'IA' ? aiResult.numeroFactura : `MAN-${Date.now()}`,
-          providerId: selectedProvider || '1',
-          providerName: providers.find(p => p.id === selectedProvider)?.name || aiResult?.nombreEmisor || 'Proveedor',
-          date: new Date().toISOString().split('T')[0],
-          type: 'Factura Compra',
-          items: itemsToProcess.length,
-          total: total,
-          status: 'PENDING'
-      };
-
-      setPurchases([newPurchase, ...purchases]);
-      setIsNewPurchaseModalOpen(false);
-      setAiResult(null);
-      setManualItems([]);
-      alert("Compra cargada exitosamente.");
-  };
-
-  const deletePurchase = (id: string) => {
-    if (confirm('¿Está seguro de que desea eliminar este comprobante de compra? Esta acción no se puede deshacer.')) {
-        setPurchases(prev => prev.filter(p => p.id !== id));
-    }
+  const handleFactoryReset = () => {
+      if (window.confirm("¡ATENCIÓN CRÍTICA! ¿Deseas borrar TODO el sistema, incluyendo usuarios y configuraciones?")) {
+          if (window.confirm("Esta acción es IRREVERSIBLE. ¿Confirmar reinicio de fábrica absoluto?")) {
+              localStorage.clear();
+              sessionStorage.clear();
+              alert("Sistema reseteado a cero. Redirigiendo...");
+              window.location.href = '/'; 
+          }
+      }
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50 overflow-hidden font-sans">
-      <div className="bg-white border-b border-gray-200 px-6 shrink-0 z-20">
-        <div className="flex gap-2 h-14 items-end">
-            {[
-                { id: 'PURCHASES', label: 'Libro Compras', icon: Receipt },
-                { id: 'MANUAL_ENTRY', label: 'Carga Manual', icon: PlusCircle },
-                { id: 'HISTORY', label: 'Historial', icon: History }
-            ].map(tab => (
-                <button
-                    key={tab.id}
-                    onClick={() => {
-                        if (tab.id === 'MANUAL_ENTRY') {
-                            setPurchaseMode('MANUAL');
-                            setManualItems([]);
-                            setIsNewPurchaseModalOpen(true);
-                        } else {
-                            setActiveTab(tab.id);
-                        }
-                    }}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-t-2xl font-black text-[10px] uppercase tracking-widest transition-all border-x border-t ${
-                        activeTab === tab.id 
-                        ? 'bg-slate-50 border-gray-200 text-indigo-600 -mb-px shadow-[0_-5px_15px_rgba(0,0,0,0.03)]' 
-                        : 'bg-white border-transparent text-gray-400 hover:text-gray-600'
-                    }`}
-                >
-                    <tab.icon size={16} />
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-      </div>
-
-      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                        <Wand2 size={120}/>
-                    </div>
-                    <h3 className="text-xl font-black uppercase tracking-tight mb-2">Carga con IA</h3>
-                    <p className="text-indigo-100 text-xs font-medium leading-relaxed mb-6">Sincroniza costos escaneando la factura del proveedor.</p>
-                    <input type="file" ref={invoiceFileRef} className="hidden" accept="image/*,application/pdf" onChange={handleAiInvoiceUpload} />
-                    <button 
-                        onClick={() => invoiceFileRef.current?.click()}
-                        disabled={isAiProcessing}
-                        className="w-full bg-white text-indigo-600 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
-                        {isAiProcessing ? <RefreshCw className="animate-spin"/> : <><Upload size={18}/> Escanear Factura</>}
-                    </button>
-                </div>
-
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-between">
-                    <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Compras del Mes</p>
-                        <h4 className="text-3xl font-black text-slate-800">${purchases.reduce((a,c) => a + c.total, 0).toLocaleString()}</h4>
-                    </div>
-                    <div className="pt-4 border-t mt-4 flex justify-between items-center text-indigo-600 font-black text-[9px] uppercase tracking-widest">
-                        <span>Reporte Analítico</span>
-                        <ArrowRight size={14}/>
-                    </div>
-                </div>
-
-                <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-between shadow-xl">
-                    <div className="flex items-center gap-3">
-                        <div className="p-3 bg-indigo-500 rounded-2xl"><Truck size={24}/></div>
-                        <div>
-                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Proveedores</p>
-                            <p className="text-lg font-black">{providers.length} Entidades</p>
-                        </div>
-                    </div>
-                    <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Administrar Fichero</button>
-                </div>
+    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full overflow-y-auto animate-fade-in pb-20">
+      {/* CABECERA RESUMEN */}
+      <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">
+          <div className="absolute -top-10 -left-10 p-20 opacity-5 text-indigo-600 pointer-events-none">
+              <Cloud size={240}/>
           </div>
-
-          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
-              <table className="w-full text-left">
-                  <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest">
-                      <tr>
-                          <th className="px-8 py-5">Comprobante</th>
-                          <th className="px-8 py-5">Proveedor</th>
-                          <th className="px-8 py-5">Fecha</th>
-                          <th className="px-8 py-5 text-right">Total</th>
-                          <th className="px-8 py-5 text-center">Estado</th>
-                          <th className="px-8 py-5 text-center">Acciones</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-[11px]">
-                      {purchases.length === 0 ? (
-                          <tr><td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin compras registradas</td></tr>
-                      ) : purchases.map(p => (
-                          <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
-                              <td className="px-8 py-5 font-black text-slate-800">{p.id}</td>
-                              <td className="px-8 py-5 font-black text-slate-500 uppercase">{p.providerName}</td>
-                              <td className="px-8 py-5 font-bold text-slate-400">{p.date}</td>
-                              <td className="px-8 py-5 text-right font-black text-slate-900">${p.total.toLocaleString()}</td>
-                              <td className="px-8 py-5 text-center">
-                                  <span className="px-3 py-1 rounded-full text-[8px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">Cargado</span>
-                              </td>
-                              <td className="px-8 py-5">
-                                  <div className="flex justify-center gap-2">
-                                      <button className="p-2 text-slate-300 hover:text-indigo-600 transition-all"><Eye size={18}/></button>
-                                      <button onClick={() => deletePurchase(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
-                                  </div>
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-
-      {isNewPurchaseModalOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
-                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                      <div className="flex items-center gap-4">
-                          <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><PlusCircle size={24}/></div>
-                          <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{purchaseMode === 'IA' ? 'Confirmación de Factura IA' : 'Nueva Carga Manual'}</h3>
-                              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Suministro de Inventario</p>
-                          </div>
-                      </div>
-                      <button onClick={() => setIsNewPurchaseModalOpen(false)}><X size={28}/></button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Proveedor</label>
-                              <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold uppercase text-xs" value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)}>
-                                  <option value="">{purchaseMode === 'IA' ? aiResult?.nombreEmisor : '-- SELECCIONE PROVEEDOR --'}</option>
-                                  {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                              </select>
-                          </div>
-                          
-                          {purchaseMode === 'MANUAL' && (
-                              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 relative">
-                                  <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-2">Añadir Artículos por SKU / Prov / EAN</label>
-                                  <div className="relative">
-                                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20}/>
-                                      <input 
-                                          type="text" 
-                                          placeholder="Buscar producto a ingresar..."
-                                          className="w-full pl-12 p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold uppercase text-xs"
-                                          value={productSearch}
-                                          onFocus={() => setShowSearchResults(true)}
-                                          onChange={e => setProductSearch(e.target.value)}
-                                      />
-                                      {showSearchResults && productSearch.length > 0 && (
-                                          <div className="absolute top-full left-0 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 z-[100] mt-2 overflow-hidden">
-                                              {filteredProducts.map(p => (
-                                                  <button key={p.id} onClick={() => addExistingProductToPurchase(p)} className="w-full p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center group">
-                                                      <div className="text-left">
-                                                          <p className="font-black text-slate-800 uppercase text-xs">{p.name}</p>
-                                                          <div className="flex gap-2 text-[8px] font-bold text-slate-400 uppercase">
-                                                              <span>INT: {p.internalCodes[0]}</span>
-                                                              <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
-                                                          </div>
-                                                      </div>
-                                                      <Plus size={16} className="text-indigo-400 group-hover:scale-125 transition-transform"/>
-                                                  </button>
-                                              ))}
-                                          </div>
-                                      )}
-                                  </div>
-                              </div>
-                          )}
-
-                          {purchaseMode === 'IA' && (
-                              <div className="bg-slate-900 p-8 rounded-[2rem] text-white flex flex-col justify-center">
-                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Detectado</p>
-                                  <p className="text-5xl font-black tracking-tighter leading-none">${aiResult.total?.toLocaleString()}</p>
-                              </div>
-                          )}
-                      </div>
-
-                      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-                          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-                              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Detalle de Comprobante</h4>
-                              {purchaseMode === 'MANUAL' && (
-                                <button onClick={handleAddManualItem} className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1 hover:underline">
-                                    <PlusCircle size={14}/> Nuevo Ítem Libre
-                                </button>
-                              )}
-                          </div>
-                          <table className="w-full text-left">
-                              <thead className="bg-white text-[8px] font-black text-gray-400 uppercase border-b">
-                                  <tr>
-                                      <th className="px-6 py-4">Descripción del Artículo</th>
-                                      <th className="px-6 py-4 text-center">Cant.</th>
-                                      <th className="px-6 py-4 text-right">Costo Unit.</th>
-                                      <th className="px-6 py-4 text-right">Subtotal</th>
-                                      <th className="px-6 py-4 w-10"></th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-50 text-[10px]">
-                                  {(purchaseMode === 'IA' ? aiResult.items : manualItems).map((item: any, idx: number) => (
-                                      <tr key={idx} className="hover:bg-indigo-50/20 transition-all">
-                                          <td className="px-6 py-3">
-                                              <input 
-                                                type="text" 
-                                                className="w-full bg-transparent font-black text-slate-800 uppercase outline-none focus:text-indigo-600" 
-                                                value={item.descripcion}
-                                                onChange={e => {
-                                                    const newItems = purchaseMode === 'IA' ? [...aiResult.items] : [...manualItems];
-                                                    newItems[idx].descripcion = e.target.value;
-                                                    purchaseMode === 'IA' ? setAiResult({...aiResult, items: newItems}) : setManualItems(newItems);
-                                                }}
-                                              />
-                                          </td>
-                                          <td className="px-6 py-3">
-                                              <input 
-                                                type="number" 
-                                                className="w-16 mx-auto bg-slate-50 border border-slate-200 rounded-lg p-1 text-center font-black" 
-                                                value={item.cantidad}
-                                                onChange={e => {
-                                                    const val = parseFloat(e.target.value) || 0;
-                                                    const newItems = purchaseMode === 'IA' ? [...aiResult.items] : [...manualItems];
-                                                    newItems[idx].cantidad = val;
-                                                    newItems[idx].subtotal = val * newItems[idx].costoUnitario;
-                                                    purchaseMode === 'IA' ? setAiResult({...aiResult, items: newItems}) : setManualItems(newItems);
-                                                }}
-                                              />
-                                          </td>
-                                          <td className="px-6 py-3 text-right">
-                                              <input 
-                                                type="number" 
-                                                className="w-24 bg-slate-50 border border-slate-200 rounded-lg p-1 text-right font-black" 
-                                                value={item.costoUnitario}
-                                                onChange={e => {
-                                                    const val = parseFloat(e.target.value) || 0;
-                                                    const newItems = purchaseMode === 'IA' ? [...aiResult.items] : [...manualItems];
-                                                    newItems[idx].costoUnitario = val;
-                                                    newItems[idx].subtotal = val * newItems[idx].cantidad;
-                                                    purchaseMode === 'IA' ? setAiResult({...aiResult, items: newItems}) : setManualItems(newItems);
-                                                }}
-                                              />
-                                          </td>
-                                          <td className="px-6 py-3 text-right font-black text-slate-900">${(item.subtotal || 0).toLocaleString()}</td>
-                                          <td className="px-6 py-3">
-                                              <button onClick={() => {
-                                                  const newItems = (purchaseMode === 'IA' ? aiResult.items : manualItems).filter((_:any, i:number) => i !== idx);
-                                                  purchaseMode === 'IA' ? setAiResult({...aiResult, items: newItems}) : setManualItems(newItems);
-                                              }} className="text-red-300 hover:text-red-500"><Trash2 size={14}/></button>
-                                          </td>
-                                      </tr>
-                                  ))}
-                              </tbody>
-                          </table>
-                      </div>
-                  </div>
-
-                  <div className="p-8 bg-white border-t border-gray-100 flex justify-between items-center shrink-0">
-                      <div className="text-left">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Comprobante</p>
-                          <p className="text-3xl font-black text-slate-900">${(purchaseMode === 'IA' ? aiResult.total : manualItems.reduce((a,c) => a + (parseFloat(c.subtotal) || 0), 0)).toLocaleString()}</p>
-                      </div>
-                      <div className="flex gap-3">
-                        <button onClick={() => setIsNewPurchaseModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                        <button onClick={handleSavePurchase} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3 active:scale-95 transition-all">
-                            <CheckCircle size={18}/> Procesar Ingreso
-                        </button>
-                      </div>
+          <div className="flex items-center gap-8 relative z-10">
+              <div className="w-24 h-24 bg-indigo-50 rounded-[2rem] flex items-center justify-center text-indigo-600 shadow-inner">
+                  <Database size={48} />
+              </div>
+              <div>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Mantenimiento de Datos</h2>
+                  <p className="text-gray-500 mt-2 font-medium italic text-lg">Último respaldo local: <span className="font-black text-slate-900 not-italic">{lastBackup}</span></p>
+                  <div className="flex items-center gap-2 mt-4 text-green-600 font-black text-xs bg-green-50 w-fit px-3 py-1.5 rounded-full uppercase tracking-widest border border-green-100">
+                      <CheckCircle size={14} /> Sistema Sincronizado en la Nube
                   </div>
               </div>
           </div>
-      )}
+          <div className="flex flex-col sm:flex-row gap-3 relative z-10">
+              <button 
+                onClick={handleBackup}
+                disabled={isBackingUp || isRestoring}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 transition-all shadow-xl shadow-indigo-200 active:scale-95 disabled:opacity-50">
+                {isBackingUp ? (
+                    <><RefreshCw className="animate-spin" size={20} /> Procesando...</>
+                ) : (
+                    <><Cloud size={20} /> Generar Respaldo</>
+                )}
+              </button>
+              <input type="file" ref={restoreFileRef} className="hidden" accept=".json" onChange={handleRestore} />
+              <button 
+                onClick={() => restoreFileRef.current?.click()}
+                disabled={isBackingUp || isRestoring}
+                className="bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-2xl font-black text-sm flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 disabled:opacity-50">
+                {isRestoring ? (
+                    <><RefreshCw className="animate-spin" size={20} /> Restaurando...</>
+                ) : (
+                    <><RotateCcw size={20} /> Restaurar Datos</>
+                )}
+              </button>
+          </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* SECCIÓN: LIMPIEZA SELECTIVA */}
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 p-8 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-black text-lg text-slate-800 flex items-center gap-3 uppercase tracking-tighter">
+                      <Eraser size={22} className="text-indigo-600"/> Limpieza Selectiva
+                  </h3>
+                  <button 
+                    onClick={() => {
+                        const allTrue = Object.values(selectedToReset).every(v => v);
+                        const next = {} as any;
+                        resetOptions.forEach(o => next[o.id] = !allTrue);
+                        setSelectedToReset(next);
+                    }}
+                    className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                    {Object.values(selectedToReset).every(v => v) ? 'Desmarcar Todos' : 'Marcar Todos'}
+                  </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+                  {resetOptions.map(opt => (
+                      <button 
+                        key={opt.id}
+                        onClick={() => toggleResetOption(opt.id)}
+                        className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedToReset[opt.id] ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-50 hover:border-slate-200 bg-white'}`}>
+                          <div className={`p-2.5 rounded-xl ${selectedToReset[opt.id] ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                              <opt.icon size={18}/>
+                          </div>
+                          <div className="flex-1">
+                              <p className={`text-xs font-black uppercase tracking-tight ${selectedToReset[opt.id] ? 'text-indigo-900' : 'text-slate-600'}`}>{opt.label}</p>
+                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Resetear a cero</p>
+                          </div>
+                          {selectedToReset[opt.id] ? <CheckSquare className="text-indigo-600" size={18}/> : <Square className="text-slate-200" size={18}/>}
+                      </button>
+                  ))}
+              </div>
+
+              <div className="mt-auto pt-6 border-t border-slate-100">
+                  <div className="bg-amber-50 p-4 rounded-2xl mb-4 flex items-start gap-3 border border-amber-100">
+                      <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-amber-700 font-bold leading-relaxed uppercase">
+                          Atención: Los datos de las categorías seleccionadas serán eliminados de la base de datos local y de la nube permanentemente.
+                      </p>
+                  </div>
+                  <button 
+                    onClick={handleSelectiveReset}
+                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95">
+                    <Trash2 size={18}/> Borrar Datos Seleccionados
+                  </button>
+              </div>
+          </div>
+
+          {/* COLUMNA DERECHA: IMPORTACIÓN Y DESCARGAS */}
+          <div className="space-y-8">
+              {/* SECCIÓN: RESTAURAR DESDE NUBE / ARCHIVO */}
+              <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                      <UploadCloud size={140}/>
+                  </div>
+                  <div className="relative z-10 space-y-6">
+                      <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3">
+                          <RotateCcw size={22} className="text-indigo-300"/> Restauración Manual
+                      </h3>
+                      <p className="text-indigo-200 text-sm font-medium leading-relaxed">
+                          Sube un archivo de respaldo (.json) generado anteriormente para recuperar toda la información de tu sistema de manera instantánea.
+                      </p>
+                      <button 
+                        onClick={() => restoreFileRef.current?.click()}
+                        disabled={isRestoring}
+                        className="bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-3 active:scale-95">
+                        {isRestoring ? <RefreshCw className="animate-spin" size={18}/> : <FileUp size={18}/>}
+                        Cargar Archivo JSON
+                      </button>
+                  </div>
+              </div>
+
+              <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
+                  <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-3 uppercase tracking-tighter">
+                      <HardDrive size={20} className="text-slate-400"/> Descargas Recientes
+                  </h3>
+                  <div className="overflow-hidden rounded-2xl border border-gray-100">
+                      <table className="w-full text-left">
+                          <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-widest">
+                              <tr>
+                                  <th className="px-6 py-4">Fecha y Hora</th>
+                                  <th className="px-6 py-4">Origen</th>
+                                  <th className="px-6 py-4 text-right">Acción</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 text-sm">
+                              {backups.map(b => (
+                                  <tr key={b.id} className="hover:bg-indigo-50/30 transition-colors">
+                                      <td className="px-6 py-4 text-slate-700 font-bold text-xs">{b.date}</td>
+                                      <td className="px-6 py-4">
+                                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${b.type === 'Automático' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
+                                              {b.type}
+                                          </span>
+                                      </td>
+                                      <td className="px-6 py-4 text-right">
+                                          <button 
+                                            onClick={triggerFileDownload}
+                                            className="text-indigo-600 hover:bg-indigo-100 p-2 rounded-xl transition-all">
+                                              <Download size={16}/>
+                                          </button>
+                                      </td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+
+              <div className="bg-red-50 border-2 border-red-100 rounded-[2rem] p-8 flex flex-col justify-between shadow-sm">
+                  <div className="flex items-start gap-6 mb-6">
+                      <div className="p-4 bg-white rounded-2xl text-red-600 shadow-md">
+                          <AlertOctagon size={32} />
+                      </div>
+                      <div>
+                          <h3 className="text-xl font-black text-red-800 uppercase tracking-tighter">Reset de Fábrica</h3>
+                          <p className="text-red-700/70 text-xs mt-2 font-medium leading-relaxed">
+                              Elimina **TODOS** los datos del sistema, incluyendo usuarios, certificados AFIP, configuraciones de empresa y traslados.
+                          </p>
+                      </div>
+                  </div>
+                  <button 
+                    onClick={handleFactoryReset}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-3">
+                      <Trash2 size={18} /> BORRADO TOTAL SISTEMA
+                  </button>
+              </div>
+          </div>
+      </div>
     </div>
   );
 };
 
-export default Purchases;
+export default Backup;
