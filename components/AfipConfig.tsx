@@ -15,14 +15,20 @@ const AfipConfig: React.FC = () => {
   useEffect(() => {
       const savedUrl = localStorage.getItem('afip_backend_url');
       const savedPoint = localStorage.getItem('afip_sales_point');
+      const savedCuit = localStorage.getItem('afip_cuit');
+      const savedEnv = localStorage.getItem('afip_environment');
+
       if (savedUrl) setBackendUrl(savedUrl);
       if (savedPoint) setSalesPoint(parseInt(savedPoint));
+      if (savedCuit) setCuit(savedCuit);
+      if (savedEnv) setEnvironment(savedEnv as any);
   }, []);
 
   const handleSave = () => {
       localStorage.setItem('afip_backend_url', backendUrl);
       localStorage.setItem('afip_sales_point', salesPoint.toString());
       localStorage.setItem('afip_environment', environment);
+      localStorage.setItem('afip_cuit', cuit);
       alert('Configuración guardada correctamente.');
   };
 
@@ -38,8 +44,8 @@ const AfipConfig: React.FC = () => {
     <div className="p-8 max-w-5xl mx-auto h-full space-y-8 animate-fade-in bg-slate-50 overflow-y-auto">
       <div className="flex justify-between items-start bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm">
           <div>
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-                  <ShieldCheck size={32} className="text-blue-600"/> Enlace Fiscal ARCA (ex-AFIP)
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-gap-3">
+                  <ShieldCheck size={32} className="text-blue-600 mr-2"/> Enlace Fiscal ARCA (ex-AFIP)
               </h2>
               <p className="text-gray-400 text-sm font-medium mt-1">Gestión de certificados, entorno y puntos de venta para factura electrónica.</p>
           </div>
@@ -54,7 +60,13 @@ const AfipConfig: React.FC = () => {
               <div className="space-y-6">
                   <div>
                       <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">CUIT Contribuyente</label>
-                      <input type="text" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl font-black text-slate-700 font-mono" value={cuit} readOnly />
+                      <input 
+                        type="text" 
+                        className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-700 font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all" 
+                        value={cuit} 
+                        onChange={e => setCuit(e.target.value)}
+                        placeholder="Ej: 30-12345678-9"
+                      />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                       <div>
