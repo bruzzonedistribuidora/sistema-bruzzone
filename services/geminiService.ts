@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
@@ -157,7 +156,7 @@ export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Busca los datos actuales de AFIP Argentina para el CUIT: "${cuit}". Identifica la razón social, el domicilio fiscal y la condición de IVA. Devuelve JSON.`,
+      contents: `Busca los datos oficiales de AFIP Argentina para el CUIT: "${cuit}". Identifica la razón social exacta, el domicilio fiscal y la condición de IVA. Devuelve JSON.`,
       config: { 
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
@@ -168,7 +167,7 @@ export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
             domicilio: { type: Type.STRING },
             condicionIva: { 
                 type: Type.STRING,
-                description: "Debe ser: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'"
+                description: "Debe ser uno de: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'"
             }
           },
           required: ["razonSocial", "domicilio", "condicionIva"]
