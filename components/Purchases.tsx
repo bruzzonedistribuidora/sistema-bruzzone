@@ -106,6 +106,12 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
       alert("Compra cargada exitosamente.");
   };
 
+  const deletePurchase = (id: string) => {
+    if (confirm('¿Está seguro de que desea eliminar este comprobante de compra? Esta acción no se puede deshacer.')) {
+        setPurchases(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50 overflow-hidden font-sans">
       <div className="bg-white border-b border-gray-200 px-6 shrink-0 z-20">
@@ -188,14 +194,14 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                           <th className="px-8 py-5">Fecha</th>
                           <th className="px-8 py-5 text-right">Total</th>
                           <th className="px-8 py-5 text-center">Estado</th>
-                          <th className="px-8 py-5"></th>
+                          <th className="px-8 py-5 text-center">Acciones</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-[11px]">
                       {purchases.length === 0 ? (
                           <tr><td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black tracking-widest">Sin compras registradas</td></tr>
                       ) : purchases.map(p => (
-                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                          <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                               <td className="px-8 py-5 font-black text-slate-800">{p.id}</td>
                               <td className="px-8 py-5 font-black text-slate-500 uppercase">{p.providerName}</td>
                               <td className="px-8 py-5 font-bold text-slate-400">{p.date}</td>
@@ -203,7 +209,12 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                               <td className="px-8 py-5 text-center">
                                   <span className="px-3 py-1 rounded-full text-[8px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">Cargado</span>
                               </td>
-                              <td className="px-8 py-5 text-right"><button className="p-2 text-slate-300 hover:text-indigo-600"><Eye size={18}/></button></td>
+                              <td className="px-8 py-5">
+                                  <div className="flex justify-center gap-2">
+                                      <button className="p-2 text-slate-300 hover:text-indigo-600 transition-all"><Eye size={18}/></button>
+                                      <button onClick={() => deletePurchase(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
+                                  </div>
+                              </td>
                           </tr>
                       ))}
                   </tbody>
