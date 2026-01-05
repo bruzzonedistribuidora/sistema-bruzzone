@@ -21,8 +21,8 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
   const [selectedRemitoIds, setSelectedRemitoIds] = useState<string[]>([]);
   const [showPrintModal, setShowPrintModal] = useState<Remito | null>(null);
+  const [editingRemitoId, setEditingRemitoId] = useState<string | null>(null);
 
-  // Estado para Ítem Manual
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
@@ -48,7 +48,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     if (!term) return [];
     return products.filter(p => 
         (p.name || '').toLowerCase().includes(term) || 
-        p.internalCodes.some(c => c.toLowerCase().includes(term))
+        p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
+        p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
+        p.barcodes.some(c => c.toLowerCase().includes(term))
     ).slice(0, 10);
   }, [searchTerm, products]);
 
@@ -112,17 +114,44 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
   const handleCreateRemito = () => {
     if (!selectedClient || cart.length === 0) return;
-    const newRemito: Remito = {
-      id: `R-${Math.floor(Math.random() * 10000)}`,
-      clientId: selectedClient,
-      clientName: selectedClient,
-      items: [...cart],
-      date: new Date().toISOString().split('T')[0],
-      status: 'PENDING'
-    };
-    setExistingRemitos([newRemito, ...existingRemitos]);
+
+    if (editingRemitoId) {
+        setExistingRemitos(prev => prev.map(r => r.id === editingRemitoId ? {
+            ...r,
+            clientId: selectedClient,
+            clientName: selectedClient,
+            items: [...cart],
+        } : r));
+        alert("Remito actualizado correctamente.");
+        setEditingRemitoId(null);
+    } else {
+        const newRemito: Remito = {
+          id: `R-${Math.floor(Math.random() * 10000)}`,
+          clientId: selectedClient,
+          clientName: selectedClient,
+          items: [...cart],
+          date: new Date().toISOString().split('T')[0],
+          status: 'PENDING'
+        };
+        setExistingRemitos([newRemito, ...existingRemitos]);
+    }
+    
     setCart([]);
-    setShowPrintModal(newRemito);
+    setSelectedClient('');
+    setActiveTab('HISTORY');
+  };
+
+  const handleEditRemito = (remito: Remito) => {
+      setEditingRemitoId(remito.id);
+      setSelectedClient(remito.clientName);
+      setCart([...remito.items]);
+      setActiveTab('NEW');
+  };
+
+  const handleCancelEdit = () => {
+      setEditingRemitoId(null);
+      setCart([]);
+      setSelectedClient('');
   };
 
   const handlePrint = () => {
@@ -186,13 +215,22 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
           <ClipboardList size={18} className="text-indigo-600"/> Remitos de Entrega
         </h2>
         <div className="flex bg-slate-100 rounded-lg p-1">
-          <button onClick={() => setActiveTab('NEW')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'NEW' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Nuevo</button>
+          <button onClick={() => setActiveTab('NEW')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'NEW' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>{editingRemitoId ? 'Editando' : 'Nuevo'}</button>
           <button onClick={() => setActiveTab('HISTORY')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all tracking-wider ${activeTab === 'HISTORY' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Historial</button>
         </div>
       </div>
 
       {activeTab === 'NEW' && (
         <div className="flex-1 flex flex-col gap-3 min-0 print:hidden">
+            {editingRemitoId && (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <AlertCircle className="text-amber-600" size={18}/>
+                        <p className="text-xs font-black text-amber-900 uppercase">Editando Remito: {editingRemitoId}</p>
+                    </div>
+                    <button onClick={handleCancelEdit} className="p-1 hover:bg-amber-100 rounded-lg text-amber-700 transition-colors"><X size={18}/></button>
+                </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
                 <div className="md:col-span-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Cliente Destino</label>
@@ -202,11 +240,11 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     </select>
                 </div>
                 <div className="md:col-span-6 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5 relative">
-                    <label className="text-[9px] font-black text-gray-400 uppercase">Añadir Artículos</label>
+                    <label className="text-[9px] font-black text-gray-400 uppercase">Añadir Artículos (SKU/Prov/EAN)</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                            <input type="text" placeholder="Buscar..." className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-100 rounded-lg font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
+                            <input type="text" placeholder="Buscar por código o nombre..." className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-100 rounded-lg font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
                         </div>
                         <button 
                             onClick={() => setIsManualModalOpen(true)}
@@ -218,8 +256,14 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     {showSearchResults && searchTerm.trim().length > 0 && (
                         <div className="absolute top-full left-0 w-full bg-white border rounded-xl shadow-2xl mt-1 max-h-60 overflow-y-auto z-50 p-1">
                             {filteredProducts.map(p => (
-                                <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-2 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50">
-                                    <div><p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p><p className="text-[8px] text-gray-400 uppercase">{p.internalCodes[0]}</p></div>
+                                <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-2 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50 group">
+                                    <div>
+                                        <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
+                                        <div className="flex gap-2 text-[7px] font-bold text-gray-400 uppercase">
+                                            <span>INT: {p.internalCodes[0]}</span>
+                                            <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
+                                        </div>
+                                    </div>
                                     <div className="text-right"><p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p></div>
                                 </button>
                             ))}
@@ -227,7 +271,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     )}
                 </div>
                 <div className="md:col-span-3 flex items-end">
-                    <button onClick={handleCreateRemito} className="w-full py-2.5 bg-slate-900 text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all">Generar Remito</button>
+                    <button onClick={handleCreateRemito} className={`w-full py-2.5 ${editingRemitoId ? 'bg-indigo-600' : 'bg-slate-900'} text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-opacity-90 transition-all`}>
+                        {editingRemitoId ? 'Guardar Cambios' : 'Generar Remito'}
+                    </button>
                 </div>
             </div>
             
@@ -248,7 +294,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                                     <td className="px-4 py-2">
                                         <p className="font-black uppercase text-slate-800 leading-none mb-1">{item.product.name}</p>
                                         {item.product.id.startsWith('manual-rem') && (
-                                            <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1 py-0.5 rounded uppercase tracking-widest">No Listado</span>
+                                            <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">No Listado</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-2 text-center font-bold">{item.quantity}</td>
@@ -334,7 +380,10 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                           <td className="px-6 py-4 text-center">
                               <div className="flex justify-center gap-2">
                                 {remito.status === 'PENDING' && (
-                                    <button onClick={() => convertRemitoToSale(remito)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Convertir a Venta"><Receipt size={14}/></button>
+                                    <>
+                                        <button onClick={() => handleEditRemito(remito)} className="p-2 text-slate-600 bg-slate-50 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm" title="Editar Remito"><Pencil size={14}/></button>
+                                        <button onClick={() => convertRemitoToSale(remito)} className="p-2 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Convertir a Venta"><Receipt size={14}/></button>
+                                    </>
                                 )}
                                 <button onClick={() => setShowPrintModal(remito)} className="p-2 text-gray-400 bg-slate-50 rounded-lg hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Printer size={14}/></button>
                               </div>
