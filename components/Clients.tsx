@@ -134,29 +134,40 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   };
 
   const handleSearchCuit = async () => {
-      const cleanCuit = (clientForm.cuit || '').trim();
+      // Limpiamos el CUIT para que sea solo números antes de enviarlo
+      const rawCuit = (clientForm.cuit || '').toString().trim();
+      const cleanCuit = rawCuit.replace(/\D/g, '');
+      
       if (cleanCuit.length < 10) {
-          alert("Por favor, ingrese un CUIT válido para sincronizar.");
+          alert("Por favor, ingrese un CUIT válido (mínimo 10 u 11 dígitos).");
           return;
       }
+
       setIsSearchingCuit(true);
       try {
-          const data = await fetchCompanyByCuit(cleanCuit);
+          // Usamos el CUIT con guiones o sin ellos para la búsqueda de la IA, pero lo normalizamos
+          const formattedCuitForSearch = cleanCuit.length === 11 
+            ? `${cleanCuit.slice(0,2)}-${cleanCuit.slice(2,10)}-${cleanCuit.slice(10)}`
+            : cleanCuit;
+
+          const data = await fetchCompanyByCuit(formattedCuitForSearch);
+          
           if (data && data.razonSocial) {
               setClientForm(prev => ({ 
                   ...prev, 
                   name: data.razonSocial.toUpperCase(), 
                   razonSocial: data.razonSocial.toUpperCase(),
-                  address: (data.domicilio || '').toUpperCase(),
-                  taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition
+                  address: data.domicilio ? data.domicilio.toUpperCase() : prev.address,
+                  taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition,
+                  cuit: formattedCuitForSearch // Guardamos el formato con guiones
               }));
-              alert("✅ Datos sincronizados correctamente desde ARCA.");
+              alert("✅ Datos fiscales recuperados con éxito.");
           } else {
-              alert("❌ No se encontraron datos para ese CUIT. Por favor, verifíquelo.");
+              alert("❌ La IA no pudo localizar datos públicos para este CUIT. Por favor, complételos manualmente.");
           }
       } catch (err) { 
           console.error(err); 
-          alert("⚠️ Error al conectar con el servicio de IA. Intente nuevamente.");
+          alert("⚠️ Error en la conexión con el motor de IA. Verifique su conexión.");
       } finally { 
           setIsSearchingCuit(false); 
       }
