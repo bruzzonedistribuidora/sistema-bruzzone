@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+
+import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
 declare var process: {
@@ -51,18 +52,19 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
 export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Update: Using 'gemini-flash-lite-latest' as per guidelines for flash-lite tasks
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-lite-latest',
-      contents: [
-        {
-          inlineData: {
-            data: base64Data.split(',')[1] || base64Data,
-            mimeType: mimeType
-          }
-        },
-        { text: "Analiza esta factura de compra de ferretería. Extrae: CUIT emisor, nombre emisor, fecha, número factura, y una lista de items con: descripcion, cantidad, costo_unitario, bonificacion y subtotal. Devuelve exclusivamente JSON." }
-      ],
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Data.split(',')[1] || base64Data,
+              mimeType: mimeType
+            }
+          },
+          { text: "Analiza esta factura de compra de ferretería. Extrae: CUIT emisor, nombre emisor, fecha, número factura, y una lista de items con: descripcion, cantidad, costo_unitario, bonificacion y subtotal. Devuelve exclusivamente JSON." }
+        ]
+      },
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -155,9 +157,27 @@ export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Datos AFIP para CUIT: "${cuit}". Devuelve JSON con razonSocial, domicilio, condicionIva.`,
-      config: { responseMimeType: "application/json" }
+      contents: `Busca los datos actuales de AFIP Argentina para el CUIT: "${cuit}". Identifica la razón social, el domicilio fiscal y la condición de IVA. Devuelve JSON.`,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            razonSocial: { type: Type.STRING },
+            domicilio: { type: Type.STRING },
+            condicionIva: { 
+                type: Type.STRING,
+                description: "Debe ser: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'"
+            }
+          },
+          required: ["razonSocial", "domicilio", "condicionIva"]
+        }
+      }
     });
     return JSON.parse(response.text || '{}');
-  } catch (error) { return null; }
+  } catch (error) { 
+    console.error("Error fetching company by CUIT:", error);
+    return null; 
+  }
 };
