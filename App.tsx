@@ -75,7 +75,11 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
-  const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
+  const [activeView, setActiveView] = useState<ViewState>(() => {
+    // Si la URL contiene /shop, arrancar en la tienda directamente
+    if (window.location.pathname.includes('/shop')) return ViewState.SHOP;
+    return ViewState.DASHBOARD;
+  });
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
   const [quickNavSearch, setQuickNavSearch] = useState("");
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
@@ -105,18 +109,6 @@ const App: React.FC = () => {
         setActiveView(newViews[newViews.length - 1]);
     }
   };
-
-  const filteredLauncherItems = useMemo(() => {
-    const items = Object.entries(ViewState)
-        .filter(([_, value]) => value !== ViewState.LOGIN && value !== ViewState.CUSTOMER_PORTAL)
-        .map(([_, value]) => ({
-            id: value as ViewState,
-            ...(VIEW_CONFIG[value as string] || { icon: Package, label: (value as string).replace(/_/g, ' '), color: "bg-slate-400" })
-        }));
-    
-    if (!quickNavSearch) return items;
-    return items.filter(i => i.label.toLowerCase().includes(quickNavSearch.toLowerCase()));
-  }, [quickNavSearch]);
 
   const renderViewContent = (view: ViewState) => {
     switch (view) {
@@ -157,6 +149,13 @@ const App: React.FC = () => {
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
+
+  // Vistas públicas que no requieren sidebar ni login de admin
+  const isPublicView = activeView === ViewState.SHOP || activeView === ViewState.PUBLIC_PORTAL;
+
+  if (isPublicView) {
+      return <div className="h-screen w-full bg-white overflow-hidden">{renderViewContent(activeView)}</div>;
+  }
 
   if (!loggedInUser) {
     return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
@@ -208,46 +207,6 @@ const App: React.FC = () => {
                 <Plus size={20} className={`transition-transform duration-300 ${isQuickNavOpen ? 'rotate-45' : ''}`} />
             </button>
         </header>
-
-        {isQuickNavOpen && (
-            <div className="absolute top-16 left-6 w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[100] flex flex-col animate-fade-in max-h-[500px] overflow-hidden">
-                <div className="p-4 bg-slate-900">
-                    <div className="relative">
-                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16}/>
-                        <input 
-                            autoFocus
-                            type="text" 
-                            placeholder="Buscar módulo..." 
-                            className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/10 rounded-xl text-xs text-white font-bold outline-none focus:bg-white focus:text-slate-900 transition-all uppercase"
-                            value={quickNavSearch}
-                            onChange={e => setQuickNavSearch(e.target.value)}
-                        />
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-1">
-                    {filteredLauncherItems.map(item => (
-                        <button 
-                            key={item.id}
-                            onClick={() => handleNavigate(item.id as ViewState)}
-                            className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-all group"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl text-white ${item.color} shadow-sm group-hover:scale-110 transition-transform`}>
-                                    <item.icon size={16}/>
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight">{item.label}</p>
-                                    {openViews.includes(item.id as ViewState) && (
-                                        <span className="text-[8px] font-black text-indigo-500 uppercase">Ya abierto</span>
-                                    )}
-                                </div>
-                            </div>
-                            <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all"/>
-                        </button>
-                    ))}
-                </div>
-            </div>
-        )}
 
         <main className="flex-1 relative bg-slate-50 overflow-hidden">
           {openViews.map((view) => (
