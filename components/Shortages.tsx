@@ -31,7 +31,8 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
       const combined = [...stockShortages, ...manualItems];
       setShortages(combined);
       
-      const criticalIds = combined.filter(p => p.stock <= p.minStock || manualIds.includes(p.id)).map(p => p.id);
+      // FIX: Changed p.minStock to p.stockMinimo
+      const criticalIds = combined.filter(p => p.stock <= (p.stockMinimo || 0) || manualIds.includes(p.id)).map(p => p.id);
       setSelectedIds(criticalIds);
   }, []);
 
@@ -50,7 +51,8 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
   const calculateTotalCost = () => {
       return shortages
         .filter(p => selectedIds.includes(p.id))
-        .reduce((acc, p) => acc + (Math.max(1, p.desiredStock - p.stock) * p.listCost), 0);
+        // FIX: Changed p.desiredStock to p.stockMaximo
+        .reduce((acc, p) => acc + (Math.max(1, (p.stockMaximo || 0) - p.stock) * p.listCost), 0);
   };
 
   const filteredSearch = allProducts.filter(p => 
@@ -87,7 +89,8 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
       const itemsToOrder = shortages.filter(p => selectedIds.includes(p.id));
       const replenishmentItems: ReplenishmentItem[] = itemsToOrder.map(product => ({
               product: product,
-              quantity: Math.max(1, product.desiredStock - product.stock),
+              // FIX: Changed product.desiredStock to product.stockMaximo
+              quantity: Math.max(1, (product.stockMaximo || 0) - product.stock),
               selectedProviderId: 'P1', 
               selectedProviderName: product.provider
       }));
@@ -160,7 +163,8 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
                                   <div className="text-xs text-gray-400 font-mono uppercase">{product.internalCodes[0]}</div>
                               </td>
                               <td className="px-6 py-4 text-center font-bold text-gray-700">{product.stock}</td>
-                              <td className="px-6 py-4 text-center font-bold text-indigo-700 bg-indigo-50/50 text-lg">{Math.max(1, product.desiredStock - product.stock)}</td>
+                              {/* FIX: Changed product.desiredStock to product.stockMaximo */}
+                              <td className="px-6 py-4 text-center font-bold text-indigo-700 bg-indigo-50/50 text-lg">{Math.max(1, (product.stockMaximo || 0) - product.stock)}</td>
                               <td className="px-6 py-4 text-center">
                                   <button onClick={() => handleRemoveFromList(product.id)} className="text-gray-300 hover:text-red-500 p-2 rounded-full"><Trash2 size={16}/></button>
                               </td>
