@@ -14,6 +14,8 @@ const Providers: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isSearchingCuit, setIsSearchingCuit] = useState(false);
+    // Fix: Added state for AI grounding sources
+    const [aiSources, setAiSources] = useState<{title: string, uri: string}[]>([]);
 
     const [providers, setProviders] = useState<Provider[]>(() => {
         const saved = localStorage.getItem('ferrecloud_providers');
@@ -42,6 +44,7 @@ const Providers: React.FC = () => {
     const handleSearchCuit = async () => {
         if (!formData.cuit || formData.cuit.length < 10) return;
         setIsSearchingCuit(true);
+        setAiSources([]);
         try {
             const data = await fetchCompanyByCuit(formData.cuit);
             if (data) {
@@ -51,6 +54,8 @@ const Providers: React.FC = () => {
                     address: data.address || data.domicilio || prev.address,
                     taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition
                 }));
+                // Fix: Set grounding sources from AI search
+                setAiSources(data.sources || []);
             }
         } catch (err) {
             console.error("Error buscando CUIT:", err);
@@ -78,6 +83,7 @@ const Providers: React.FC = () => {
             });
             setIsEditing(false);
         }
+        setAiSources([]);
         setIsModalOpen(true);
     };
 
@@ -208,6 +214,19 @@ const Providers: React.FC = () => {
                         <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-4">
                                 <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><Building2 size={24}/></div>
+                                {/* Fix: Render AI grounding sources as required by guidelines */}
+                                {aiSources.length > 0 && (
+                                    <div className="mt-2 p-2 bg-blue-900/50 rounded-lg border border-blue-700/50">
+                                        <p className="text-[8px] font-black text-blue-300 uppercase tracking-widest mb-1 flex items-center gap-1"><Info size={8}/> Fuentes consultadas por IA:</p>
+                                        <div className="flex gap-2">
+                                            {aiSources.map((s, idx) => (
+                                                <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="text-[8px] font-bold text-blue-400 hover:text-white truncate max-w-[100px] flex items-center gap-1">
+                                                    <ExternalLink size={8}/> {s.title}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <div>
                                     <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{isEditing ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h3>
                                     <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Configuración Fiscal y Comercial</p>
