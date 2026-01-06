@@ -4,7 +4,7 @@ import {
     Search, Plus, Package, X, Save, DollarSign, 
     Barcode, Pen, Trash2, Tag, Layers, Info, 
     Percent, Activity, Database, Boxes, RefreshCw, 
-    Settings2, Zap
+    Settings2, Zap, Calculator, ShoppingCart, ChevronRight
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch } from '../types';
 import { productDB } from '../services/storageService';
@@ -42,7 +42,7 @@ const Inventory: React.FC = () => {
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
   }, [searchTerm]);
 
-  // Lógica de Precios con Coeficientes
+  // Lógica de Precios con Coeficientes de Bonificación (Ferretería)
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
     const coefBonif = Number(formData.coeficienteBonificacionCosto) || 1;
@@ -224,14 +224,6 @@ const Inventory: React.FC = () => {
                                                   <label className="text-[9px] font-black text-slate-400 uppercase">Cod PROV</label>
                                                   <input className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono font-bold uppercase outline-none" value={formData.providerCodes?.[0]} onChange={e => { const c = [...(formData.providerCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, providerCodes: c}); }} />
                                               </div>
-                                          </div>
-                                          <div className="grid grid-cols-3 gap-2 mt-4">
-                                              {['1', '2', '3'].map(n => (
-                                                <div key={n}>
-                                                    <label className="text-[8px] font-black text-slate-400 uppercase">OtrosCod{n}</label>
-                                                    <input className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-[10px] font-bold uppercase" value={(formData as any)[`otrosCodigos${n}`]} onChange={e => setFormData({...formData, [`otrosCodigos${n}`]: e.target.value.toUpperCase()})} />
-                                                </div>
-                                              ))}
                                           </div>
                                       </div>
                                   </div>
