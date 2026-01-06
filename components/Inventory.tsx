@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Product, ProductStock, Brand, Category, ComboItem, Provider, CompanyConfig, Branch } from '../types';
 import { searchVirtualInventory } from '../services/geminiService';
+import { productDB } from '../services/storageService';
 
 const Inventory: React.FC = () => {
   const [inventoryTab, setInventoryTab] = useState<'PRODUCTS' | 'BRANDS' | 'CATEGORIES' | 'PROVIDERS'>('PRODUCTS');
@@ -18,7 +19,7 @@ const Inventory: React.FC = () => {
   const [isAiSearching, setIsAiSearching] = useState(false);
 
   // Estados de datos
-  const [products, setProducts] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
+  const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
   const [providers, setProviders] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
@@ -40,12 +41,24 @@ const Inventory: React.FC = () => {
   // Auxiliares para entradas dinámicas
   const [newBarcode, setNewBarcode] = useState('');
 
+  // CARGA INICIAL Y SINCRONIZACIÓN
+  const loadProducts = async () => {
+      const all = await productDB.getAll();
+      setProducts(all);
+  };
+
   useEffect(() => {
-    localStorage.setItem('ferrecloud_products', JSON.stringify(products));
+    loadProducts();
+    const handleSync = () => loadProducts();
+    window.addEventListener('ferrecloud_products_updated', handleSync);
+    return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('ferrecloud_brands', JSON.stringify(brands));
     localStorage.setItem('ferrecloud_categories', JSON.stringify(categories));
     localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
-  }, [products, brands, categories, providers]);
+  }, [brands, categories, providers]);
 
   // Lógica de Precios para Productos
   useEffect(() => {
@@ -69,16 +82,16 @@ const Inventory: React.FC = () => {
     }));
   }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate, formData.isCombo, formData.comboItems, modalType]);
 
-  // Búsqueda Inteligente
+  // Búsqueda Inteligente (Optimizada para no bloquear la UI)
   const filteredData = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     if (inventoryTab === 'PRODUCTS') {
         if (!term) return products.slice(0, 100);
         return products.filter(p => 
-            p.name.toLowerCase().includes(term) || 
-            p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
-            p.barcodes.some(c => c.toLowerCase().includes(term)) ||
-            p.providerCodes.some(c => c.toLowerCase().includes(term))
+            (p.name && p.name.toLowerCase().includes(term)) || 
+            (p.internalCodes && p.internalCodes.some(c => c.toLowerCase().includes(term))) ||
+            (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(term))) ||
+            (p.providerCodes && p.providerCodes.some(c => c.toLowerCase().includes(term)))
         ).slice(0, 100);
     }
     if (inventoryTab === 'BRANDS') return brands.filter(b => b.name.toLowerCase().includes(term));
@@ -116,11 +129,11 @@ const Inventory: React.FC = () => {
 
   const addBarcode = () => {
       if (!newBarcode.trim()) return;
-      if (formData.barcodes.includes(newBarcode.trim())) {
+      if (formData.barcodes?.includes(newBarcode.trim())) {
           alert("Este código ya está asignado al producto.");
           return;
       }
-      setFormData({ ...formData, barcodes: [...formData.barcodes, newBarcode.trim()] });
+      setFormData({ ...formData, barcodes: [...(formData.barcodes || []), newBarcode.trim()] });
       setNewBarcode('');
   };
 
@@ -128,17 +141,14 @@ const Inventory: React.FC = () => {
       setFormData({ ...formData, barcodes: formData.barcodes.filter((c: string) => c !== code) });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name) return;
     
     if (modalType === 'PRODUCT') {
         const totalStock = formData.stockDetails?.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 0), 0) || 0;
         const finalProduct = { ...formData, stock: totalStock };
-        setProducts(prev => {
-            const idx = prev.findIndex(p => p.id === finalProduct.id);
-            if (idx >= 0) { const next = [...prev]; next[idx] = finalProduct; return next; }
-            return [finalProduct, ...prev];
-        });
+        await productDB.save(finalProduct);
+        // El listener de eventos se encargará de refrescar la lista
     } else if (modalType === 'BRAND') {
         setBrands(prev => prev.some(b => b.id === formData.id) ? prev.map(b => b.id === formData.id ? formData : b) : [formData, ...prev]);
     } else if (modalType === 'CATEGORY') {
@@ -148,6 +158,19 @@ const Inventory: React.FC = () => {
     }
     
     setIsModalOpen(false);
+  };
+
+  const handleDelete = async (item: any) => {
+      if (!confirm('¿Seguro desea eliminar este elemento?')) return;
+      if (inventoryTab === 'PRODUCTS') {
+          await productDB.delete(item.id);
+      } else if (inventoryTab === 'BRANDS') {
+          setBrands(brands.filter(x => x.id !== item.id));
+      } else if (inventoryTab === 'CATEGORIES') {
+          setCategories(categories.filter(x => x.id !== item.id));
+      } else if (inventoryTab === 'PROVIDERS') {
+          setProviders(providers.filter(x => x.id !== item.id));
+      }
   };
 
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,6 +263,8 @@ const Inventory: React.FC = () => {
                     setIsAiSearching(true);
                     try {
                         const res = await searchVirtualInventory(searchTerm);
+                        // No guardamos automáticamente, permitimos al usuario ver y elegir si guardar o simplemente listamos
+                        // En este sistema, la búsqueda IA devuelve artículos "virtuales"
                         setProducts(prev => [...res.filter(r => !prev.some(p => p.id === r.id)), ...prev]);
                     } finally { setIsAiSearching(false); }
                 }} className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
@@ -285,7 +310,7 @@ const Inventory: React.FC = () => {
                                 <>
                                     <td className="px-6 py-4 font-mono font-bold text-indigo-600">
                                         <div className="flex flex-col gap-1">
-                                            <span>{item.internalCodes[0] || 'S/C'}</span>
+                                            <span>{item.internalCodes?.[0] || 'S/C'}</span>
                                             {item.barcodes?.length > 0 && <span className="text-[8px] text-slate-400">({item.barcodes.length} Barras)</span>}
                                         </div>
                                     </td>
@@ -322,12 +347,7 @@ const Inventory: React.FC = () => {
                             <td className="px-6 py-4">
                                 <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => handleOpenModal(inventoryTab.slice(0, -1) as any, item)} className="p-2.5 bg-white text-indigo-600 rounded-xl shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14} /></button>
-                                    <button onClick={() => {
-                                        if (inventoryTab === 'PRODUCTS') setProducts(products.filter(x => x.id !== item.id));
-                                        if (inventoryTab === 'BRANDS') setBrands(brands.filter(x => x.id !== item.id));
-                                        if (inventoryTab === 'CATEGORIES') setCategories(categories.filter(x => x.id !== item.id));
-                                        if (inventoryTab === 'PROVIDERS') setProviders(providers.filter(x => x.id !== item.id));
-                                    }} className="p-2.5 bg-white text-red-400 rounded-xl shadow-sm border border-red-100 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>
+                                    <button onClick={() => handleDelete(item)} className="p-2.5 bg-white text-red-400 rounded-xl shadow-sm border border-red-100 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>
                                 </div>
                             </td>
                         </tr>
@@ -416,7 +436,7 @@ const Inventory: React.FC = () => {
                                                <div className="space-y-4">
                                                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                                                        <span className="text-[9px] font-black text-slate-400 uppercase">SKU Sistema:</span>
-                                                       <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes[0]} onChange={e => { const c = [...formData.internalCodes]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
+                                                       <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes?.[0]} onChange={e => { const c = [...(formData.internalCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
                                                    </div>
 
                                                    <div className="space-y-3">
