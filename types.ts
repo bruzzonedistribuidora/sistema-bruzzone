@@ -60,7 +60,6 @@ export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monot
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
 export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
 
-// Added missing types for print templates
 export interface Position {
   x: number;
   y: number;
@@ -98,7 +97,7 @@ export interface PrintTemplate {
 
 export interface Product {
   id: string;
-  // Identificación
+  // Identificación (Mapeo Bruzzone)
   internalCodes: string[]; // "CODIGO Propi"
   barcodes: string[]; // "Codigo de Barras"
   providerCodes: string[]; // "Cod PROV"
@@ -111,7 +110,7 @@ export interface Product {
   category: string; // "Rubro"
   description: string;
   
-  // Costos y Bonificaciones
+  // Costos y Bonificaciones Técnicas
   listCost: number; // "Costo"
   precioCostoSinBonificar?: number;
   coeficienteBonificacionCosto?: number;
@@ -119,7 +118,7 @@ export interface Product {
   costAfterDiscounts: number;
   discounts: number[];
   
-  // Venta y Márgenes
+  // Venta y Márgenes (Vistas Especiales)
   profitMargin: number; // "ganancia"
   porcentajeGanancia1View?: number;
   porcentajeGanancia2View?: number;
@@ -141,7 +140,7 @@ export interface Product {
   measureUnitSale?: string;
   conversionFactor?: number;
 
-  // Fiscal y Otros
+  // Fiscal y Tasas Especiales
   tasa?: number;
   listItemTasa?: number;
   alicuotaImpuestoInterno?: number;
