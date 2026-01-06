@@ -57,10 +57,10 @@ export interface CloudConfig {
 
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 
-// Added missing types for PrintSettings.tsx
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
 export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
 
+// Added missing types for print templates
 export interface Position {
   x: number;
   y: number;
@@ -68,7 +68,7 @@ export interface Position {
 }
 
 export interface TableColumnConfig {
-  key: string;
+  id: string;
   label: string;
   visible: boolean;
 }
@@ -96,72 +96,56 @@ export interface PrintTemplate {
   positions: Record<string, Position>;
 }
 
-// Added missing PurchaseItem interface
-export interface PurchaseItem {
-  descripcion: string;
-  cantidad: number;
-  costoUnitario: number;
-  subtotal: number;
-}
-
 export interface Product {
   id: string;
-  // Campos Identificación
-  internalCodes: string[]; // Mapea a "CODIGO Propi"
-  barcodes: string[]; // Mapea a "Codigo de Barras"
-  providerCodes: string[]; // Mapea a "Cod PROV" / "CodigosProveedor"
+  // Identificación
+  internalCodes: string[]; // "CODIGO Propi"
+  barcodes: string[]; // "Codigo de Barras"
+  providerCodes: string[]; // "Cod PROV"
   otrosCodigos1?: string;
   otrosCodigos2?: string;
   otrosCodigos3?: string;
-  name: string; // Mapea a "Nombre"
-  brand: string; // Mapea a "Marca"
-  provider: string; // Mapea a "Proveedor"
-  category: string; // Mapea a "Rubro"
+  name: string; // "Nombre"
+  brand: string; // "Marca"
+  provider: string; // "Proveedor"
+  category: string; // "Rubro"
   description: string;
   
-  // Campos de Compra / Costo
-  measureUnitPurchase: string; // Mapea a "UnidadDeMedidaCompra"
-  // Added measureUnitSale and conversionFactor to fix errors in Remitos and Replenishment
-  measureUnitSale?: string;
-  conversionFactor?: number;
-  purchaseCurrency: string; // Mapea a "MonedaCompra"
-  saleCurrency: string; // Mapea a "MonedaVenta"
-  listCost: number; // Mapea a "Costo"
-  precioCostoSinBonificar?: number; // Mapea a "PrecioCostoSinBonificar"
-  coeficienteBonificacionCosto?: number; // Mapea a "CoeficienteBonificacionCosto"
-  porcentajesBonificacionCosto?: string; // Mapea a "PorcentajesBonificacionCosto"
-  porcentajesBonificacion?: string; // Mapea a "PorcentajesBonificacion"
-  // Added discounts array for Product
-  discounts?: number[];
+  // Costos y Bonificaciones
+  listCost: number; // "Costo"
+  precioCostoSinBonificar?: number;
+  coeficienteBonificacionCosto?: number;
+  porcentajesBonificacionCosto?: string;
   costAfterDiscounts: number;
+  discounts: number[];
   
-  // Campos de Venta / Ganancia
-  profitMargin: number; // Mapea a "ganancia" o "Porcentaje ganancia"
-  porcentajeGanancia1View?: number; // Mapea a "PorcentajeGanancia1View"
-  porcentajeGanancia2View?: number; // Mapea a "PorcentajeGanancia2View"
-  precioConTasaBonificadoView?: number; // Mapea a "PrecioConTasaBonificadoView"
+  // Venta y Márgenes
+  profitMargin: number; // "ganancia"
+  porcentajeGanancia1View?: number;
+  porcentajeGanancia2View?: number;
+  precioConTasaBonificadoView?: number;
   priceNeto: number;
   priceFinal: number;
   vatRate: number;
-  usaPorcentaje?: boolean; // Mapea a "UsaPorcentaje"
-  listaCodigo?: string; // Mapea a "ListaCodigo"
+  usaPorcentaje?: boolean;
+  listaCodigo?: string;
 
-  // Campos Stock
-  stock: number; // Mapea a "Stock"
-  stockMinimo?: number; // Mapea a "StockMinimo"
-  stockMaximo?: number; // Mapea a "StockMaximo"
-  // Added legacy aliases to avoid unlisted but potential type errors in Shortages and Replenishment
-  minStock?: number;
-  desiredStock?: number;
-  reorderPoint: number; // Mapea a "Punto pedido"
+  // Stock
+  stock: number;
+  stockMinimo?: number;
+  stockMaximo?: number;
+  reorderPoint: number;
   stockDetails: ProductStock[];
   location: string;
+  measureUnitPurchase: string;
+  measureUnitSale?: string;
+  conversionFactor?: number;
 
-  // Campos Fiscales Técnicos
-  tasa?: number; // Mapea a "Tasa"
-  listItemTasa?: number; // Mapea a "ListItemTasa"
-  detalleOtrosCostos?: string; // Mapea a "DetalleOtrosCostos"
-  alicuotaImpuestoInterno?: number; // Mapea a "AlicuotaImpuestoInterno"
+  // Fiscal y Otros
+  tasa?: number;
+  listItemTasa?: number;
+  alicuotaImpuestoInterno?: number;
+  detalleOtrosCostos?: string;
 
   ecommerce: {
     isPublished?: boolean;
@@ -169,13 +153,14 @@ export interface Product {
     offerPrice?: number | null;
     isFeatured?: boolean;
     imageUrl?: string;
-    // Added missing ecommerce properties for external integrations
     mercadoLibre?: boolean;
     tiendaNube?: boolean;
     webPropia?: boolean;
   };
   isCombo: boolean;
   comboItems: ComboItem[];
+  purchaseCurrency: string;
+  saleCurrency: string;
 }
 
 export interface ProductStock {
@@ -206,6 +191,7 @@ export interface CashRegister { id: string; name: string; balance: number; isOpe
 export interface Check { id: string; number: string; bank: string; issuer: string; amount: number; dueDate: string; status: 'PENDING' | 'DEPOSITED' | 'REJECTED'; type: 'FISICO' | 'ECHEQ'; }
 export interface TreasuryMovement { id: string; date: string; type: 'INCOME' | 'EXPENSE'; subtype: string; paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO'; amount: number; description: string; cashRegisterId: string; }
 export interface Purchase { id: string; providerId: string; providerName: string; date: string; type: string; items: number; total: number; status: 'PENDING' | 'COMPLETED'; }
+export interface PurchaseItem { descripcion: string; cantidad: number; costoUnitario: number; subtotal: number; }
 export interface CurrentAccountMovement { id: string; clientId?: string; providerId?: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
 export interface CompanyConfig { name: string; fantasyName: string; cuit: string; taxCondition: TaxCondition; iibb: string; startDate: string; address: string; city: string; zipCode: string; phone: string; email: string; web: string; logo: string | null; slogan: string; whatsappNumber: string; defaultProfitMargin: number; paymentAccounts: PaymentAccount[]; paymentMethods: string[]; paymentSystems: PaymentSystem[]; loyalty?: LoyaltyConfig; currencies?: CurrencyQuote[]; }
 export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; bankName: string; alias: string; cbu: string; owner: string; active: boolean; qrImage?: string; }
