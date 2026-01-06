@@ -26,9 +26,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'listCost', label: 'Costo Lista', required: true },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro/Categoría', required: false },
+        { key: 'provider', label: 'Proveedor (Nombre)', required: false },
         { key: 'stock', label: 'Stock Actual', required: false },
         { key: 'barcodes', label: 'Código Barras (EAN)', required: false },
-        { key: 'providerCodes', label: 'Cód. Proveedor', required: false },
+        { key: 'providerCodes', label: 'Cód. Proveedor Ref.', required: false },
         { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
         { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonificación', required: false },
     ];
@@ -53,7 +54,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             productFields.forEach(field => {
                 const index = parsedRows[0].findIndex(h => 
                     h.toLowerCase().includes(field.label.toLowerCase()) || 
-                    h.toLowerCase().includes(field.key.toLowerCase())
+                    h.toLowerCase().includes(field.key.toLowerCase()) ||
+                    (field.key === 'provider' && h.toLowerCase() === 'proveedor')
                 );
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -96,7 +98,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     name: (row[mapping.name] || 'SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : 'GENÉRICO').toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : 'GENERAL').toUpperCase(),
-                    provider: 'PROVEEDOR',
+                    provider: (mapping.provider !== undefined ? row[mapping.provider] : 'PROVEEDOR').toUpperCase(),
                     description: '',
                     measureUnitPurchase: 'Unidad',
                     purchaseCurrency: 'ARS',
