@@ -4,26 +4,44 @@ import {
     Search, Plus, Package, X, Save, DollarSign, 
     Barcode, Pen, Trash2, Tag, Layers, Info, 
     Percent, Activity, Database, Boxes, RefreshCw, 
-    Settings2, Zap, Calculator, ShoppingCart, ChevronRight
+    Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
+    Truck, ListFilter, FileUp, PlusCircle, CheckCircle,
+    // Add missing Hash icon import
+    Hash
 } from 'lucide-react';
-import { Product, Provider, CompanyConfig, Branch } from '../types';
+import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB } from '../services/storageService';
+import Providers from './Providers'; // Reutilizamos el componente existente
 
 const Inventory: React.FC = () => {
   const [inventoryTab, setInventoryTab] = useState<'PRODUCTS' | 'BRANDS' | 'CATEGORIES' | 'PROVIDERS'>('PRODUCTS');
   const [products, setProducts] = useState<Product[]>([]);
-  const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
-  const [branches] = useState<Branch[]>(() => JSON.parse(localStorage.getItem('ferrecloud_branches') || '[]'));
-
-  const companyConfig: CompanyConfig = useMemo(() => {
-    const saved = localStorage.getItem('company_config');
-    return saved ? JSON.parse(saved) : {};
-  }, []);
-
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estados para Marcas y Rubros
+  const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
+  const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
+  
+  // Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
+  const [isMassImportOpen, setIsMassImportOpen] = useState(false);
+  
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const [entityForm, setEntityForm] = useState<{id?: string, name: string}>({ name: '' });
+  const [massInput, setMassInput] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
+
+  const providers: Provider[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'), []);
+  const branches: Branch[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_branches') || '[]'), []);
+
+  useEffect(() => {
+    localStorage.setItem('ferrecloud_brands', JSON.stringify(brands));
+  }, [brands]);
+
+  useEffect(() => {
+    localStorage.setItem('ferrecloud_categories', JSON.stringify(categories));
+  }, [categories]);
 
   const loadProducts = async () => {
       if (searchTerm.trim().length > 2) {
@@ -42,12 +60,11 @@ const Inventory: React.FC = () => {
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
   }, [searchTerm]);
 
-  // Lógica de Precios con Coeficientes de Bonificación (Ferretería)
+  // Lógica de Precios
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
     const coefBonif = Number(formData.coeficienteBonificacionCosto) || 1;
     const costAfterDiscounts = listCost * coefBonif;
-    
     const margin = Number(formData.profitMargin) || 0;
     const priceNeto = costAfterDiscounts * (1 + margin / 100);
     const vatRate = Number(formData.vatRate) || 21;
@@ -61,109 +78,204 @@ const Inventory: React.FC = () => {
     }));
   }, [formData.listCost, formData.coeficienteBonificacionCosto, formData.profitMargin, formData.vatRate]);
 
-  const handleOpenModal = (p?: Product) => {
-    if (p) {
-        setFormData(p);
+  const handleSaveEntity = () => {
+    if (!entityForm.name) return;
+    const newEntity = { id: entityForm.id || Date.now().toString(), name: entityForm.name.toUpperCase() };
+    
+    if (inventoryTab === 'BRANDS') {
+        setBrands(prev => entityForm.id ? prev.map(b => b.id === entityForm.id ? newEntity : b) : [newEntity, ...prev]);
     } else {
-        setFormData({
-            id: Date.now().toString(), 
-            internalCodes: [''], 
-            barcodes: [], 
-            providerCodes: [''],
-            name: '', brand: '', provider: '', category: 'General',
-            listCost: 0, coeficienteBonificacionCosto: 1, 
-            profitMargin: companyConfig.defaultProfitMargin || 30,
-            vatRate: 21, stock: 0,
-            tasa: 0, alicuotaImpuestoInterno: 0,
-            stockDetails: branches.map(b => ({ branchId: b.id, branchName: b.name, quantity: 0 })),
-            ecommerce: { isPublished: false },
-            isCombo: false, comboItems: [],
-            purchaseCurrency: 'ARS', saleCurrency: 'ARS'
-        });
+        setCategories(prev => entityForm.id ? prev.map(c => c.id === entityForm.id ? newEntity : c) : [newEntity, ...prev]);
     }
-    setModalTab('GENERAL');
-    setIsModalOpen(true);
+    setIsEntityModalOpen(false);
   };
 
-  const handleSave = async () => {
-    if (!formData.name) return;
-    await productDB.save(formData as Product);
-    setIsModalOpen(false);
+  const handleMassImport = () => {
+    const names = massInput.split('\n').map(n => n.trim()).filter(n => n !== '');
+    const newEntities = names.map(n => ({ id: `${Date.now()}-${Math.random()}`, name: n.toUpperCase() }));
+    
+    if (inventoryTab === 'BRANDS') {
+        setBrands(prev => [...newEntities, ...prev]);
+    } else {
+        setCategories(prev => [...newEntities, ...prev]);
+    }
+    setMassInput('');
+    setIsMassImportOpen(false);
   };
 
   return (
     <div className="p-4 h-full flex flex-col space-y-4 bg-slate-50 overflow-hidden font-sans">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm gap-4 shrink-0">
-          <div>
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-                  <Database size={28} className="text-indigo-600"/> Catálogo Maestro
-              </h2>
-          </div>
-          <button onClick={() => handleOpenModal()} className="bg-slate-900 text-white px-8 py-4 rounded-[2rem] font-black shadow-2xl flex items-center gap-3 hover:bg-slate-800 transition-all uppercase text-xs tracking-widest active:scale-95">
-              <Plus size={20} /> Nuevo Articulo
-          </button>
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-2 shrink-0 flex gap-2">
-            <div className="relative flex-1 group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20} />
-                <input 
-                    type="text" 
-                    placeholder="Búsqueda global entre 140.000 artículos (Nombre, SKU, Barras, OtrosCódigos)..."
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-[1.5rem] text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                />
+      {/* HEADER CON PESTAÑAS */}
+      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm shrink-0">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-5">
+                <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><Boxes size={32}/></div>
+                <div>
+                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Gestión de Stock</h2>
+                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Control de Catálogo y Entidades</p>
+                </div>
             </div>
-      </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-auto custom-scrollbar">
-              <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
-                      <tr>
-                          <th className="px-6 py-5">Identificación / Códigos</th>
-                          <th className="px-6 py-5">Descripción Comercial</th>
-                          <th className="px-6 py-5 text-center">Rubro / Marca</th>
-                          <th className="px-6 py-5 text-right">Stock</th>
-                          <th className="px-6 py-5 text-right bg-slate-800">Precio Venta</th>
-                          <th className="px-6 py-5 text-center">Acciones</th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-[11px]">
-                      {products.map(p => (
-                          <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
-                              <td className="px-6 py-5">
-                                  <p className="font-mono font-black text-indigo-600">{p.internalCodes[0] || 'S/C'}</p>
-                                  <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">EAN: {p.barcodes?.[0] || '-'}</p>
-                              </td>
-                              <td className="px-6 py-5">
-                                  <p className="font-black text-slate-800 uppercase leading-none mb-1.5">{p.name}</p>
-                                  <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{p.provider}</p>
-                              </td>
-                              <td className="px-6 py-5 text-center">
-                                  <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded-lg border text-[9px] font-black uppercase mb-1 block w-fit mx-auto">{p.category}</span>
-                                  <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{p.brand}</span>
-                              </td>
-                              <td className="px-6 py-5 text-right font-black text-lg tracking-tighter">
-                                  {p.stock?.toLocaleString()}
-                              </td>
-                              <td className="px-6 py-5 text-right font-black text-slate-900 bg-indigo-50/10">
-                                  <p className="text-lg tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
-                              </td>
-                              <td className="px-6 py-5 text-center">
-                                  <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => handleOpenModal(p)} className="p-3 bg-white text-indigo-600 rounded-xl shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14} /></button>
-                                      <button onClick={async () => { if(confirm('¿Eliminar artículo?')) await productDB.delete(p.id); }} className="p-3 bg-white text-red-400 rounded-xl shadow-sm border border-red-100 hover:bg-red-50 hover:text-white transition-all"><Trash2 size={14} /></button>
-                                  </div>
-                              </td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
+            <div className="flex bg-slate-100 rounded-2xl p-1.5 shadow-inner border border-slate-200">
+                <button onClick={() => setInventoryTab('PRODUCTS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${inventoryTab === 'PRODUCTS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Artículos</button>
+                <button onClick={() => setInventoryTab('BRANDS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${inventoryTab === 'BRANDS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Marcas</button>
+                <button onClick={() => setInventoryTab('CATEGORIES')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${inventoryTab === 'CATEGORIES' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Rubros</button>
+                <button onClick={() => setInventoryTab('PROVIDERS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${inventoryTab === 'PROVIDERS' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Proveedores</button>
+            </div>
+
+            <div className="flex gap-2">
+                {inventoryTab !== 'PROVIDERS' && (
+                    <button onClick={() => inventoryTab === 'PRODUCTS' ? setIsModalOpen(true) : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-8 py-3.5 rounded-[1.8rem] font-black shadow-xl flex items-center gap-3 hover:bg-indigo-600 transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                        <Plus size={18} /> Nuevo {inventoryTab === 'PRODUCTS' ? 'Artículo' : inventoryTab === 'BRANDS' ? 'Marca' : 'Rubro'}
+                    </button>
+                )}
+                {(inventoryTab === 'BRANDS' || inventoryTab === 'CATEGORIES') && (
+                    <button onClick={() => setIsMassImportOpen(true)} className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-[1.8rem] border border-indigo-100 font-black flex items-center gap-2 hover:bg-indigo-100 transition-all uppercase text-[10px] tracking-widest">
+                        <FileUp size={18} /> Carga Masiva
+                    </button>
+                )}
+            </div>
           </div>
       </div>
 
+      {/* CONTENIDO SEGÚN PESTAÑA */}
+      <div className="flex-1 overflow-hidden">
+        {inventoryTab === 'PRODUCTS' && (
+            <div className="h-full flex flex-col space-y-4 animate-fade-in">
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-2 shrink-0 flex gap-2">
+                    <div className="relative flex-1 group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                        <input 
+                            type="text" 
+                            placeholder="Buscar en el catálogo maestro (+140.000 artículos)..."
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 border-2 border-transparent rounded-[1.5rem] text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                    <div className="flex-1 overflow-auto custom-scrollbar">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-5">Identificación / Códigos</th>
+                                    <th className="px-6 py-5">Descripción Comercial</th>
+                                    <th className="px-6 py-5 text-center">Rubro / Marca</th>
+                                    <th className="px-6 py-5 text-right">Stock</th>
+                                    <th className="px-6 py-5 text-right bg-slate-800">Precio Venta</th>
+                                    <th className="px-6 py-5 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-[11px]">
+                                {products.map(p => (
+                                    <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
+                                        <td className="px-6 py-5">
+                                            <p className="font-mono font-black text-indigo-600">{p.internalCodes[0] || 'S/C'}</p>
+                                            <p className="text-[8px] text-gray-400 font-bold uppercase mt-1">EAN: {p.barcodes?.[0] || '-'}</p>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <p className="font-black text-slate-800 uppercase leading-none mb-1.5">{p.name}</p>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate max-w-[200px]">{p.provider}</p>
+                                        </td>
+                                        <td className="px-6 py-5 text-center">
+                                            <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded-lg border text-[9px] font-black uppercase mb-1 block w-fit mx-auto">{p.category}</span>
+                                            <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{p.brand}</span>
+                                        </td>
+                                        <td className="px-6 py-5 text-right font-black text-lg tracking-tighter">
+                                            {p.stock?.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-5 text-right font-black text-slate-900 bg-indigo-50/10">
+                                            <p className="text-lg tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
+                                        </td>
+                                        <td className="px-6 py-5 text-center">
+                                            <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-3 bg-white text-indigo-600 rounded-xl shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14} /></button>
+                                                <button onClick={async () => { if(confirm('¿Eliminar artículo?')) await productDB.delete(p.id); }} className="p-3 bg-white text-red-400 rounded-xl shadow-sm border border-red-100 hover:bg-red-50 hover:text-white transition-all"><Trash2 size={14} /></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {(inventoryTab === 'BRANDS' || inventoryTab === 'CATEGORIES') && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-y-auto h-full pb-10 custom-scrollbar animate-fade-in">
+                {(inventoryTab === 'BRANDS' ? brands : categories).map(entity => (
+                    <div key={entity.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:shadow-xl transition-all relative overflow-hidden">
+                        <div className={`absolute top-0 right-0 p-8 opacity-5 text-indigo-600 group-hover:scale-110 transition-transform`}>
+                            {inventoryTab === 'BRANDS' ? <Tag size={120}/> : <Layers size={120}/>}
+                        </div>
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="p-3 bg-slate-100 text-indigo-600 rounded-2xl"><Hash size={20}/></div>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => { setEntityForm(entity); setIsEntityModalOpen(true); }} className="p-2 bg-white text-indigo-600 rounded-xl shadow-sm border hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14}/></button>
+                                    <button onClick={() => inventoryTab === 'BRANDS' ? setBrands(brands.filter(b => b.id !== entity.id)) : setCategories(categories.filter(c => c.id !== entity.id))} className="p-2 bg-white text-red-400 rounded-xl shadow-sm border hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14}/></button>
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight leading-none mb-2">{entity.name}</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ID: {entity.id}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )}
+
+        {inventoryTab === 'PROVIDERS' && <Providers />}
+      </div>
+
+      {/* MODAL: NUEVA ENTIDAD (MARCA/RUBRO) */}
+      {isEntityModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <h3 className="text-xl font-black uppercase tracking-tighter">Gestionar {inventoryTab === 'BRANDS' ? 'Marca' : 'Rubro'}</h3>
+                      <button onClick={() => setIsEntityModalOpen(false)}><X size={32}/></button>
+                  </div>
+                  <div className="p-10 space-y-6">
+                      <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-2">Nombre de la Entidad</label>
+                          <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-slate-800 uppercase" value={entityForm.name} onChange={e => setEntityForm({...entityForm, name: e.target.value})} autoFocus />
+                      </div>
+                      <button onClick={handleSaveEntity} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+                          <Save size={20}/> Guardar Cambios
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL: CARGA MASIVA DE ENTIDADES */}
+      {isMassImportOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                  <div className="p-8 bg-indigo-600 text-white flex justify-between items-center">
+                      <h3 className="text-xl font-black uppercase tracking-tighter">Importación Rápida</h3>
+                      <button onClick={() => setIsMassImportOpen(false)}><X size={32}/></button>
+                  </div>
+                  <div className="p-10 space-y-6">
+                      <p className="text-xs text-slate-500 font-medium">Pegue una lista de {inventoryTab === 'BRANDS' ? 'Marcas' : 'Rubros'} (uno por línea).</p>
+                      <textarea 
+                          className="w-full p-6 bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-indigo-600 outline-none font-bold text-xs h-64 resize-none uppercase" 
+                          placeholder="STANLEY&#10;BOSCH&#10;DEWALT..."
+                          value={massInput}
+                          onChange={e => setMassInput(e.target.value)}
+                      />
+                      <button onClick={handleMassImport} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+                          <CheckCircle size={20}/> Procesar e Incorporar
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL: PRODUCTO (CON SELECTORES MAESTROS) */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -203,12 +315,18 @@ const Inventory: React.FC = () => {
                                           </div>
                                           <div className="grid grid-cols-2 gap-4">
                                               <div>
-                                                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Marca</label>
-                                                  <input className="w-full p-4 bg-white border rounded-2xl font-bold uppercase text-xs" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value.toUpperCase()})} />
+                                                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Marca (Maestro)</label>
+                                                  <select className="w-full p-4 bg-white border rounded-2xl font-bold uppercase text-xs" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})}>
+                                                      <option value="">-- SELECCIONE --</option>
+                                                      {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                                  </select>
                                               </div>
                                               <div>
-                                                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Rubro</label>
-                                                  <input className="w-full p-4 bg-white border rounded-2xl font-bold uppercase text-xs" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value.toUpperCase()})} />
+                                                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Rubro (Maestro)</label>
+                                                  <select className="w-full p-4 bg-white border rounded-2xl font-bold uppercase text-xs" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                                      <option value="">-- SELECCIONE --</option>
+                                                      {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                  </select>
                                               </div>
                                           </div>
                                       </div>
@@ -339,7 +457,7 @@ const Inventory: React.FC = () => {
 
                   <div className="p-8 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
                       <button onClick={() => setIsModalOpen(false)} className="px-10 py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                      <button onClick={handleSave} className="bg-slate-900 text-white px-16 py-4 rounded-[1.8rem] font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-indigo-600 transition-all flex items-center gap-3">
+                      <button onClick={async () => { if(formData.name) { await productDB.save(formData as Product); setIsModalOpen(false); } }} className="bg-slate-900 text-white px-16 py-4 rounded-[1.8rem] font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-indigo-600 transition-all flex items-center gap-3">
                           <Save size={20}/> Aplicar Cambios
                       </button>
                   </div>
