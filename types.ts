@@ -1,4 +1,5 @@
 
+
 export enum ViewState {
   LOGIN = 'LOGIN',
   DASHBOARD = 'DASHBOARD',
@@ -41,7 +42,18 @@ export enum ViewState {
   PUBLIC_PORTAL = 'PUBLIC_PORTAL',
   SHOP = 'SHOP',
   ECOMMERCE_ADMIN = 'ECOMMERCE_ADMIN',
-  INITIAL_IMPORT = 'INITIAL_IMPORT'
+  INITIAL_IMPORT = 'INITIAL_IMPORT',
+  CLOUD_HUB = 'CLOUD_HUB'
+}
+
+export type CloudSyncStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING' | 'ERROR';
+
+export interface CloudConfig {
+  enabled: boolean;
+  vaultId: string;
+  lastSync: string;
+  autoSync: boolean;
+  apiUrl: string;
 }
 
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
