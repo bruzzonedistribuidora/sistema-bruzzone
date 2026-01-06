@@ -77,20 +77,22 @@ export interface Product {
   saleCurrency: string; // Map to "MonedaVenta"
   vatRate: number;
   
-  // Pricing Fields
-  listCost: number; // Map to "Costo" or "PrecioCostoSinBonificar"
-  coeficienteBonificacionCosto?: number;
-  porcentajesBonificacionCosto?: string;
+  // Pricing Fields (From Screenshot)
+  listCost: number; // Map to "Costo"
+  precioCostoSinBonificar?: number; // Map to "PrecioCostoSinBonificar"
+  coeficienteBonificacionCosto?: number; // Map to "CoeficienteBonificacionCosto"
+  porcentajesBonificacionCosto?: string; // Map to "PorcentajesBonificacionCosto"
+  porcentajesBonificacion?: string; // Map to "PorcentajesBonificacion"
   costAfterDiscounts: number;
-  precioConTasaBonificadoView?: number;
-  discounts: number[]; // From "PorcentajesBonificacion"
+  precioConTasaBonificadoView?: number; // Map to "PrecioConTasaBonificadoView"
+  discounts: number[]; 
   profitMargin: number; // Map to "ganancia" or "Porcentaje ganancia"
-  porcentajeGanancia1View?: number;
-  porcentajeGanancia2View?: number;
+  porcentajeGanancia1View?: number; // Map to "PorcentajeGanancia1View"
+  porcentajeGanancia2View?: number; // Map to "PorcentajeGanancia2View"
   priceNeto: number;
   priceFinal: number;
   
-  // Stock Fields
+  // Stock Fields (From Screenshot)
   stock: number; // Map to "Stock"
   stockMinimo?: number; // Map to "StockMinimo"
   stockMaximo?: number; // Map to "StockMaximo"
@@ -98,13 +100,13 @@ export interface Product {
   stockDetails: ProductStock[];
   location: string;
 
-  // Fiscal Fields
+  // Fiscal Fields (From Screenshot)
   tasa?: number; // Map to "Tasa"
-  listItemTasa?: number;
-  detalleOtrosCostos?: string;
-  alicuotaImpuestoInterno?: number;
-  usaPorcentaje?: boolean;
-  listaCodigo?: string;
+  listItemTasa?: number; // Map to "ListItemTasa"
+  detalleOtrosCostos?: string; // Map to "DetalleOtrosCostos"
+  alicuotaImpuestoInterno?: number; // Map to "AlicuotaImpuestoInterno"
+  usaPorcentaje?: boolean; // Map to "UsaPorcentaje"
+  listaCodigo?: string; // Map to "ListaCodigo"
 
   ecommerce: {
     mercadoLibre?: boolean;
@@ -133,7 +135,7 @@ export interface ComboItem {
   quantity: number;
   unitCost: number;
 }
-// Rest of the interfaces remain the same...
+
 export interface Brand { id: string; name: string; }
 export interface Category { id: string; name: string; }
 export interface Provider { id: string; name: string; cuit: string; contact: string; phone?: string; email?: string; address?: string; balance: number; defaultDiscounts: [number, number, number]; taxCondition?: TaxCondition; orderPhone?: string; orderEmail?: string; }
