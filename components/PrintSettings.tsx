@@ -39,11 +39,12 @@ const PrintSettings: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   }, []);
 
-  const [templates, setTemplates] = useState<Record<string, any>>(() => {
+  // Use the PrintTemplate type for the templates state to resolve 'any' usage and ensure consistency
+  const [templates, setTemplates] = useState<Record<string, PrintTemplate>>(() => {
       const saved = localStorage.getItem('ferrecloud_print_templates_v6');
       if (saved) return JSON.parse(saved);
 
-      const initial: Record<string, any> = {};
+      const initial: Record<string, PrintTemplate> = {};
       REPORT_LIST.forEach(report => {
           initial[report.type] = {
               id: report.type,
@@ -92,7 +93,8 @@ const PrintSettings: React.FC = () => {
     return currentTemplate.orientation === 'HORIZONTAL' ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
   }, [currentTemplate.paperSize, currentTemplate.orientation]);
 
-  const updateTemplate = (updates: any) => {
+  // Updated to use Partial<PrintTemplate> for safer updates
+  const updateTemplate = (updates: Partial<PrintTemplate>) => {
     setTemplates(prev => ({
         ...prev,
         [selectedType]: { ...prev[selectedType], ...updates }
@@ -101,14 +103,18 @@ const PrintSettings: React.FC = () => {
 
   const toggleVisibility = (key: string) => {
     const newPositions = { ...currentTemplate.positions };
-    newPositions[key].visible = !newPositions[key].visible;
-    updateTemplate({ positions: newPositions });
+    if (newPositions[key]) {
+      newPositions[key].visible = !newPositions[key].visible;
+      updateTemplate({ positions: newPositions });
+    }
   };
 
   const updatePosition = (key: string, x: number, y: number) => {
       const newPositions = { ...currentTemplate.positions };
-      newPositions[key] = { ...newPositions[key], x, y };
-      updateTemplate({ positions: newPositions });
+      if (newPositions[key]) {
+        newPositions[key] = { ...newPositions[key], x, y };
+        updateTemplate({ positions: newPositions });
+      }
   };
 
   const handleMouseDown = (e: React.MouseEvent, key: string) => {
@@ -281,7 +287,7 @@ const PrintSettings: React.FC = () => {
                         {Object.keys(PAPER_DIMENSIONS).filter(k => k !== 'CUSTOM').map(size => (
                             <button 
                                 key={size}
-                                onClick={() => updateTemplate({paperSize: size})}
+                                onClick={() => updateTemplate({paperSize: size as PaperSize})}
                                 className={`py-2 rounded-xl text-[9px] font-black border transition-all ${currentTemplate.paperSize === size ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200'}`}>
                                 {size.replace('_', ' ')}
                             </button>
