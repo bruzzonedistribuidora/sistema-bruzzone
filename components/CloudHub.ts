@@ -23,7 +23,6 @@ const CloudHub: React.FC = () => {
 
     const [status, setStatus] = useState<CloudSyncStatus>('OFFLINE');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [progress, setProgress] = useState(0);
 
     useEffect(() => {
         localStorage.setItem('ferrecloud_sync_config', JSON.stringify(config));
@@ -131,7 +130,7 @@ const CloudHub: React.FC = () => {
                         <Key size={24} className="text-indigo-600"/> Enlace Multi-PC Directo
                     </h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed">
-                        Para ver los mismos 140,000 artículos en todas sus computadoras, genere un paquete de datos en su PC principal y cárguelo en las terminales secundarias. Los cambios se unificarán.
+                        Para ver los mismos 140.000 artículos en todas sus computadoras, genere un paquete de datos en su PC principal y cárguelo en las terminales secundarias. Los cambios se unificarán.
                     </p>
                     <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-4">
                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">ID Único de Bóveda</label>
