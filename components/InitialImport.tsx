@@ -20,22 +20,17 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const [progress, setProgress] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Mapeo exhaustivo según requerimientos Bruzzone
     const productFields = [
-        { key: 'internalCodes', label: 'CODIGO Propi', required: true },
-        { key: 'name', label: 'Nombre', required: true },
-        { key: 'listCost', label: 'Costo', required: true },
+        { key: 'internalCodes', label: 'CODIGO Propi (SKU)', required: true },
+        { key: 'name', label: 'Nombre Artículo', required: true },
+        { key: 'listCost', label: 'Costo Lista', required: true },
         { key: 'brand', label: 'Marca', required: false },
-        { key: 'category', label: 'Rubro', required: false },
-        { key: 'stock', label: 'Stock', required: false },
-        { key: 'barcodes', label: 'Codigo de Barras', required: false },
-        { key: 'providerCodes', label: 'Cod PROV', required: false },
-        { key: 'profitMargin', label: 'ganancia (%)', required: false },
-        { key: 'coeficienteBonificacionCosto', label: 'Coeficiente Bonif.', required: false },
-        { key: 'tasa', label: 'Tasa ($)', required: false },
-        { key: 'measureUnitPurchase', label: 'Unidad Medida', required: false },
-        { key: 'alicuotaImpuestoInterno', label: 'Imp. Interno (%)', required: false },
-        { key: 'otrosCodigos1', label: 'Otros Códigos 1', required: false },
+        { key: 'category', label: 'Rubro/Categoría', required: false },
+        { key: 'stock', label: 'Stock Actual', required: false },
+        { key: 'barcodes', label: 'Código Barras (EAN)', required: false },
+        { key: 'providerCodes', label: 'Cód. Proveedor', required: false },
+        { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
+        { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonificación', required: false },
     ];
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,7 +49,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             setHeaders(parsedRows[0]);
             setFileRows(parsedRows.slice(1));
             
-            // Auto-mapping inteligente
             const autoMap: Record<string, number> = {};
             productFields.forEach(field => {
                 const index = parsedRows[0].findIndex(h => 
@@ -71,7 +65,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
     const processImport = async () => {
         if (mapping.internalCodes === undefined || mapping.name === undefined || mapping.listCost === undefined) {
-            alert("Mapeo incompleto de campos obligatorios (Código, Nombre, Costo).");
+            alert("Mapeo incompleto de campos obligatorios.");
             return;
         }
 
@@ -99,13 +93,12 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     internalCodes: [row[mapping.internalCodes] || 'S/C'],
                     barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : [],
                     providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : [],
-                    otrosCodigos1: mapping.otrosCodigos1 !== undefined ? row[mapping.otrosCodigos1] : '',
                     name: (row[mapping.name] || 'SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : 'GENÉRICO').toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : 'GENERAL').toUpperCase(),
                     provider: 'PROVEEDOR',
                     description: '',
-                    measureUnitPurchase: (mapping.measureUnitPurchase !== undefined ? row[mapping.measureUnitPurchase] : 'Unidad').toUpperCase(),
+                    measureUnitPurchase: 'Unidad',
                     purchaseCurrency: 'ARS',
                     saleCurrency: 'ARS',
                     vatRate: 21,
@@ -119,8 +112,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     reorderPoint: 0,
                     stockDetails: [],
                     location: '',
-                    tasa: mapping.tasa !== undefined ? parseFloat(row[mapping.tasa]) : 0,
-                    alicuotaImpuestoInterno: mapping.alicuotaImpuestoInterno !== undefined ? parseFloat(row[mapping.alicuotaImpuestoInterno]) : 0,
                     ecommerce: { isPublished: false },
                     isCombo: false, 
                     comboItems: [],
@@ -149,13 +140,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                     <div>
-                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Importador Maestro</h2>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Procesamiento acelerado para +140.000 artículos</p>
+                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Importador Masivo</h2>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Sincronización de catálogo de alta escala (+140.000 artículos)</p>
                     </div>
                 </div>
-                {step > 1 && (
-                    <button onClick={() => setStep(1)} className="p-4 bg-slate-100 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all"><RefreshCw size={20}/></button>
-                )}
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -166,11 +154,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                             <div className="group border-4 border-dashed border-slate-100 rounded-[3rem] p-16 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
                                 <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleFileUpload} />
                                 <FileSpreadsheet size={64} className="text-slate-200 mx-auto mb-4 group-hover:text-indigo-400" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">Subir listado CSV o TXT</span>
-                            </div>
-                            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-center gap-3">
-                                <Info size={18} className="text-amber-600 shrink-0"/>
-                                <p className="text-[10px] text-amber-700 font-bold uppercase text-left">Nota: El sistema detectará automáticamente columnas como 'Costo' y 'CODIGO Propi'.</p>
+                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">Subir Archivo de Ferretería (CSV / TXT)</span>
                             </div>
                         </div>
                     </div>
@@ -179,7 +163,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 {step === 2 && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in pb-10">
                         <div className="lg:col-span-5 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-                            <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Sparkles size={16} className="text-indigo-600"/> Mapeo Técnico</h3>
+                            <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Sparkles size={16} className="text-indigo-600"/> Mapeo de Columnas</h3>
                             <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-3">
                                 {productFields.map(field => (
                                     <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
@@ -199,8 +183,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
                         <div className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
                             <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                                <h3 className="font-black text-sm uppercase tracking-widest">Vista Previa de Datos</h3>
-                                <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase">{fileRows.length.toLocaleString()} Filas Detectadas</span>
+                                <h3 className="font-black text-sm uppercase tracking-widest">Vista Previa ({fileRows.length.toLocaleString()} artículos)</h3>
                             </div>
                             <div className="overflow-x-auto flex-1 custom-scrollbar">
                                 <table className="w-full text-left">
@@ -226,9 +209,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     <div className="h-full flex items-center justify-center animate-fade-in">
                         <div className="max-w-xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-8">
                             <div className="w-24 h-24 bg-green-50 text-green-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><CheckCircle size={48}/></div>
-                            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">¡Importación Exitosa!</h3>
-                            <p className="text-slate-500 font-medium px-10">Se han integrado {fileRows.length.toLocaleString()} artículos. El sistema ahora lee correctamente todas las bonificaciones y tasas aplicadas.</p>
-                            <button onClick={onComplete} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95">Ver Catálogo Actualizado <ArrowRight size={20}/></button>
+                            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">¡Éxito!</h3>
+                            <p className="text-slate-500 font-medium px-10">Se han integrado {fileRows.length.toLocaleString()} artículos al maestro local de forma óptima.</p>
+                            <button onClick={onComplete} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95">Ir al Catálogo Actualizado <ArrowRight size={20}/></button>
                         </div>
                     </div>
                 )}
