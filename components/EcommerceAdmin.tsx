@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
     Globe, Search, Star, Percent,
     Eye, EyeOff, Package, Camera, Upload, X, Image as ImageIcon,
@@ -7,14 +7,24 @@ import {
     RefreshCw, Tag
 } from 'lucide-react';
 import { Product } from '../types';
+import { productDB } from '../services/storageService';
 
 const EcommerceAdmin: React.FC = () => {
-    const [products, setProducts] = useState<Product[]>(() => 
-        JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
-    );
+    const [products, setProducts] = useState<Product[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterMode, setFilterMode] = useState<'ALL' | 'PUBLISHED' | 'OFFERS' | 'FEATURED'>('ALL');
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    const loadProducts = async () => {
+        const all = await productDB.getAll();
+        setProducts(all);
+    };
+
+    useEffect(() => {
+        loadProducts();
+        window.addEventListener('ferrecloud_products_updated', loadProducts);
+        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+    }, []);
 
     const filtered = useMemo(() => {
         return products.filter(p => {
@@ -24,7 +34,7 @@ const EcommerceAdmin: React.FC = () => {
             if (filterMode === 'OFFERS') return matchesSearch && p.ecommerce?.isOffer;
             if (filterMode === 'FEATURED') return matchesSearch && p.ecommerce?.isFeatured;
             return matchesSearch;
-        }).sort((a, b) => (b.ecommerce?.isPublished ? 1 : 0) - (a.ecommerce?.isPublished ? 1 : 0));
+        }).sort((a, b) => (b.ecommerce?.isPublished ? 1 : 0) - (a.ecommerce?.isPublished ? 1 : 0)).slice(0, 100);
     }, [products, searchTerm, filterMode]);
 
     const stats = useMemo(() => ({
@@ -34,16 +44,16 @@ const EcommerceAdmin: React.FC = () => {
         featured: products.filter(p => p.ecommerce?.isFeatured).length
     }), [products]);
 
-    const handleUpdateProduct = (id: string, updates: any) => {
-        const newProducts = products.map(p => {
-            if (p.id === id) {
-                return { ...p, ecommerce: { ...(p.ecommerce || {}), ...updates } };
-            }
-            return p;
-        });
-        setProducts(newProducts);
-        localStorage.setItem('ferrecloud_products', JSON.stringify(newProducts));
-        window.dispatchEvent(new Event('storage'));
+    const handleUpdateProduct = async (id: string, updates: any) => {
+        const product = products.find(p => p.id === id);
+        if (!product) return;
+        
+        const updated = { 
+            ...product, 
+            ecommerce: { ...(product.ecommerce || {}), ...updates } 
+        };
+        
+        await productDB.save(updated);
     };
 
     const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,16 +61,15 @@ const EcommerceAdmin: React.FC = () => {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             const base64 = event.target?.result as string;
-            handleUpdateProduct(id, { imageUrl: base64 });
+            await handleUpdateProduct(id, { imageUrl: base64 });
         };
         reader.readAsDataURL(file);
     };
 
     return (
         <div className="p-6 h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden font-sans">
-            {/* KPIs */}
             <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><Globe size={28}/></div>
@@ -72,9 +81,9 @@ const EcommerceAdmin: React.FC = () => {
 
                 <div className="flex gap-3">
                     {[
-                        { label: 'Visibles', val: stats.published, icon: Globe, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                        { label: 'Ofertas', val: stats.offers, icon: Percent, color: 'text-orange-500', bg: 'bg-orange-50' },
-                        { label: 'Portada', val: stats.featured, icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-50' }
+                        { label: 'Visibles', val: stats.published, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                        { label: 'Ofertas', val: stats.offers, color: 'text-orange-500', bg: 'bg-orange-50' },
+                        { label: 'Portada', val: stats.featured, color: 'text-yellow-500', bg: 'bg-yellow-50' }
                     ].map(st => (
                         <div key={st.label} className={`${st.bg} ${st.color} px-5 py-3 rounded-2xl border border-white shadow-sm text-center min-w-[100px]`}>
                             <p className="text-[8px] font-black uppercase mb-0.5 tracking-widest">{st.label}</p>
@@ -84,7 +93,6 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
             </div>
 
-            {/* FILTROS */}
             <div className="flex flex-col lg:flex-row gap-3 shrink-0 items-center">
                 <div className="relative flex-1 group w-full">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={18}/>
@@ -113,13 +121,11 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
             </div>
 
-            {/* LISTADO */}
             <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
                     <div className="grid grid-cols-1 gap-4">
                         {filtered.map(p => (
                             <div key={p.id} className={`p-6 rounded-3xl border transition-all flex flex-col lg:flex-row items-center gap-6 ${p.ecommerce?.isPublished ? 'border-indigo-100 bg-indigo-50/10' : 'border-slate-100 bg-white opacity-60 hover:opacity-100'}`}>
-                                
                                 <div className="shrink-0 relative">
                                     <input 
                                         type="file" 
@@ -143,7 +149,7 @@ const EcommerceAdmin: React.FC = () => {
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-black text-slate-800 uppercase text-sm tracking-tight leading-none mb-2 truncate">{p.name || 'SIN NOMBRE'}</h4>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-[9px] font-mono font-bold text-slate-400">SKU: {p.internalCodes?.[0] || 'S/C'}</span>
+                                        <span className="text-[9px] font-mono font-bold text-slate-400">SKU: {p.internalCodes[0]}</span>
                                         <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
                                         <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">{p.category || 'General'}</span>
                                     </div>
