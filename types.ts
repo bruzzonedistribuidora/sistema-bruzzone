@@ -57,70 +57,125 @@ export interface CloudConfig {
 
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 
+// Added missing types for PrintSettings.tsx
+export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
+export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
+
+export interface Position {
+  x: number;
+  y: number;
+  visible: boolean;
+}
+
+export interface TableColumnConfig {
+  key: string;
+  label: string;
+  visible: boolean;
+}
+
+export interface PrintTemplate {
+  id: string;
+  name: string;
+  paperSize: PaperSize;
+  orientation: 'VERTICAL' | 'HORIZONTAL';
+  titleText: string;
+  docLetterText: string;
+  docCodeText: string;
+  headerText: string;
+  subHeaderText: string;
+  footerText: string;
+  totalsLabel: string;
+  voucherPointOfSale: string;
+  voucherNumber: string;
+  voucherCuitEmisor: string;
+  voucherIIBBEmisor: string;
+  showPrices: boolean;
+  showSkus: boolean;
+  showBrands: boolean;
+  showIvaColumn: boolean;
+  positions: Record<string, Position>;
+}
+
+// Added missing PurchaseItem interface
+export interface PurchaseItem {
+  descripcion: string;
+  cantidad: number;
+  costoUnitario: number;
+  subtotal: number;
+}
+
 export interface Product {
   id: string;
-  internalCodes: string[]; // Map to "CODIGO Propi"
-  barcodes: string[]; // Map to "Codigo de Barras"
-  providerCodes: string[]; // Map to "Cod PROV" / "CodigosProveedor"
+  // Campos Identificación
+  internalCodes: string[]; // Mapea a "CODIGO Propi"
+  barcodes: string[]; // Mapea a "Codigo de Barras"
+  providerCodes: string[]; // Mapea a "Cod PROV" / "CodigosProveedor"
   otrosCodigos1?: string;
   otrosCodigos2?: string;
   otrosCodigos3?: string;
-  name: string; // Map to "Nombre"
-  brand: string; // Map to "Marca"
-  provider: string; // Map to "Proveedor"
-  category: string; // Map to "Rubro"
+  name: string; // Mapea a "Nombre"
+  brand: string; // Mapea a "Marca"
+  provider: string; // Mapea a "Proveedor"
+  category: string; // Mapea a "Rubro"
   description: string;
-  measureUnitSale: string;
-  measureUnitPurchase: string; // Map to "UnidadDeMedidaCompra"
-  conversionFactor: number;
-  purchaseCurrency: string; // Map to "MonedaCompra"
-  saleCurrency: string; // Map to "MonedaVenta"
-  vatRate: number;
   
-  // Pricing Fields (From Screenshot)
-  listCost: number; // Map to "Costo"
-  precioCostoSinBonificar?: number; // Map to "PrecioCostoSinBonificar"
-  coeficienteBonificacionCosto?: number; // Map to "CoeficienteBonificacionCosto"
-  porcentajesBonificacionCosto?: string; // Map to "PorcentajesBonificacionCosto"
-  porcentajesBonificacion?: string; // Map to "PorcentajesBonificacion"
+  // Campos de Compra / Costo
+  measureUnitPurchase: string; // Mapea a "UnidadDeMedidaCompra"
+  // Added measureUnitSale and conversionFactor to fix errors in Remitos and Replenishment
+  measureUnitSale?: string;
+  conversionFactor?: number;
+  purchaseCurrency: string; // Mapea a "MonedaCompra"
+  saleCurrency: string; // Mapea a "MonedaVenta"
+  listCost: number; // Mapea a "Costo"
+  precioCostoSinBonificar?: number; // Mapea a "PrecioCostoSinBonificar"
+  coeficienteBonificacionCosto?: number; // Mapea a "CoeficienteBonificacionCosto"
+  porcentajesBonificacionCosto?: string; // Mapea a "PorcentajesBonificacionCosto"
+  porcentajesBonificacion?: string; // Mapea a "PorcentajesBonificacion"
+  // Added discounts array for Product
+  discounts?: number[];
   costAfterDiscounts: number;
-  precioConTasaBonificadoView?: number; // Map to "PrecioConTasaBonificadoView"
-  discounts: number[]; 
-  profitMargin: number; // Map to "ganancia" or "Porcentaje ganancia"
-  porcentajeGanancia1View?: number; // Map to "PorcentajeGanancia1View"
-  porcentajeGanancia2View?: number; // Map to "PorcentajeGanancia2View"
+  
+  // Campos de Venta / Ganancia
+  profitMargin: number; // Mapea a "ganancia" o "Porcentaje ganancia"
+  porcentajeGanancia1View?: number; // Mapea a "PorcentajeGanancia1View"
+  porcentajeGanancia2View?: number; // Mapea a "PorcentajeGanancia2View"
+  precioConTasaBonificadoView?: number; // Mapea a "PrecioConTasaBonificadoView"
   priceNeto: number;
   priceFinal: number;
-  
-  // Stock Fields (From Screenshot)
-  stock: number; // Map to "Stock"
-  stockMinimo?: number; // Map to "StockMinimo"
-  stockMaximo?: number; // Map to "StockMaximo"
-  reorderPoint: number; // Map to "Punto pedido"
+  vatRate: number;
+  usaPorcentaje?: boolean; // Mapea a "UsaPorcentaje"
+  listaCodigo?: string; // Mapea a "ListaCodigo"
+
+  // Campos Stock
+  stock: number; // Mapea a "Stock"
+  stockMinimo?: number; // Mapea a "StockMinimo"
+  stockMaximo?: number; // Mapea a "StockMaximo"
+  // Added legacy aliases to avoid unlisted but potential type errors in Shortages and Replenishment
+  minStock?: number;
+  desiredStock?: number;
+  reorderPoint: number; // Mapea a "Punto pedido"
   stockDetails: ProductStock[];
   location: string;
 
-  // Fiscal Fields (From Screenshot)
-  tasa?: number; // Map to "Tasa"
-  listItemTasa?: number; // Map to "ListItemTasa"
-  detalleOtrosCostos?: string; // Map to "DetalleOtrosCostos"
-  alicuotaImpuestoInterno?: number; // Map to "AlicuotaImpuestoInterno"
-  usaPorcentaje?: boolean; // Map to "UsaPorcentaje"
-  listaCodigo?: string; // Map to "ListaCodigo"
+  // Campos Fiscales Técnicos
+  tasa?: number; // Mapea a "Tasa"
+  listItemTasa?: number; // Mapea a "ListItemTasa"
+  detalleOtrosCostos?: string; // Mapea a "DetalleOtrosCostos"
+  alicuotaImpuestoInterno?: number; // Mapea a "AlicuotaImpuestoInterno"
 
   ecommerce: {
-    mercadoLibre?: boolean;
-    tiendaNube?: boolean;
-    webPropia?: boolean;
     isPublished?: boolean;
     isOffer?: boolean;
     offerPrice?: number | null;
     isFeatured?: boolean;
     imageUrl?: string;
+    // Added missing ecommerce properties for external integrations
+    mercadoLibre?: boolean;
+    tiendaNube?: boolean;
+    webPropia?: boolean;
   };
   isCombo: boolean;
   comboItems: ComboItem[];
-  lastProviders?: { name: string; date: string; price: number }[];
 }
 
 export interface ProductStock {
@@ -151,7 +206,6 @@ export interface CashRegister { id: string; name: string; balance: number; isOpe
 export interface Check { id: string; number: string; bank: string; issuer: string; amount: number; dueDate: string; status: 'PENDING' | 'DEPOSITED' | 'REJECTED'; type: 'FISICO' | 'ECHEQ'; }
 export interface TreasuryMovement { id: string; date: string; type: 'INCOME' | 'EXPENSE'; subtype: string; paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO'; amount: number; description: string; cashRegisterId: string; }
 export interface Purchase { id: string; providerId: string; providerName: string; date: string; type: string; items: number; total: number; status: 'PENDING' | 'COMPLETED'; }
-export interface PurchaseItem { descripcion: string; cantidad: number; costoUnitario: number; subtotal: number; }
 export interface CurrentAccountMovement { id: string; clientId?: string; providerId?: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
 export interface CompanyConfig { name: string; fantasyName: string; cuit: string; taxCondition: TaxCondition; iibb: string; startDate: string; address: string; city: string; zipCode: string; phone: string; email: string; web: string; logo: string | null; slogan: string; whatsappNumber: string; defaultProfitMargin: number; paymentAccounts: PaymentAccount[]; paymentMethods: string[]; paymentSystems: PaymentSystem[]; loyalty?: LoyaltyConfig; currencies?: CurrencyQuote[]; }
 export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; bankName: string; alias: string; cbu: string; owner: string; active: boolean; qrImage?: string; }
@@ -166,17 +220,12 @@ export interface StockTransfer { id: string; date: string; sourceBranchId: strin
 export interface StockTransferItem { productId: string; productName: string; quantity: number; }
 export interface SalesOrder { id: string; clientName: string; date: string; priority: 'NORMAL' | 'URGENTE'; status: SalesOrderStatus; items: InvoiceItem[]; notes: string; total: number; }
 export type SalesOrderStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'COMPLETED' | 'CANCELLED';
-export interface PrintTemplate { id: string; name: string; paperSize: PaperSize; orientation: 'VERTICAL' | 'HORIZONTAL'; positions: Record<string, Position>; }
-export interface Position { x: number; y: number; visible: boolean; }
-export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
-export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
-export interface TableColumnConfig { key: string; label: string; visible: boolean; width: number; }
-export interface OnlineOrder { id: string; platformId: string; platform: OnlinePlatform; date: string; customer: { name: string; nickname?: string; address: string; city: string; zipCode: string; phone: string; dni: string; }; items: InvoiceItem[]; total: number; shippingCost: number; shippingMethod: string; status: OnlineOrderStatus; labelPrinted: boolean; invoiced: boolean; trackingCode: string; }
-export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WEB_PROPIA';
-export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 export interface DailyExpense { id: string; date: string; description: string; amount: number; category: 'FIXED' | 'VARIABLE'; paymentMethod: string; type: 'EXPENSE' | 'INCOME'; cashRegisterId: string; }
 export interface Employee { id: string; name: string; position: string; baseSalary: number; dni: string; startDate: string; active: boolean; movements: EmployeeMovement[]; }
 export interface EmployeeMovement { id: string; type: 'SALARY' | 'ADVANCE' | 'BONUS' | 'DEDUCTION'; amount: number; description: string; month: string; date: string; }
 export interface Coupon { id: string; code: string; description: string; discountType: 'PERCENT' | 'FIXED'; value: number; validUntil: string; usedCount: number; active: boolean; }
 export interface MarketingCampaign { id: string; name: string; targetSegment: string; channel: 'WHATSAPP' | 'EMAIL' | 'SMS'; message: string; sentDate: string; reach: number; }
 export interface CreditNote { id: string; targetId: string; targetName: string; relatedVoucherId?: string; date: string; type: 'SALES' | 'PURCHASE'; items: InvoiceItem[]; reason: 'DEVOLUCION' | 'ERROR_PRECIO' | 'BONIFICACION' | 'OTROS'; returnToStock: boolean; total: number; }
+export interface OnlineOrder { id: string; platformId: string; platform: OnlinePlatform; date: string; customer: { name: string; nickname?: string; address: string; city: string; zipCode: string; phone: string; dni: string; }; items: InvoiceItem[]; total: number; shippingCost: number; shippingMethod: string; status: OnlineOrderStatus; labelPrinted: boolean; invoiced: boolean; trackingCode: string; }
+export type OnlinePlatform = 'MERCADOLIBRE' | 'TIENDANUBE' | 'WEB_PROPIA';
+export type OnlineOrderStatus = 'NEW' | 'PACKING' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
