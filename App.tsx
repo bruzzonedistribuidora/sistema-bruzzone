@@ -6,7 +6,7 @@ import {
     Search as SearchIcon, ChevronRight, Package, ListOrdered,
     RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
     Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
-    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart
+    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -43,6 +43,7 @@ import SalesOrders from './components/SalesOrders';
 import CreditNotes from './components/CreditNotes';
 import MassProductUpdate from './components/MassProductUpdate';
 import StockTransfers from './components/StockTransfers';
+import CloudHub from './components/CloudHub';
 import Login from './components/Login';
 import { ViewState, User, Client, InvoiceItem } from './types';
 
@@ -70,6 +71,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.STATISTICS]: { icon: TrendingUp, label: "Estadísticas", color: "bg-cyan-500" },
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
     [ViewState.BACKUP]: { icon: HardDrive, label: "Respaldo Datos", color: "bg-slate-600" },
+    [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
 };
 
 const App: React.FC = () => {
@@ -142,6 +144,7 @@ const App: React.FC = () => {
       case ViewState.SALES_ORDERS: return <SalesOrders />;
       case ViewState.CREDIT_NOTES: return <CreditNotes />;
       case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
+      case ViewState.CLOUD_HUB: return <CloudHub />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
