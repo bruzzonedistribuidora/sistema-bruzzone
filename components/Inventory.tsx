@@ -34,17 +34,20 @@ const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'PRODUCT' | 'BRAND' | 'CATEGORY' | 'PROVIDER'>('PRODUCT');
   
-  // Forms
   const [formData, setFormData] = useState<Product | any>({});
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'COMBO' | 'STOCK'>('GENERAL');
-
-  // Auxiliares para entradas dinámicas
   const [newBarcode, setNewBarcode] = useState('');
 
-  // CARGA INICIAL Y SINCRONIZACIÓN
+  // CARGA INICIAL Y SINCRONIZACIÓN CON LIMITADOR
   const loadProducts = async () => {
-      const all = await productDB.getAll();
-      setProducts(all);
+      if (searchTerm.trim().length > 2) {
+          const results = await productDB.search(searchTerm);
+          setProducts(results);
+      } else {
+          // Si no hay búsqueda, solo mostrar los últimos 100 para no explotar la RAM
+          const initial = await productDB.getAll(100);
+          setProducts(initial);
+      }
   };
 
   useEffect(() => {
@@ -52,7 +55,7 @@ const Inventory: React.FC = () => {
     const handleSync = () => loadProducts();
     window.addEventListener('ferrecloud_products_updated', handleSync);
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
-  }, []);
+  }, [searchTerm]);
 
   useEffect(() => {
     localStorage.setItem('ferrecloud_brands', JSON.stringify(brands));
@@ -82,18 +85,9 @@ const Inventory: React.FC = () => {
     }));
   }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate, formData.isCombo, formData.comboItems, modalType]);
 
-  // Búsqueda Inteligente (Optimizada para no bloquear la UI)
   const filteredData = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    if (inventoryTab === 'PRODUCTS') {
-        if (!term) return products.slice(0, 100);
-        return products.filter(p => 
-            (p.name && p.name.toLowerCase().includes(term)) || 
-            (p.internalCodes && p.internalCodes.some(c => c.toLowerCase().includes(term))) ||
-            (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(term))) ||
-            (p.providerCodes && p.providerCodes.some(c => c.toLowerCase().includes(term)))
-        ).slice(0, 100);
-    }
+    if (inventoryTab === 'PRODUCTS') return products; // Ya vienen filtrados de la DB
     if (inventoryTab === 'BRANDS') return brands.filter(b => b.name.toLowerCase().includes(term));
     if (inventoryTab === 'CATEGORIES') return categories.filter(c => c.name.toLowerCase().includes(term));
     if (inventoryTab === 'PROVIDERS') return providers.filter(p => p.name.toLowerCase().includes(term) || p.cuit.includes(term));
@@ -137,18 +131,12 @@ const Inventory: React.FC = () => {
       setNewBarcode('');
   };
 
-  const removeBarcode = (code: string) => {
-      setFormData({ ...formData, barcodes: formData.barcodes.filter((c: string) => c !== code) });
-  };
-
   const handleSave = async () => {
     if (!formData.name) return;
-    
     if (modalType === 'PRODUCT') {
         const totalStock = formData.stockDetails?.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 0), 0) || 0;
         const finalProduct = { ...formData, stock: totalStock };
         await productDB.save(finalProduct);
-        // El listener de eventos se encargará de refrescar la lista
     } else if (modalType === 'BRAND') {
         setBrands(prev => prev.some(b => b.id === formData.id) ? prev.map(b => b.id === formData.id ? formData : b) : [formData, ...prev]);
     } else if (modalType === 'CATEGORY') {
@@ -156,7 +144,6 @@ const Inventory: React.FC = () => {
     } else if (modalType === 'PROVIDER') {
         setProviders(prev => prev.some(p => p.id === formData.id) ? prev.map(p => p.id === formData.id ? formData : p) : [formData, ...prev]);
     }
-    
     setIsModalOpen(false);
   };
 
@@ -176,40 +163,27 @@ const Inventory: React.FC = () => {
   const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-
       const reader = new FileReader();
       reader.onload = (event) => {
           const content = event.target?.result as string;
           const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
           if (lines.length < 1) return;
-
           const newItems: any[] = [];
           const separator = lines[0].includes(';') ? ';' : ',';
-
           lines.forEach((line, idx) => {
               const parts = line.split(separator).map(p => p.trim().toUpperCase());
               if (!parts[0]) return;
-
               if (inventoryTab === 'BRANDS' || inventoryTab === 'CATEGORIES') {
                   if (![...brands, ...categories].some(x => x.name === parts[0])) {
                       newItems.push({ id: `imp-${Date.now()}-${idx}`, name: parts[0] });
                   }
               } else if (inventoryTab === 'PROVIDERS') {
-                  newItems.push({ 
-                      id: `prov-${Date.now()}-${idx}`, 
-                      name: parts[0], 
-                      cuit: parts[1] || '00-00000000-0',
-                      phone: parts[2] || '',
-                      balance: 0,
-                      defaultDiscounts: [0,0,0]
-                  });
+                  newItems.push({ id: `prov-${Date.now()}-${idx}`, name: parts[0], cuit: parts[1] || '00-00000000-0', phone: parts[2] || '', balance: 0, defaultDiscounts: [0,0,0] });
               }
           });
-
           if (inventoryTab === 'BRANDS') setBrands(prev => [...newItems, ...prev]);
           if (inventoryTab === 'CATEGORIES') setCategories(prev => [...newItems, ...prev]);
           if (inventoryTab === 'PROVIDERS') setProviders(prev => [...newItems, ...prev]);
-          
           alert(`Importación exitosa: Se agregaron ${newItems.length} registros.`);
       };
       reader.readAsText(file);
@@ -251,7 +225,7 @@ const Inventory: React.FC = () => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20} />
                 <input 
                     type="text" 
-                    placeholder={`Filtrar ${inventoryTab.toLowerCase()}...`} 
+                    placeholder={inventoryTab === 'PRODUCTS' ? "Escriba al menos 3 caracteres para buscar entre 140k artículos..." : "Filtrar..."}
                     className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
@@ -259,17 +233,15 @@ const Inventory: React.FC = () => {
             </div>
             {inventoryTab === 'PRODUCTS' && (
                 <button onClick={async () => {
-                    if (searchTerm.length < 3) return;
+                    if (searchTerm.length < 3) { alert("Escribe al menos 3 caracteres."); return; }
                     setIsAiSearching(true);
                     try {
                         const res = await searchVirtualInventory(searchTerm);
-                        // No guardamos automáticamente, permitimos al usuario ver y elegir si guardar o simplemente listamos
-                        // En este sistema, la búsqueda IA devuelve artículos "virtuales"
                         setProducts(prev => [...res.filter(r => !prev.some(p => p.id === r.id)), ...prev]);
                     } finally { setIsAiSearching(false); }
                 }} className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200">
                     {isAiSearching ? <RefreshCw size={18} className="animate-spin"/> : <Sparkles size={18}/>}
-                    <span className="hidden md:inline">Búsqueda IA</span>
+                    <span className="hidden md:inline">Sugerencias IA</span>
                 </button>
             )}
       </div>
@@ -311,7 +283,6 @@ const Inventory: React.FC = () => {
                                     <td className="px-6 py-4 font-mono font-bold text-indigo-600">
                                         <div className="flex flex-col gap-1">
                                             <span>{item.internalCodes?.[0] || 'S/C'}</span>
-                                            {item.barcodes?.length > 0 && <span className="text-[8px] text-slate-400">({item.barcodes.length} Barras)</span>}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
@@ -407,69 +378,14 @@ const Inventory: React.FC = () => {
                                                    </select>
                                                </div>
                                            </div>
-                                           
-                                           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-                                               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2">
-                                                   <Truck size={14}/> Suministro y Vínculo
-                                               </h4>
-                                               <div className="grid grid-cols-1 gap-4">
-                                                   <div>
-                                                       <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-1">Proveedor Predeterminado</label>
-                                                       <select className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
-                                                           <option value="">-- SELECCIONE PROVEEDOR --</option>
-                                                           {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                                                       </select>
-                                                   </div>
-                                                   <div>
-                                                       <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-1">Código del Proveedor (Vínculo Listas)</label>
-                                                       <input type="text" className="w-full p-3 bg-slate-50 border rounded-xl font-mono text-xs uppercase" value={formData.providerCodes?.[0]} onChange={e => { const c = [...(formData.providerCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, providerCodes: c}); }} placeholder="Ej: HG-5502..." />
-                                                       <p className="text-[8px] text-slate-400 mt-1 italic">Este código se usa para actualizar precios desde el Excel del proveedor.</p>
-                                                   </div>
-                                               </div>
-                                           </div>
                                        </div>
 
                                        <div className="space-y-6">
                                            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-                                               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Barcode size={14}/> Codificación Interna y Barras</h4>
-                                               
-                                               <div className="space-y-4">
-                                                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                       <span className="text-[9px] font-black text-slate-400 uppercase">SKU Sistema:</span>
-                                                       <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes?.[0]} onChange={e => { const c = [...(formData.internalCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
-                                                   </div>
-
-                                                   <div className="space-y-3">
-                                                       <label className="text-[9px] font-black text-slate-400 uppercase block ml-1">Códigos de Barra (EAN/UPC)</label>
-                                                       <div className="flex gap-2">
-                                                            <div className="relative flex-1">
-                                                                <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                                                <input 
-                                                                    type="text" 
-                                                                    placeholder="Escanear o tipear código..." 
-                                                                    className="w-full pl-10 p-3 bg-slate-50 border rounded-xl font-mono text-xs outline-none focus:ring-1 focus:ring-indigo-500" 
-                                                                    value={newBarcode} 
-                                                                    onChange={e => setNewBarcode(e.target.value)}
-                                                                    onKeyDown={e => e.key === 'Enter' && addBarcode()}
-                                                                />
-                                                            </div>
-                                                            <button onClick={addBarcode} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg active:scale-95 transition-all">
-                                                                <Plus size={20}/>
-                                                            </button>
-                                                       </div>
-                                                       
-                                                       <div className="flex flex-wrap gap-2 pt-2">
-                                                           {formData.barcodes?.map((code: string) => (
-                                                               <div key={code} className="flex items-center gap-2 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 group animate-fade-in">
-                                                                   <span className="text-[10px] font-mono font-bold">{code}</span>
-                                                                   <button onClick={() => removeBarcode(code)} className="text-indigo-300 hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
-                                                               </div>
-                                                           ))}
-                                                           {(!formData.barcodes || formData.barcodes.length === 0) && (
-                                                               <p className="text-[9px] text-slate-400 italic py-2">No se han registrado códigos de barra.</p>
-                                                           )}
-                                                       </div>
-                                                   </div>
+                                               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Barcode size={14}/> Codificación</h4>
+                                               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                   <span className="text-[9px] font-black text-slate-400 uppercase">SKU:</span>
+                                                   <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes?.[0]} onChange={e => { const c = [...(formData.internalCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
                                                </div>
                                            </div>
                                        </div>
@@ -485,18 +401,10 @@ const Inventory: React.FC = () => {
                                                    <input type="number" className="w-full pl-14 p-6 bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-indigo-600 outline-none font-black text-5xl text-slate-800" value={formData.listCost} onChange={e => setFormData({...formData, listCost: parseFloat(e.target.value) || 0})} />
                                                </div>
                                            </div>
-                                           <div className="pt-6 border-t flex justify-between items-center">
-                                               <span className="text-sm font-black text-slate-400 uppercase">Costo Neto Final:</span>
-                                               <span className="text-3xl font-black text-indigo-600">${formData.costAfterDiscounts?.toLocaleString()}</span>
-                                           </div>
                                        </div>
                                        <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl space-y-10 flex flex-col justify-center">
-                                           <div className="text-center">
-                                               <p className="text-indigo-400 text-[10px] font-black uppercase mb-4 tracking-widest">Margen de Utilidad (%)</p>
-                                               <input type="number" className="w-48 p-6 bg-white/5 border-2 border-white/10 rounded-3xl font-black text-6xl text-center outline-none focus:border-indigo-500" value={formData.profitMargin} onChange={e => setFormData({...formData, profitMargin: parseFloat(e.target.value) || 0})} />
-                                           </div>
                                            <div className="text-center border-t border-white/10 pt-8">
-                                               <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Precio de Venta Final</p>
+                                               <p className="text-[10px] font-black text-slate-500 uppercase mb-2">Venta Final</p>
                                                <h4 className="text-6xl font-black text-green-400 tracking-tighter">${formData.priceFinal?.toLocaleString()}</h4>
                                            </div>
                                        </div>
@@ -509,18 +417,6 @@ const Inventory: React.FC = () => {
                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nombre / Razón Social</label>
                                    <input className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-slate-800 uppercase shadow-sm focus:border-indigo-600 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} autoFocus />
                                </div>
-                               {modalType === 'PROVIDER' && (
-                                   <div className="grid grid-cols-2 gap-4">
-                                       <div>
-                                           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">CUIT</label>
-                                           <input className="w-full p-4 bg-white border rounded-2xl font-mono font-bold" value={formData.cuit} onChange={e => setFormData({...formData, cuit: e.target.value})} placeholder="30-00000000-0" />
-                                       </div>
-                                       <div>
-                                           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Teléfono</label>
-                                           <input className="w-full p-4 bg-white border rounded-2xl font-bold" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                                       </div>
-                                   </div>
-                               )}
                           </div>
                       )}
                   </div>
