@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Search, Plus, Package, X, Save, Globe, DollarSign, 
@@ -6,7 +7,7 @@ import {
     AlertCircle, LayoutGrid, Database, Calculator, ShoppingCart,
     Sparkles, RefreshCw, Hash, QrCode, Boxes, FileSpreadsheet,
     Download, UploadCloud, Phone, Mail, UserSearch, SearchCode,
-    TrendingUp, FileUp, CheckCircle, ListFilter
+    TrendingUp, FileUp, CheckCircle, ListFilter, PlusCircle
 } from 'lucide-react';
 import { Product, ProductStock, Brand, Category, ComboItem, Provider, CompanyConfig, Branch } from '../types';
 import { searchVirtualInventory } from '../services/geminiService';
@@ -35,6 +36,9 @@ const Inventory: React.FC = () => {
   // Forms
   const [formData, setFormData] = useState<Product | any>({});
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'COMBO' | 'STOCK'>('GENERAL');
+
+  // Auxiliares para entradas dinámicas
+  const [newBarcode, setNewBarcode] = useState('');
 
   useEffect(() => {
     localStorage.setItem('ferrecloud_products', JSON.stringify(products));
@@ -70,7 +74,12 @@ const Inventory: React.FC = () => {
     const term = searchTerm.toLowerCase().trim();
     if (inventoryTab === 'PRODUCTS') {
         if (!term) return products.slice(0, 100);
-        return products.filter(p => p.name.toLowerCase().includes(term) || p.internalCodes.some(c => c.toLowerCase().includes(term))).slice(0, 100);
+        return products.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
+            p.barcodes.some(c => c.toLowerCase().includes(term)) ||
+            p.providerCodes.some(c => c.toLowerCase().includes(term))
+        ).slice(0, 100);
     }
     if (inventoryTab === 'BRANDS') return brands.filter(b => b.name.toLowerCase().includes(term));
     if (inventoryTab === 'CATEGORIES') return categories.filter(c => c.name.toLowerCase().includes(term));
@@ -80,18 +89,20 @@ const Inventory: React.FC = () => {
 
   const handleOpenModal = (type: typeof modalType, data?: any) => {
     setModalType(type);
+    setNewBarcode('');
     if (data) {
         setFormData(data);
     } else {
         if (type === 'PRODUCT') {
             setFormData({
-                id: Date.now().toString(), internalCodes: [''], barcodes: [], providerCodes: [],
+                id: Date.now().toString(), internalCodes: [''], barcodes: [], providerCodes: [''],
                 name: '', brand: '', provider: '', description: '', category: 'General',
                 measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1,
                 purchaseCurrency: 'ARS', saleCurrency: 'ARS', vatRate: 21.0,
                 listCost: 0, discounts: [0,0,0,0], costAfterDiscounts: 0, profitMargin: companyConfig.defaultProfitMargin || 30,
                 priceNeto: 0, priceFinal: 0, stock: 0, stockDetails: branches.map(b => ({ branchId: b.id, branchName: b.name, quantity: 0 })),
-                minStock: 0, desiredStock: 0, reorderPoint: 0, location: '', isCombo: false, comboItems: []
+                minStock: 0, desiredStock: 0, reorderPoint: 0, location: '', isCombo: false, comboItems: [],
+                ecommerce: { isPublished: false }
             });
             setModalTab('GENERAL');
         } else if (type === 'BRAND' || type === 'CATEGORY') {
@@ -101,6 +112,20 @@ const Inventory: React.FC = () => {
         }
     }
     setIsModalOpen(true);
+  };
+
+  const addBarcode = () => {
+      if (!newBarcode.trim()) return;
+      if (formData.barcodes.includes(newBarcode.trim())) {
+          alert("Este código ya está asignado al producto.");
+          return;
+      }
+      setFormData({ ...formData, barcodes: [...formData.barcodes, newBarcode.trim()] });
+      setNewBarcode('');
+  };
+
+  const removeBarcode = (code: string) => {
+      setFormData({ ...formData, barcodes: formData.barcodes.filter((c: string) => c !== code) });
   };
 
   const handleSave = () => {
@@ -242,7 +267,7 @@ const Inventory: React.FC = () => {
                             <th className="px-6 py-4">Razón Social</th>
                             <th className="px-6 py-4">CUIT</th>
                             <th className="px-6 py-4">Teléfono</th>
-                            <th className="px-6 py-4 text-right">Saldo</th>
+                            <th className="px-8 py-4 text-right">Saldo</th>
                             <th className="px-6 py-4 text-center">Gestión</th>
                         </tr>
                     ) : (
@@ -258,10 +283,18 @@ const Inventory: React.FC = () => {
                         <tr key={item.id} className="hover:bg-indigo-50/20 transition-colors group">
                             {inventoryTab === 'PRODUCTS' ? (
                                 <>
-                                    <td className="px-6 py-4 font-mono font-bold text-indigo-600">{item.internalCodes[0] || 'S/C'}</td>
+                                    <td className="px-6 py-4 font-mono font-bold text-indigo-600">
+                                        <div className="flex flex-col gap-1">
+                                            <span>{item.internalCodes[0] || 'S/C'}</span>
+                                            {item.barcodes?.length > 0 && <span className="text-[8px] text-slate-400">({item.barcodes.length} Barras)</span>}
+                                        </div>
+                                    </td>
                                     <td className="px-6 py-4">
                                         <p className="font-black text-slate-800 uppercase leading-none mb-1.5">{item.name}</p>
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.brand}</p>
+                                        <div className="flex gap-2">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.brand}</p>
+                                            {item.provider && <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">• {item.provider}</p>}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <span className="bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg border text-[9px] font-black uppercase">{item.category}</span>
@@ -336,7 +369,7 @@ const Inventory: React.FC = () => {
                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                        <div className="space-y-6">
                                            <div>
-                                               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Descripción</label>
+                                               <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 ml-1">Descripción Comercial</label>
                                                <input className="w-full p-4 bg-white border-2 border-transparent rounded-2xl font-black text-lg text-slate-800 uppercase shadow-sm focus:border-indigo-600 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
                                            </div>
                                            <div className="grid grid-cols-2 gap-4">
@@ -354,13 +387,69 @@ const Inventory: React.FC = () => {
                                                    </select>
                                                </div>
                                            </div>
+                                           
+                                           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                                               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2">
+                                                   <Truck size={14}/> Suministro y Vínculo
+                                               </h4>
+                                               <div className="grid grid-cols-1 gap-4">
+                                                   <div>
+                                                       <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-1">Proveedor Predeterminado</label>
+                                                       <select className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
+                                                           <option value="">-- SELECCIONE PROVEEDOR --</option>
+                                                           {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                                       </select>
+                                                   </div>
+                                                   <div>
+                                                       <label className="block text-[9px] font-black text-slate-400 uppercase mb-1 ml-1">Código del Proveedor (Vínculo Listas)</label>
+                                                       <input type="text" className="w-full p-3 bg-slate-50 border rounded-xl font-mono text-xs uppercase" value={formData.providerCodes?.[0]} onChange={e => { const c = [...(formData.providerCodes || [])]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, providerCodes: c}); }} placeholder="Ej: HG-5502..." />
+                                                       <p className="text-[8px] text-slate-400 mt-1 italic">Este código se usa para actualizar precios desde el Excel del proveedor.</p>
+                                                   </div>
+                                               </div>
+                                           </div>
                                        </div>
-                                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-                                           <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Barcode size={14}/> Codificación</h4>
-                                           <div className="space-y-4">
-                                               <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                   <span className="text-[9px] font-black text-slate-400 uppercase">SKU Interno:</span>
-                                                   <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes[0]} onChange={e => { const c = [...formData.internalCodes]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
+
+                                       <div className="space-y-6">
+                                           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                                               <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Barcode size={14}/> Codificación Interna y Barras</h4>
+                                               
+                                               <div className="space-y-4">
+                                                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                       <span className="text-[9px] font-black text-slate-400 uppercase">SKU Sistema:</span>
+                                                       <input className="bg-transparent border-b border-indigo-200 font-mono font-black text-indigo-600 text-right uppercase outline-none" value={formData.internalCodes[0]} onChange={e => { const c = [...formData.internalCodes]; c[0] = e.target.value.toUpperCase(); setFormData({...formData, internalCodes: c}); }} />
+                                                   </div>
+
+                                                   <div className="space-y-3">
+                                                       <label className="text-[9px] font-black text-slate-400 uppercase block ml-1">Códigos de Barra (EAN/UPC)</label>
+                                                       <div className="flex gap-2">
+                                                            <div className="relative flex-1">
+                                                                <QrCode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="Escanear o tipear código..." 
+                                                                    className="w-full pl-10 p-3 bg-slate-50 border rounded-xl font-mono text-xs outline-none focus:ring-1 focus:ring-indigo-500" 
+                                                                    value={newBarcode} 
+                                                                    onChange={e => setNewBarcode(e.target.value)}
+                                                                    onKeyDown={e => e.key === 'Enter' && addBarcode()}
+                                                                />
+                                                            </div>
+                                                            <button onClick={addBarcode} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg active:scale-95 transition-all">
+                                                                <Plus size={20}/>
+                                                            </button>
+                                                       </div>
+                                                       
+                                                       <div className="flex flex-wrap gap-2 pt-2">
+                                                           {formData.barcodes?.map((code: string) => (
+                                                               <div key={code} className="flex items-center gap-2 bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-100 group animate-fade-in">
+                                                                   <span className="text-[10px] font-mono font-bold">{code}</span>
+                                                                   <button onClick={() => removeBarcode(code)} className="text-indigo-300 hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
+                                                               </div>
+                                                           ))}
+                                                           {(!formData.barcodes || formData.barcodes.length === 0) && (
+                                                               <p className="text-[9px] text-slate-400 italic py-2">No se han registrado códigos de barra.</p>
+                                                           )}
+                                                       </div>
+                                                   </div>
                                                </div>
                                            </div>
                                        </div>
