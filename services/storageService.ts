@@ -5,10 +5,6 @@ const DB_NAME = 'FerreCloudDB';
 const STORE_NAME = 'products';
 const DB_VERSION = 1;
 
-/**
- * Motor de persistencia IndexedDB para alta escala (140.000+ artículos).
- * Diseñado para evitar límites de quota y pérdida de datos.
- */
 class ProductDB {
     private db: IDBDatabase | null = null;
 
@@ -104,6 +100,17 @@ class ProductDB {
                 resolve();
             };
             transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
+    async clearAll(): Promise<void> {
+        const db = await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORE_NAME, 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
         });
     }
 
