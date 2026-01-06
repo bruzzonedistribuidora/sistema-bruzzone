@@ -9,13 +9,15 @@ import {
 import { InvoiceItem, Product, SalesOrder, SalesOrderStatus } from '../types';
 
 // Helper para crear productos de prueba
-// Fix: Updated createMockProduct to include missing isCombo and comboItems properties
+// FIX: Updated createMockProduct to use correct property names: stockMinimo and stockMaximo
 const createMockProduct = (id: string, internalCode: string, name: string, priceFinal: number, stock: number, category: string, brand: string = 'GENERICO'): Product => ({
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [],
   name, brand, provider: 'Proveedor Demo', category, description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: priceFinal * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 40,
-  priceNeto: priceFinal / 1.21, priceFinal: priceFinal, stock, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
+  priceNeto: priceFinal / 1.21, priceFinal: priceFinal, stock, stockDetails: [], 
+  // FIX: stockMinimo and stockMaximo according to interface
+  stockMinimo: 10, stockMaximo: 20, reorderPoint: 5,
   location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
   isCombo: false,
   comboItems: []
@@ -186,7 +188,8 @@ const SalesOrders: React.FC = () => {
                                     </div>
                                     <div className="text-right w-16">
                                         <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none mb-1">Stock</p>
-                                        <p className={`font-black text-xs ${p.stock <= p.minStock ? 'text-red-500' : 'text-slate-500'}`}>{p.stock}</p>
+                                        {/* FIX: Changed p.minStock to p.stockMinimo */}
+                                        <p className={`font-black text-xs ${p.stock <= (p.stockMinimo || 0) ? 'text-red-500' : 'text-slate-500'}`}>{p.stock}</p>
                                     </div>
                                     <button 
                                         onClick={() => addToCart(p)}
@@ -333,7 +336,7 @@ const SalesOrders: React.FC = () => {
                         </div>
                         <div className="text-right">
                              <p className="font-black text-slate-900 text-xl tracking-tighter">${order.total.toLocaleString('es-AR')}</p>
-                             <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">{order.items.length} ÍTEMS</p>
+                             <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{order.items.length} ÍTEMS</p>
                         </div>
                     </div>
 
