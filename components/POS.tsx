@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ShoppingCart, Printer, Trash2, Search, CheckCircle, 
     Plus, Minus, X, RefreshCw, Landmark,
@@ -6,7 +7,8 @@ import {
     CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
     ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig } from '../types';
+import { productDB } from '../services/storageService';
 
 const DEFAULT_CLIENT: Client = {
     id: 'cf-default', name: 'Consumidor Final', cuit: '00-00000000-0', phone: '', address: '', balance: 0, limit: 0, points: 0
@@ -25,11 +27,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [showProductResults, setShowProductResults] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isFiscalInvoicing, setIsFiscalInvoicing] = useState(false);
-    const [syncKey, setSyncKey] = useState(0);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [lastSale, setLastSale] = useState<any>(null);
 
-    const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
+    const [products, setProducts] = useState<Product[]>([]);
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
@@ -39,19 +40,29 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [selectedSystemId, setSelectedSystemId] = useState<string>('');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
 
+    const loadProducts = async () => {
+        const all = await productDB.getAll();
+        setProducts(all);
+    };
+
+    useEffect(() => {
+        loadProducts();
+        window.addEventListener('ferrecloud_products_updated', loadProducts);
+        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+    }, []);
+
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { paymentMethods: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'], paymentSystems: [] };
-    }, [syncKey]);
+    }, []);
 
-    // Búsqueda ultra-veloz filtrada para 140k ítems
     const filteredProducts = useMemo(() => {
         const term = productSearch.toLowerCase().trim();
         if (!term) return [];
         return products.filter(p => 
             p.name.toLowerCase().includes(term) || 
             p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
-            p.barcodes.some(c => c.toLowerCase().includes(term))
+            (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(term)))
         ).slice(0, 12);
     }, [productSearch, products]);
 
@@ -222,7 +233,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <th className="px-8 py-5">Ref. Operación</th>
                                     <th className="px-8 py-5">Fecha / Hora</th>
                                     <th className="px-8 py-5">Cliente</th>
-                                    <th className="px-8 py-5 text-right">Importe Percibido</th>
+                                    <th className="px-8 py-5 text-right">Importe Porcentaje</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-[11px]">
