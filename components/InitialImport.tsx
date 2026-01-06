@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
@@ -6,6 +7,7 @@ import {
     DatabaseZap, Sparkles
 } from 'lucide-react';
 import { Product } from '../types';
+import { productDB } from '../services/storageService';
 
 interface InitialImportProps {
     onComplete: () => void;
@@ -50,7 +52,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         reader.readAsText(file);
     };
 
-    const processImport = () => {
+    const processImport = async () => {
         if (!mapping.internalCodes || !mapping.name || !mapping.listCost) {
             alert("Mapeo incompleto de campos obligatorios.");
             return;
@@ -59,20 +61,19 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         setIsProcessing(true);
         setProgress(0);
 
-        // Procesamiento asíncrono para no congelar la UI con 140k registros
         const CHUNK_SIZE = 5000;
         let index = 0;
-        const existingProducts: Product[] = JSON.parse(localStorage.getItem('ferrecloud_products') || '[]');
-        const newProducts: Product[] = [];
 
-        const processChunk = () => {
+        const processChunk = async () => {
             const limit = Math.min(index + CHUNK_SIZE, fileRows.length);
+            const chunkProducts: Product[] = [];
+
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
                 const cost = parseFloat(row[mapping.listCost]?.replace(',', '.') || '0');
-                const priceNeto = cost * 1.30; // 30% default
+                const priceNeto = cost * 1.30; 
 
-                newProducts.push({
+                chunkProducts.push({
                     id: `prod-${Date.now()}-${i}`,
                     internalCodes: [row[mapping.internalCodes] || 'S/C'],
                     barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : [],
@@ -102,13 +103,13 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 });
             }
 
+            await productDB.saveBulk(chunkProducts);
             index = limit;
             setProgress(Math.round((index / fileRows.length) * 100));
 
             if (index < fileRows.length) {
                 setTimeout(processChunk, 10);
             } else {
-                localStorage.setItem('ferrecloud_products', JSON.stringify([...existingProducts, ...newProducts]));
                 setIsProcessing(false);
                 setStep(3);
             }
