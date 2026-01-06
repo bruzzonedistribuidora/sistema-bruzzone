@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-    Cloud, RefreshCw, Smartphone, Monitor, Database, 
+    Cloud, RefreshCw, Smartphone, Database, 
     Zap, ShieldCheck, Key, ArrowRight, CheckCircle, 
-    Download, Upload, AlertTriangle, Info, Globe,
-    Server, Share2, Copy, Trash2, Layers, History
+    Download, Upload, AlertTriangle, Globe,
+    Server, Copy, History, Share2, FileJson
 } from 'lucide-react';
 import { CloudConfig, CloudSyncStatus } from '../types';
 import { productDB } from '../services/storageService';
@@ -14,10 +14,10 @@ const CloudHub: React.FC = () => {
         const saved = localStorage.getItem('ferrecloud_sync_config');
         return saved ? JSON.parse(saved) : {
             enabled: false,
-            vaultId: `FERRE-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+            vaultId: `BRUZZONE-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
             lastSync: 'Nunca',
             autoSync: true,
-            apiUrl: 'https://api.ferrebruzzone.com.ar/sync'
+            apiUrl: ''
         };
     });
 
@@ -30,27 +30,67 @@ const CloudHub: React.FC = () => {
         setStatus(config.enabled ? 'ONLINE' : 'OFFLINE');
     }, [config]);
 
-    const handleInitialPush = async () => {
+    const exportFullDatabase = async () => {
         setIsProcessing(true);
-        setProgress(0);
-        
-        // Simulación de carga de 140,000 artículos en fragmentos
-        const total = 140000;
-        const chunkSize = 10000;
-        
-        for (let i = 0; i <= total; i += chunkSize) {
-            await new Promise(r => setTimeout(r, 400));
-            setProgress(Math.round((i / total) * 100));
-        }
+        try {
+            const products = await productDB.getAll();
+            const clients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
+            const providers = JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]');
+            const configData = JSON.parse(localStorage.getItem('company_config') || '{}');
 
-        setConfig(prev => ({ ...prev, lastSync: new Date().toLocaleString(), enabled: true }));
-        setIsProcessing(false);
-        alert("✅ Ferretería Bruzzone Sincronizada. Ahora puedes usar el Vault ID en tus otras PCs.");
+            const fullData = {
+                products,
+                clients,
+                providers,
+                config: configData,
+                timestamp: new Date().toISOString(),
+                vaultId: config.vaultId
+            };
+
+            const blob = new Blob([JSON.stringify(fullData)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SINCRO_BRUZZONE_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            setConfig(prev => ({ ...prev, lastSync: new Date().toLocaleString(), enabled: true }));
+            alert("✅ Paquete de datos generado. Cárgalo en tu otra PC usando el botón 'Cargar Paquete de Datos'.");
+        } catch (error) {
+            alert("Error al exportar datos.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
-    const handleCopyId = () => {
-        navigator.clipboard.writeText(config.vaultId);
-        alert("ID de Bóveda copiado.");
+    const importFullDatabase = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                setIsProcessing(true);
+                const data = JSON.parse(event.target?.result as string);
+                
+                if (data.products) {
+                    await productDB.clearAll();
+                    await productDB.saveBulk(data.products);
+                }
+                if (data.clients) localStorage.setItem('ferrecloud_clients', JSON.stringify(data.clients));
+                if (data.providers) localStorage.setItem('ferrecloud_providers', JSON.stringify(data.providers));
+                if (data.config) localStorage.setItem('company_config', JSON.stringify(data.config));
+                
+                setConfig(prev => ({ ...prev, vaultId: data.vaultId || prev.vaultId, lastSync: new Date().toLocaleString(), enabled: true }));
+                alert("✅ Sincronización exitosa. Los datos de la otra PC han sido aplicados correctamente.");
+                window.location.reload();
+            } catch (err) {
+                alert("Error: El archivo de datos no es válido.");
+            } finally {
+                setIsProcessing(false);
+            }
+        };
+        reader.readAsText(file);
     };
 
     return (
@@ -72,34 +112,32 @@ const CloudHub: React.FC = () => {
                     </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 relative z-10">
-                    {!config.enabled ? (
-                        <button 
-                            onClick={handleInitialPush}
-                            disabled={isProcessing}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-95">
-                            {isProcessing ? `Subiendo Inventario (${progress}%)` : 'Activar Bóveda en la Nube'}
-                        </button>
-                    ) : (
-                        <button className="bg-white border-2 border-green-100 text-green-600 px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-sm">
-                            <ShieldCheck size={20}/> Conectado y Protegido
-                        </button>
-                    )}
+                    <label className="bg-slate-900 text-white px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center justify-center gap-3 transition-all active:scale-95 cursor-pointer hover:bg-slate-800">
+                        <Upload size={20}/> Cargar Paquete de Datos
+                        <input type="file" className="hidden" accept=".json" onChange={importFullDatabase} />
+                    </label>
+                    <button 
+                        onClick={exportFullDatabase}
+                        disabled={isProcessing}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-5 rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-100 flex items-center justify-center gap-3 transition-all active:scale-95">
+                        <Download size={20}/> Generar Sincronizador
+                    </button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm space-y-8">
                     <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter flex items-center gap-3 border-b pb-6">
-                        <Key size={24} className="text-indigo-600"/> Enlace Multi-PC
+                        <Key size={24} className="text-indigo-600"/> Enlace Multi-PC Directo
                     </h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed">
-                        Copia este código e ingrésalo en la otra computadora de la ferretería para compartir el catálogo de 140,000 artículos, precios y ventas en tiempo real.
+                        Para ver los mismos 140,000 artículos en todas sus computadoras, genere un paquete de datos en su PC principal y cárguelo en las terminales secundarias. Los cambios se unificarán.
                     </p>
                     <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-4">
                         <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">ID Único de Bóveda</label>
                         <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-indigo-50 shadow-inner">
                             <span className="text-4xl font-mono font-black text-slate-800 tracking-widest">{config.vaultId}</span>
-                            <button onClick={handleCopyId} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-90 shadow-lg">
+                            <button onClick={() => { navigator.clipboard.writeText(config.vaultId); alert("ID Copiado"); }} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-90 shadow-lg">
                                 <Copy size={20}/>
                             </button>
                         </div>
@@ -110,60 +148,28 @@ const CloudHub: React.FC = () => {
                     <div className="absolute top-0 right-0 p-8 opacity-5"><Server size={180}/></div>
                     <div className="relative z-10">
                         <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3 mb-6">
-                            <Zap size={22} className="text-ferre-orange"/> Inteligencia de Datos
+                            <Zap size={22} className="text-ferre-orange"/> Conexión API (Avanzado)
                         </h3>
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all group">
-                                <div className="p-3 bg-indigo-500 rounded-xl"><Database size={18}/></div>
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-tight">Capacidad Total</p>
-                                    <p className="text-[10px] text-slate-400 font-medium uppercase mt-1">Sincronización optimizada para +1M de SKU</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all group">
-                                <div className="p-3 bg-emerald-500 rounded-xl"><Smartphone size={18}/></div>
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-tight">App Móvil Disponible</p>
-                                    <p className="text-[10px] text-slate-400 font-medium uppercase mt-1">Accede desde tu celular fuera del local</p>
-                                </div>
-                            </div>
+                        <p className="text-xs text-slate-400 font-medium leading-relaxed mb-8">Si dispone de un servidor web, ingrese la URL base para habilitar la sincronización automática en tiempo real entre todas las sucursales.</p>
+                        <div className="space-y-4">
+                            <input 
+                                type="text" 
+                                placeholder="https://api.tuferreteria.com/sync"
+                                className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold text-sm focus:bg-white/10 transition-all"
+                                value={config.apiUrl}
+                                onChange={e => setConfig({...config, apiUrl: e.target.value})}
+                            />
+                            <button className="w-full bg-white/10 hover:bg-white/20 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Verificar Punto de Enlace</button>
                         </div>
-                    </div>
-                    <div className="relative z-10 pt-8 mt-8 border-t border-white/10">
-                         <div className="flex justify-between items-center">
-                             <div className="flex items-center gap-2">
-                                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Servidores AR-CLOUD Activos</span>
-                             </div>
-                             <Info size={16} className="text-slate-600"/>
-                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm p-10 space-y-8">
-                <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-                    <History size={24} className="text-slate-400"/> Registro de Red
-                </h3>
-                <div className="space-y-4">
-                    {[
-                        { time: 'Hace 2 min', action: 'Sincronización de stock (Tornillos T1)', origin: 'Terminal 2' },
-                        { time: 'Hace 5 min', action: 'Venta registrada #VEN-9902', origin: 'Caja Principal' },
-                        { time: 'Hace 1 hora', action: 'Actualización masiva de precios', origin: 'Administración' },
-                    ].map((log, i) => (
-                        <div key={i} className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-indigo-100 transition-all">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 text-xs font-black group-hover:text-indigo-600">
-                                    {log.time.charAt(0)}
-                                </div>
-                                <div>
-                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tight">{log.action}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{log.origin}</p>
-                                </div>
-                            </div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full border">{log.time}</span>
-                        </div>
-                    ))}
+            <div className="bg-amber-50 rounded-[2.5rem] border border-amber-200 p-8 flex items-start gap-6">
+                <div className="p-3 bg-white rounded-2xl shadow-md text-amber-600"><AlertTriangle size={24}/></div>
+                <div>
+                    <h4 className="font-black text-amber-800 uppercase tracking-widest text-xs">Nota sobre los 140.000 artículos</h4>
+                    <p className="text-sm text-amber-700 font-medium mt-1">El volumen de datos de su ferretería es masivo. Se recomienda usar la exportación por paquete de datos para asegurar que todas las PCs tengan exactamente el mismo catálogo antes de activar la sincronización automática.</p>
                 </div>
             </div>
         </div>
