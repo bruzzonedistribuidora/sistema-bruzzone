@@ -1,41 +1,204 @@
-Run npm install && npm run build
-npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
 
-added 174 packages, and audited 175 packages in 17s
+import { GoogleGenAI, Type } from "@google/genai";
+import { Product, CreditInstallment } from "../types";
 
-28 packages are looking for funding
-  run `npm fund` for details
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
 
-found 0 vulnerabilities
+export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    let prompt = `Busca las tasas de interés vigentes para cobros con tarjeta en "${platformName}" Argentina (Planes 1, 3, 6, 12 cuotas).`;
+    if (targetUrl) prompt += ` Prioriza esta URL: ${targetUrl}`;
+    prompt += ` Devuelve JSON: [{ "installments": número, "surcharge": porcentaje, "label": "Descripción" }]`;
 
-> ferrecloud-arca@1.0.2 build
-> vite build
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              installments: { type: Type.NUMBER },
+              surcharge: { type: Type.NUMBER },
+              label: { type: Type.STRING }
+            },
+            required: ["installments", "surcharge", "label"]
+          }
+        }
+      }
+    });
 
-vite v6.4.1 building for production...
-transforming...
-✓ 41 modules transformed.
-✗ Build failed in 336ms
-error during build:
-[vite:esbuild] Transform failed with 1 error:
-/home/runner/work/sistema-bruzzone/sistema-bruzzone/services/geminiService.ts:63:13: ERROR: Expected ">" but found "className"
-file: /home/runner/work/sistema-bruzzone/sistema-bruzzone/services/geminiService.ts:63:13
+    const installments = JSON.parse(response.text || "[]");
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
 
-Expected ">" but found "className"
-61 |  
-62 |      return (
-63 |          <div className="p-6 h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden font-sans">
-   |               ^
-64 |              ***/* CABECERA CON KPIs */***
-65 |              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-8 shrink-0">
+    return { installments: installments.map((inst: any) => ({ ...inst, id: `ai-${Math.random()}` })), sources };
+  } catch (error) {
+    console.error("Error AI Rates:", error);
+    throw error;
+  }
+};
 
-    at failureErrorWithLog (/home/runner/work/sistema-bruzzone/sistema-bruzzone/node_modules/esbuild/lib/main.js:1467:15)
-    at /home/runner/work/sistema-bruzzone/sistema-bruzzone/node_modules/esbuild/lib/main.js:736:50
-    at responseCallbacks.<computed> (/home/runner/work/sistema-bruzzone/sistema-bruzzone/node_modules/esbuild/lib/main.js:603:9)
-    at handleIncomingPacket (/home/runner/work/sistema-bruzzone/sistema-bruzzone/node_modules/esbuild/lib/main.js:658:12)
-    at Socket.readFromStdout (/home/runner/work/sistema-bruzzone/sistema-bruzzone/node_modules/esbuild/lib/main.js:581:7)
-    at Socket.emit (node:events:524:28)
-    at addChunk (node:internal/streams/readable:561:12)
-    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
-    at Readable.push (node:internal/streams/readable:392:5)
-    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)
-Error: Process completed with exit code 1.
+export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Data.split(',')[1] || base64Data,
+              mimeType: mimeType
+            }
+          },
+          { text: "Analiza esta factura de compra de ferretería. Extrae: CUIT emisor, nombre emisor, fecha, número factura, y una lista de items con: descripcion, cantidad, costo_unitario, bonificacion y subtotal. Devuelve exclusivamente JSON." }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cuitEmisor: { type: Type.STRING },
+            nombreEmisor: { type: Type.STRING },
+            numeroFactura: { type: Type.STRING },
+            fecha: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  descripcion: { type: Type.STRING },
+                  cantidad: { type: Type.NUMBER },
+                  costoUnitario: { type: Type.NUMBER },
+                  bonificacion: { type: Type.NUMBER },
+                  subtotal: { type: Type.NUMBER }
+                }
+              }
+            },
+            total: { type: Type.NUMBER }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Error analizando factura:", error);
+    throw error;
+  }
+};
+
+export const searchVirtualInventory = async (query: string): Promise<Product[]> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    const prompt = `Busca productos de ferretería para: "${query}". Genera 3-5 entradas realistas en JSON.`;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              sku: { type: Type.STRING },
+              name: { type: Type.STRING },
+              category: { type: Type.STRING },
+              price: { type: Type.NUMBER },
+              stock: { type: Type.INTEGER },
+              description: { type: Type.STRING },
+              location: { type: Type.STRING },
+            },
+            required: ["id", "sku", "name", "category", "price", "stock", "description", "location"]
+          }
+        }
+      }
+    });
+
+    const raw = JSON.parse(response.text || "[]");
+    return raw.map((r: any) => ({
+        ...r,
+        id: r.id || `ai-${Math.random()}`,
+        name: r.name || 'Producto IA',
+        category: r.category || 'General',
+        priceFinal: r.price || 0,
+        stock: r.stock || 0,
+        internalCodes: [r.sku || 'S/C'],
+        barcodes: [],
+        providerCodes: [],
+        isCombo: false,
+        comboItems: [],
+        vatRate: 21.0,
+        listCost: (r.price || 0) * 0.7,
+        discounts: [0, 0, 0, 0],
+        costAfterDiscounts: (r.price || 0) * 0.7,
+        profitMargin: 30,
+        priceNeto: (r.price || 0) / 1.21,
+        stockDetails: [],
+        ecommerce: { isPublished: true }
+    }));
+  } catch (error) { return []; }
+};
+
+export const askAssistant = async (history: string[], question: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const chat = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { systemInstruction: "Eres 'FerreBot', experto en ferretería (140k artículos). Ayuda con stock, precios y técnica." }
+        });
+        const response = await chat.sendMessage({ message: question });
+        return response.text || "No pude procesar la consulta.";
+    } catch (error) { return "Error de conexión."; }
+};
+
+export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina. Devuelve estrictamente JSON con razonSocial, domicilio y condicionIva.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            razonSocial: { type: Type.STRING },
+            domicilio: { type: Type.STRING },
+            condicionIva: { type: Type.STRING }
+          },
+          required: ["razonSocial"]
+        }
+      }
+    });
+
+    const result = JSON.parse(response.text || '{}');
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
+
+    if (!result.razonSocial) return null;
+    return { ...result, sources };
+  } catch (error) { 
+    console.error("Error fetching company by CUIT:", error);
+    return null; 
+  }
+};
