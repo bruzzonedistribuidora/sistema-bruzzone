@@ -1,4 +1,4 @@
-
+    
 import { Product } from '../types';
 
 const DB_NAME = 'FerreCloudDB';
@@ -53,7 +53,7 @@ class ProductDB {
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
-            const request = store.getAll(); // IndexedDB no tiene full-text search nativo simple, filtramos aquí pero de forma asíncrona
+            const request = store.getAll(); 
             
             request.onsuccess = () => {
                 const termLower = term.toLowerCase();
@@ -61,7 +61,7 @@ class ProductDB {
                     (p.name || '').toLowerCase().includes(termLower) || 
                     (p.internalCodes || []).some(c => c.toLowerCase().includes(termLower)) ||
                     (p.barcodes || []).some(c => c.toLowerCase().includes(termLower))
-                ).slice(0, 50); // Siempre limitar resultados de UI
+                ).slice(0, 50); 
                 resolve(filtered);
             };
             request.onerror = () => reject(request.error);
@@ -86,7 +86,7 @@ class ProductDB {
         const db = await this.init();
         return new Promise((resolve, reject) => {
             const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const astore = transaction.objectStore(STORE_NAME);
+            const store = transaction.objectStore(STORE_NAME);
             products.forEach(p => store.put(p));
             transaction.oncomplete = () => {
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
