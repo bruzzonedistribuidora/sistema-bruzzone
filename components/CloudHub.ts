@@ -4,7 +4,7 @@ import {
     Cloud, RefreshCw, Smartphone, Database, 
     Zap, ShieldCheck, Key, ArrowRight, CheckCircle, 
     Download, Upload, AlertTriangle, Globe,
-    Server, Copy, History, Share2, FileJson
+    Server, Copy, History, Share2, FileJson, Info
 } from 'lucide-react';
 import { CloudConfig, CloudSyncStatus } from '../types';
 import { productDB } from '../services/storageService';
