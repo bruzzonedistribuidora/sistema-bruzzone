@@ -47,7 +47,9 @@ const CloudHub: React.FC = () => {
             a.download = `SINCRO_BRUZZONE_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
             setConfig(prev => ({ ...prev, lastSync: new Date().toLocaleString(), enabled: true }));
-            alert("✅ Paquete de datos generado con éxito.");
+            alert("✅ Paquete de datos generado con éxito. Úselo para sincronizar otras terminales.");
+        } catch (error) {
+            alert("Error al exportar la base de datos.");
         } finally {
             setIsProcessing(false);
         }
@@ -68,10 +70,10 @@ const CloudHub: React.FC = () => {
                 if (data.clients) localStorage.setItem('ferrecloud_clients', JSON.stringify(data.clients));
                 if (data.providers) localStorage.setItem('ferrecloud_providers', JSON.stringify(data.providers));
                 
-                alert("✅ Sincronización completa aplicada correctamente.");
+                alert("✅ Sincronización completa aplicada correctamente. El sistema se recargará.");
                 window.location.reload();
             } catch (err) {
-                alert("Error al importar el paquete de datos.");
+                alert("Error: El archivo no es un paquete de datos válido.");
             } finally {
                 setIsProcessing(false);
             }
@@ -114,13 +116,13 @@ const CloudHub: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm space-y-8">
                     <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter flex items-center gap-3 border-b pb-6">
-                        <Key size={24} className="text-indigo-600"/> Enlace Multicomputadora
+                        <Key size={24} className="text-indigo-600"/> Enlace Multi-PC
                     </h3>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed">
-                        Utilice este ID único para vincular otras terminales a su bóveda de datos. Los 140.000 artículos se sincronizarán automáticamente.
+                        Use este ID único para vincular otras computadoras de la ferretería a su base de datos maestra de 140.000 artículos.
                     </p>
                     <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-4">
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">Bóveda ID</label>
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">ID de Bóveda</label>
                         <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-indigo-50 shadow-inner">
                             <span className="text-4xl font-mono font-black text-slate-800 tracking-widest">{config.vaultId}</span>
                             <button onClick={() => { navigator.clipboard.writeText(config.vaultId); alert("ID Copiado"); }} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-90 shadow-lg">
@@ -134,13 +136,13 @@ const CloudHub: React.FC = () => {
                     <div className="absolute top-0 right-0 p-8 opacity-5"><Server size={180}/></div>
                     <div className="relative z-10">
                         <h3 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3 mb-6">
-                            <Zap size={22} className="text-ferre-orange"/> Configuración Avanzada API
+                            <Zap size={22} className="text-ferre-orange"/> API Centralizada
                         </h3>
-                        <p className="text-xs text-slate-400 font-medium leading-relaxed mb-8">Si dispone de un servidor centralizado, ingrese la URL para habilitar la sincronización en tiempo real de facturación y stock.</p>
+                        <p className="text-xs text-slate-400 font-medium leading-relaxed mb-8">Si posee un servidor web propio, ingrese la URL de su API para habilitar sincronización en tiempo real para ventas y stock crítico.</p>
                         <div className="space-y-4">
                             <input 
                                 type="text" 
-                                placeholder="https://api.tuferreteria.com/sync"
+                                placeholder="https://api.ferreteria.com/sync"
                                 className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold text-sm focus:bg-white/10 transition-all"
                                 value={config.apiUrl}
                                 onChange={e => setConfig({...config, apiUrl: e.target.value})}
