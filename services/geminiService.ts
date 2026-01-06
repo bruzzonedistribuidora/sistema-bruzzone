@@ -1,108 +1,204 @@
 
-import { Product } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
+import { Product, CreditInstallment } from "../types";
 
-const DB_NAME = 'FerreCloudDB';
-const STORE_NAME = 'products';
-const DB_VERSION = 1;
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
 
-/**
- * Servicio de Base de Datos IndexedDB para manejo de alta escala (140.000+ artículos)
- * Evita los límites de 5MB de localStorage y previene la pérdida de datos.
- */
-class ProductDB {
-    private db: IDBDatabase | null = null;
+export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    let prompt = `Busca las tasas de interés vigentes para cobros con tarjeta en "${platformName}" Argentina (Planes 1, 3, 6, 12 cuotas).`;
+    if (targetUrl) prompt += ` Prioriza esta URL: ${targetUrl}`;
+    prompt += ` Devuelve JSON: [{ "installments": número, "surcharge": porcentaje, "label": "Descripción" }]`;
 
-    async init(): Promise<IDBDatabase> {
-        if (this.db) return this.db;
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              installments: { type: Type.NUMBER },
+              surcharge: { type: Type.NUMBER },
+              label: { type: Type.STRING }
+            },
+            required: ["installments", "surcharge", "label"]
+          }
+        }
+      }
+    });
 
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const installments = JSON.parse(response.text || "[]");
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
 
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                    // Índices para búsquedas rápidas
-                    store.createIndex('name', 'name', { unique: false });
-                    store.createIndex('brand', 'brand', { unique: false });
-                    store.createIndex('category', 'category', { unique: false });
+    return { installments: installments.map((inst: any) => ({ ...inst, id: `ai-${Math.random()}` })), sources };
+  } catch (error) {
+    console.error("Error AI Rates:", error);
+    throw error;
+  }
+};
+
+export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Data.split(',')[1] || base64Data,
+              mimeType: mimeType
+            }
+          },
+          { text: "Analiza esta factura de compra de ferretería. Extrae: CUIT emisor, nombre emisor, fecha, número factura, y una lista de items con: descripcion, cantidad, costo_unitario, bonificacion y subtotal. Devuelve exclusivamente JSON." }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cuitEmisor: { type: Type.STRING },
+            nombreEmisor: { type: Type.STRING },
+            numeroFactura: { type: Type.STRING },
+            fecha: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  descripcion: { type: Type.STRING },
+                  cantidad: { type: Type.NUMBER },
+                  costoUnitario: { type: Type.NUMBER },
+                  bonificacion: { type: Type.NUMBER },
+                  subtotal: { type: Type.NUMBER }
                 }
-            };
+              }
+            },
+            total: { type: Type.NUMBER }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Error analizando factura:", error);
+    throw error;
+  }
+};
 
-            request.onsuccess = () => {
-                this.db = request.result;
-                resolve(request.result);
-            };
+export const searchVirtualInventory = async (query: string): Promise<Product[]> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    const prompt = `Busca productos de ferretería para: "${query}". Genera 3-5 entradas realistas en JSON.`;
 
-            request.onerror = () => reject(request.error);
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              sku: { type: Type.STRING },
+              name: { type: Type.STRING },
+              category: { type: Type.STRING },
+              price: { type: Type.NUMBER },
+              stock: { type: Type.INTEGER },
+              description: { type: Type.STRING },
+              location: { type: Type.STRING },
+            },
+            required: ["id", "sku", "name", "category", "price", "stock", "description", "location"]
+          }
+        }
+      }
+    });
+
+    const raw = JSON.parse(response.text || "[]");
+    return raw.map((r: any) => ({
+        ...r,
+        id: r.id || `ai-${Math.random()}`,
+        name: r.name || 'Producto IA',
+        category: r.category || 'General',
+        priceFinal: r.price || 0,
+        stock: r.stock || 0,
+        internalCodes: [r.sku || 'S/C'],
+        barcodes: [],
+        providerCodes: [],
+        isCombo: false,
+        comboItems: [],
+        vatRate: 21.0,
+        listCost: (r.price || 0) * 0.7,
+        discounts: [0, 0, 0, 0],
+        costAfterDiscounts: (r.price || 0) * 0.7,
+        profitMargin: 30,
+        priceNeto: (r.price || 0) / 1.21,
+        stockDetails: [],
+        ecommerce: { isPublished: true }
+    }));
+  } catch (error) { return []; }
+};
+
+export const askAssistant = async (history: string[], question: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const chat = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { systemInstruction: "Eres 'FerreBot', experto en ferretería (140k artículos). Ayuda con stock, precios y técnica." }
         });
-    }
+        const response = await chat.sendMessage({ message: question });
+        return response.text || "No pude procesar la consulta.";
+    } catch (error) { return "Error de conexión."; }
+};
 
-    async getAll(): Promise<Product[]> {
-        const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
+export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina. Devuelve estrictamente JSON con razonSocial, domicilio y condicionIva.`;
 
-    async save(product: Product): Promise<void> {
-        const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.put(product);
-            request.onsuccess = () => {
-                window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                resolve();
-            };
-            request.onerror = () => reject(request.error);
-        });
-    }
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            razonSocial: { type: Type.STRING },
+            domicilio: { type: Type.STRING },
+            condicionIva: { type: Type.STRING }
+          },
+          required: ["razonSocial"]
+        }
+      }
+    });
 
-    async saveBulk(products: Product[]): Promise<void> {
-        const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            
-            products.forEach(p => store.put(p));
+    const result = JSON.parse(response.text || '{}');
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
 
-            transaction.oncomplete = () => {
-                window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                resolve();
-            };
-            transaction.onerror = () => reject(transaction.error);
-        });
-    }
-
-    async delete(id: string): Promise<void> {
-        const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.delete(id);
-            request.onsuccess = () => {
-                window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                resolve();
-            };
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    async clear(): Promise<void> {
-        const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.clear();
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-}
-
-export const productDB = new ProductDB();
+    if (!result.razonSocial) return null;
+    return { ...result, sources };
+  } catch (error) { 
+    console.error("Error fetching company by CUIT:", error);
+    return null; 
+  }
+};
