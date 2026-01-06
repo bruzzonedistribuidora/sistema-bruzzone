@@ -1,502 +1,200 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-    User, Plus, Search, FileText, Globe, X, Copy, MessageCircle, Key, 
-    ExternalLink, History, Eye, ChevronRight, ShoppingBag, Receipt, 
-    Printer, Mail, DollarSign, ArrowDownLeft, CheckCircle, Wallet, 
-    CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
-    ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
-    Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil, ArrowLeft,
-    UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp, Columns, Table as TableIcon, Hash, Tag, Notebook, Percent, Settings2
-} from 'lucide-react';
-import { Client, CurrentAccountMovement, CompanyConfig, TaxCondition } from '../types';
-import { fetchCompanyByCuit } from '../services/geminiService';
 
-const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [isSearchingCuit, setIsSearchingCuit] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [modalTab, setModalTab] = useState<'GENERAL' | 'COMMERCIAL'>('GENERAL');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+import { GoogleGenAI, Type } from "@google/genai";
+import { Product, CreditInstallment } from "../types";
 
-  const [isImportMappingOpen, setIsImportMappingOpen] = useState(false);
-  const [importRows, setImportRows] = useState<string[][]>([]);
-  const [importMapping, setImportMapping] = useState<Record<string, number>>({});
-
-  const [clients, setClients] = useState<Client[]>(() => {
-      const saved = localStorage.getItem('ferrecloud_clients');
-      return saved ? JSON.parse(saved) : [];
-  });
-
-  const companyConfig: CompanyConfig = useMemo(() => {
-    const saved = localStorage.getItem('company_config');
-    return saved ? JSON.parse(saved) : { 
-        loyalty: { enabled: true, valuePerPoint: 2, minPointsToRedeem: 500 },
-        paymentMethods: ['EFECTIVO', 'MERCADO_PAGO', 'TRANSFERENCIA', 'CHEQUE', 'E-CHEQ']
-    };
-  }, []);
-
-  const [movements, setMovements] = useState<CurrentAccountMovement[]>(() => {
-      const saved = localStorage.getItem('ferrecloud_movements');
-      return saved ? JSON.parse(saved) : [];
-  });
-
-  const [clientForm, setClientForm] = useState<Partial<Client>>({
-      id: '', number: '', name: '', razonSocial: '', fantasyName: '', cuit: '', taxCondition: 'Consumidor Final',
-      locality: '', address: '', phone: '', email: '', description: '', balance: 0, limit: 100000, 
-      points: 0, specialDiscount: 0, currency: 'ARS', contactName: '', portalEnabled: true
-  });
-
-  useEffect(() => {
-      if (initialClientId) {
-          const c = clients.find(cl => cl.id === initialClientId);
-          if (c) {
-              setSelectedClient(c);
-              setIsHistoryOpen(true);
-          }
-      }
-  }, [initialClientId, clients]);
-
-  useEffect(() => { 
-      localStorage.setItem('ferrecloud_clients', JSON.stringify(clients)); 
-  }, [clients]);
-
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
-  }, [movements]);
-
-  const handleStartImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const content = event.target?.result as string;
-        const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
-        if (lines.length > 0) {
-            const firstLine = lines[0];
-            const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
-            const rows = lines.map(line => line.split(separator).map(cell => cell.trim()));
-            setImportRows(rows);
-            setImportMapping({});
-            setIsImportMappingOpen(true);
-        }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+declare var process: {
+  env: {
+    API_KEY: string;
   };
-
-  const confirmImport = () => {
-      if (importMapping.name === undefined || importMapping.cuit === undefined) {
-          alert("Debes mapear al menos el Nombre y el CUIT.");
-          return;
-      }
-      const currentCuits = new Set(clients.map(c => c.cuit.replace(/[^0-9]/g, '')));
-      const newClients: Client[] = [];
-      
-      const dataRows = importRows.slice(1);
-
-      dataRows.forEach((row, index) => {
-          const name = row[importMapping.name];
-          const cuit = row[importMapping.cuit];
-          if (!name || !cuit) return;
-
-          const cleanCuit = cuit.replace(/[^0-9]/g, '');
-          if (!currentCuits.has(cleanCuit)) {
-              newClients.push({
-                  id: `cli-${Date.now()}-${index}`,
-                  name: name.toUpperCase(),
-                  cuit: cuit,
-                  phone: importMapping.phone !== undefined ? row[importMapping.phone] : '',
-                  address: importMapping.address !== undefined ? row[importMapping.address] : '',
-                  email: importMapping.email !== undefined ? row[importMapping.email] : '',
-                  balance: 0, 
-                  limit: 100000,
-                  points: 0, 
-                  portalEnabled: true,
-                  taxCondition: 'Consumidor Final',
-                  portalHash: `p-${Math.random().toString(36).substr(2, 6)}`
-              } as Client);
-              currentCuits.add(cleanCuit);
-          }
-      });
-
-      if (newClients.length === 0) {
-          alert("No se encontraron clientes nuevos para importar (o ya existen en el sistema).");
-      } else {
-          setClients([...newClients, ...clients]);
-          alert(`¡Importación exitosa! Se agregaron ${newClients.length} clientes.`);
-      }
-      setIsImportMappingOpen(false);
-  };
-
-  const handleSearchCuit = async () => {
-      // Limpiamos el CUIT para que sea solo números antes de enviarlo
-      const rawCuit = (clientForm.cuit || '').toString().trim();
-      const cleanCuit = rawCuit.replace(/\D/g, '');
-      
-      if (cleanCuit.length < 10) {
-          alert("Por favor, ingrese un CUIT válido (mínimo 10 u 11 dígitos).");
-          return;
-      }
-
-      setIsSearchingCuit(true);
-      try {
-          // Usamos el CUIT con guiones o sin ellos para la búsqueda de la IA, pero lo normalizamos
-          const formattedCuitForSearch = cleanCuit.length === 11 
-            ? `${cleanCuit.slice(0,2)}-${cleanCuit.slice(2,10)}-${cleanCuit.slice(10)}`
-            : cleanCuit;
-
-          const data = await fetchCompanyByCuit(formattedCuitForSearch);
-          
-          if (data && data.razonSocial) {
-              setClientForm(prev => ({ 
-                  ...prev, 
-                  name: data.razonSocial.toUpperCase(), 
-                  razonSocial: data.razonSocial.toUpperCase(),
-                  address: data.domicilio ? data.domicilio.toUpperCase() : prev.address,
-                  taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition,
-                  cuit: formattedCuitForSearch // Guardamos el formato con guiones
-              }));
-              alert("✅ Datos fiscales recuperados con éxito.");
-          } else {
-              alert("❌ La IA no pudo localizar datos públicos para este CUIT. Por favor, complételos manualmente.");
-          }
-      } catch (err) { 
-          console.error(err); 
-          alert("⚠️ Error en la conexión con el motor de IA. Verifique su conexión.");
-      } finally { 
-          setIsSearchingCuit(false); 
-      }
-  };
-
-  const handleSaveClient = () => {
-      if (!clientForm.name || !clientForm.cuit) {
-          alert("Nombre y CUIT son obligatorios");
-          return;
-      }
-      setClients(prev => {
-          if (isEditing && clientForm.id) {
-              return prev.map(c => c.id === clientForm.id ? { ...c, ...clientForm } as Client : c);
-          } else {
-              return [{...clientForm as Client, id: Date.now().toString(), portalHash: `p-${Math.random().toString(36).substr(2, 5)}`}, ...prev];
-          }
-      });
-      setIsNewClientModalOpen(false);
-  };
-
-  const deleteClient = (id: string) => {
-    if (confirm('¿Desea eliminar este cliente permanentemente? Se borrará todo su historial de deudas.')) {
-        setClients(prev => prev.filter(c => c.id !== id));
-    }
-  };
-
-  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.cuit.includes(searchTerm));
-
-  return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto h-full flex flex-col space-y-6 animate-fade-in bg-slate-50 overflow-hidden">
-        <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleStartImport} />
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm gap-4 shrink-0">
-            <div>
-                <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-                    <Users className="text-indigo-600"/> Fichero de Clientes
-                </h2>
-                <div className="relative mt-4 w-full md:w-80">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18}/>
-                    <input type="text" placeholder="Nombre o CUIT..." className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none border-2 border-transparent focus:border-indigo-500 uppercase" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                </div>
-            </div>
-            <div className="flex gap-3">
-                <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-50 text-indigo-600 px-6 py-3.5 rounded-2xl flex items-center gap-3 font-black border border-indigo-100 hover:bg-indigo-100 transition-all uppercase text-xs tracking-widest active:scale-95">
-                    <FileUp size={20} /> Importar CSV
-                </button>
-                <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setClientForm({name: '', cuit: '', phone: '', address: '', balance: 0, limit: 100000, points: 0, portalEnabled: true, taxCondition: 'Consumidor Final', currency: 'ARS'}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
-                    <Plus size={20} /> Nuevo Cliente
-                </button>
-            </div>
-        </div>
-
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-900 text-[10px] text-slate-300 uppercase font-black tracking-widest sticky top-0 z-10">
-                        <tr>
-                            <th className="px-8 py-5"># Nº / Razón Social</th>
-                            <th className="px-8 py-5">Situación IVA</th>
-                            <th className="px-8 py-5 text-right">Saldo</th>
-                            <th className="px-8 py-5 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {filteredClients.map(client => (
-                            <tr key={client.id} className="hover:bg-slate-50 transition-colors group">
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-11 h-11 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-slate-400 uppercase text-lg">{client.name.charAt(0)}</div>
-                                        <div>
-                                            <div className="font-black text-slate-800 text-sm uppercase tracking-tight leading-none mb-1.5">{client.name}</div>
-                                            <div className="text-[10px] text-gray-400 font-mono font-bold tracking-tighter">Nº {client.number || '-'} • {client.cuit}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <span className="text-[10px] font-black uppercase text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border">{client.taxCondition}</span>
-                                </td>
-                                <td className={`px-8 py-5 text-right font-black text-lg tracking-tighter ${client.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                    ${client.balance.toLocaleString('es-AR')}
-                                </td>
-                                <td className="px-8 py-5 text-center">
-                                    <div className="flex justify-center gap-2">
-                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setModalTab('GENERAL'); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90" title="Editar Ficha"><Pencil size={18}/></button>
-                                        <button onClick={() => onOpenPortal?.(client)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all active:scale-90" title="Ver Portal Cliente"><Globe size={18}/></button>
-                                        <button onClick={() => deleteClient(client.id)} className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90" title="Eliminar Cliente"><Trash2 size={18}/></button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        {/* MODAL: MAPEO DE IMPORTACIÓN */}
-        {isImportMappingOpen && (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
-                <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
-                    <div className="p-8 bg-indigo-900 text-white flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-white/10 rounded-2xl shadow-lg"><Settings2 size={24}/></div>
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Mapeo de Columnas</h3>
-                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Vincula tu archivo con los campos del sistema</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setIsImportMappingOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {[
-                                { key: 'name', label: 'Nombre / Razón Social', required: true },
-                                { key: 'cuit', label: 'CUIT / DNI', required: true },
-                                { key: 'phone', label: 'Teléfono / WhatsApp', required: false },
-                                { key: 'address', label: 'Dirección', required: false },
-                                { key: 'email', label: 'E-mail', required: false }
-                            ].map(field => (
-                                <div key={field.key} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-2">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex justify-between">
-                                        {field.label} {field.required && <span className="text-red-500">* Requerido</span>}
-                                    </label>
-                                    <select 
-                                        className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
-                                        value={importMapping[field.key] ?? ''}
-                                        onChange={e => setImportMapping({...importMapping, [field.key]: parseInt(e.target.value)})}
-                                    >
-                                        <option value="">-- Seleccionar Columna --</option>
-                                        {importRows[0]?.map((header, i) => (
-                                            <option key={i} value={i}>{header || `Columna ${i + 1}`}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                            <div className="p-4 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">Vista previa del archivo (primeras 5 filas)</div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-[10px]">
-                                    <thead className="bg-slate-50 border-b">
-                                        <tr>
-                                            {importRows[0]?.map((h, i) => (
-                                                <th key={i} className="px-4 py-3 border-r font-black text-slate-400">{h || `Col ${i+1}`}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {importRows.slice(1, 6).map((row, i) => (
-                                            <tr key={i} className="hover:bg-slate-50">
-                                                {row.map((cell, j) => (
-                                                    <td key={j} className="px-4 py-2.5 border-r font-medium text-slate-600 truncate max-w-[150px]">{cell}</td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-8 bg-white border-t border-gray-100 flex justify-end gap-4 shrink-0">
-                        <button onClick={() => setIsImportMappingOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                        <button onClick={confirmImport} className="bg-indigo-600 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3">
-                            <CheckCircle size={18}/> Procesar Importación ({importRows.length - 1} filas)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {isNewClientModalOpen && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-                <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[95vh]">
-                    <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><UserCheck size={24}/></div>
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{isEditing ? 'Ficha Cliente' : 'Nuevo Cliente'}</h3>
-                                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Gestión de Cuenta y Datos Fiscales</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setIsNewClientModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
-                    </div>
-
-                    <div className="flex bg-slate-100 p-1 shrink-0">
-                        <button onClick={() => setModalTab('GENERAL')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === 'GENERAL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>1. Datos Generales</button>
-                        <button onClick={() => setModalTab('COMMERCIAL')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === 'COMMERCIAL' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>2. Configuración Comercial</button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/30 custom-scrollbar">
-                        {modalTab === 'GENERAL' ? (
-                            <div className="space-y-6 animate-fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número de Cliente</label>
-                                        <div className="relative">
-                                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.number} onChange={e => setClientForm({...clientForm, number: e.target.value})} placeholder="CLI-001..." />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Situación Tributaria</label>
-                                        <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold" value={clientForm.taxCondition} onChange={e => setClientForm({...clientForm, taxCondition: e.target.value as TaxCondition})}>
-                                            <option value="Consumidor Final">Consumidor Final</option>
-                                            <option value="Responsable Inscripto">Responsable Inscripto</option>
-                                            <option value="Monotributo">Monotributo</option>
-                                            <option value="Exento">Exento</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">CUIT / DNI</label>
-                                        <div className="flex gap-2">
-                                            <input type="text" className="flex-1 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold tracking-widest" value={clientForm.cuit} onChange={e => setClientForm({...clientForm, cuit: e.target.value})} placeholder="30-..." />
-                                            <button onClick={handleSearchCuit} className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center disabled:opacity-50" disabled={isSearchingCuit}>
-                                                {isSearchingCuit ? <RefreshCw className="animate-spin" size={20}/> : <Zap size={20}/>}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Razón Social</label>
-                                        <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.razonSocial} onChange={e => setClientForm({...clientForm, razonSocial: e.target.value.toUpperCase(), name: e.target.value.toUpperCase()})} placeholder="Nombre legal..." />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Fantasía</label>
-                                        <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.fantasyName} onChange={e => setClientForm({...clientForm, fantasyName: e.target.value.toUpperCase()})} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Localidad</label>
-                                        <div className="relative">
-                                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.locality} onChange={e => setClientForm({...clientForm, locality: e.target.value})} />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Domicilio</label>
-                                    <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.address} onChange={e => setClientForm({...clientForm, address: e.target.value})} />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Teléfono</label>
-                                        <div className="relative">
-                                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold" value={clientForm.phone} onChange={e => setClientForm({...clientForm, phone: e.target.value})} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">E-mail</label>
-                                        <div className="relative">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="email" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold" value={clientForm.email} onChange={e => setClientForm({...clientForm, email: e.target.value})} />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descripción / Notas</label>
-                                    <textarea className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-medium h-24 resize-none" value={clientForm.description} onChange={e => setClientForm({...clientForm, description: e.target.value})} placeholder="Detalles internos sobre el cliente..." />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-8 animate-fade-in">
-                                <div className="bg-white p-8 rounded-[2rem] border border-gray-200 shadow-sm space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1">Descuento Especial (%)</label>
-                                            <div className="relative">
-                                                <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                                <input type="number" className="w-full pl-11 p-4 bg-indigo-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-xl text-indigo-700" value={clientForm.specialDiscount} onChange={e => setClientForm({...clientForm, specialDiscount: parseFloat(e.target.value) || 0})} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Moneda Predeterminada</label>
-                                            <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold" value={clientForm.currency} onChange={e => setClientForm({...clientForm, currency: e.target.value})}>
-                                                <option value="ARS">Pesos Argentinos ($)</option>
-                                                <option value="USD">Dólar (U$D)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-red-600 uppercase tracking-widest ml-1">Saldo Anterior / Inicial ($)</label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                                <input type="number" className="w-full pl-11 p-4 bg-red-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-xl text-red-700" value={clientForm.balance} onChange={e => setClientForm({...clientForm, balance: parseFloat(e.target.value) || 0})} />
-                                            </div>
-                                            <p className="text-[8px] text-gray-400 italic px-2">Use este campo para cargar deudas previas al sistema.</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Límite de Crédito ($)</label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                                <input type="number" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-black text-xl" value={clientForm.limit} onChange={e => setClientForm({...clientForm, limit: parseFloat(e.target.value) || 0})} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contacto del Cliente / Autorizado</label>
-                                        <div className="relative">
-                                            <Notebook className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
-                                            <input type="text" className="w-full pl-11 p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-600 outline-none font-bold uppercase" value={clientForm.contactName} onChange={e => setClientForm({...clientForm, contactName: e.target.value})} placeholder="Nombre de la persona de contacto..." />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="p-8 bg-white border-t border-gray-100 flex justify-end gap-4 shrink-0">
-                        <button onClick={() => setIsNewClientModalOpen(false)} className="px-8 py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest">Cancelar</button>
-                        <button onClick={handleSaveClient} className="bg-slate-900 text-white px-12 py-4 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3">
-                            <Save size={18}/> {isEditing ? 'Guardar Cambios' : 'Registrar Cliente'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-    </div>
-  );
 };
 
-interface ClientsProps {
-    initialClientId?: string;
-    onOpenPortal?: (client: Client) => void;
-}
+export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    let prompt = `Busca las tasas de interés vigentes para cobros con tarjeta en "${platformName}" Argentina (Planes 1, 3, 6, 12 cuotas).`;
+    if (targetUrl) prompt += ` Prioriza esta URL: ${targetUrl}`;
+    prompt += ` Devuelve JSON: [{ "installments": número, "surcharge": porcentaje, "label": "Descripción" }]`;
 
-export default Clients;
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              installments: { type: Type.NUMBER },
+              surcharge: { type: Type.NUMBER },
+              label: { type: Type.STRING }
+            },
+            required: ["installments", "surcharge", "label"]
+          }
+        }
+      }
+    });
+
+    const installments = JSON.parse(response.text || "[]");
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
+
+    return { installments: installments.map((inst: any) => ({ ...inst, id: `ai-${Math.random()}` })), sources };
+  } catch (error) {
+    console.error("Error AI Rates:", error);
+    throw error;
+  }
+};
+
+export const analyzeInvoice = async (base64Data: string, mimeType: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: base64Data.split(',')[1] || base64Data,
+              mimeType: mimeType
+            }
+          },
+          { text: "Analiza esta factura de compra de ferretería. Extrae: CUIT emisor, nombre emisor, fecha, número factura, y una lista de items con: descripcion, cantidad, costo_unitario, bonificacion y subtotal. Devuelve exclusivamente JSON." }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cuitEmisor: { type: Type.STRING },
+            nombreEmisor: { type: Type.STRING },
+            numeroFactura: { type: Type.STRING },
+            fecha: { type: Type.STRING },
+            items: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  descripcion: { type: Type.STRING },
+                  cantidad: { type: Type.NUMBER },
+                  costoUnitario: { type: Type.NUMBER },
+                  bonificacion: { type: Type.NUMBER },
+                  subtotal: { type: Type.NUMBER }
+                }
+              }
+            },
+            total: { type: Type.NUMBER }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Error analizando factura:", error);
+    throw error;
+  }
+};
+
+export const searchVirtualInventory = async (query: string): Promise<Product[]> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-3-flash-preview';
+    const prompt = `Busca productos de ferretería para: "${query}". Genera 3-5 entradas realistas en JSON.`;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              sku: { type: Type.STRING },
+              name: { type: Type.STRING },
+              category: { type: Type.STRING },
+              price: { type: Type.NUMBER },
+              stock: { type: Type.INTEGER },
+              description: { type: Type.STRING },
+              location: { type: Type.STRING },
+            },
+            required: ["id", "sku", "name", "category", "price", "stock", "description", "location"]
+          }
+        }
+      }
+    });
+
+    const raw = JSON.parse(response.text || "[]");
+    return raw.map((r: any) => ({
+        ...r,
+        internalCodes: [r.sku], barcodes: [], providerCodes: [], isCombo: false, comboItems: [], vatRate: 21.0,
+        listCost: r.price * 0.7, discounts: [0, 0, 0, 0], costAfterDiscounts: r.price * 0.7,
+        profitMargin: 30, priceNeto: r.price / 1.21, priceFinal: r.price, stockDetails: []
+    }));
+  } catch (error) { return []; }
+};
+
+export const askAssistant = async (history: string[], question: string): Promise<string> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const chat = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: { systemInstruction: "Eres 'FerreBot', experto en ferretería (140k artículos). Ayuda con stock, precios y técnica." }
+        });
+        const response = await chat.sendMessage({ message: question });
+        return response.text || "No pude procesar la consulta.";
+    } catch (error) { return "Error de conexión."; }
+};
+
+export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Prompt más agresivo y específico para Argentina
+    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina. 
+    Busca en AFIP, CUITOnline, Dateas o el Boletín Oficial. 
+    Identifica:
+    1. Razón Social (Nombre legal completo).
+    2. Domicilio Fiscal (Si no lo encuentras, pon "No informado").
+    3. Condición de IVA (Debe ser: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'). Si no estás seguro, pon 'Responsable Inscripto'.
+    Devuelve estrictamente JSON.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: { 
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            razonSocial: { type: Type.STRING },
+            domicilio: { type: Type.STRING },
+            condicionIva: { 
+                type: Type.STRING,
+                description: "Debe ser uno de: 'Responsable Inscripto', 'Monotributo', 'Exento' o 'Consumidor Final'"
+            }
+          },
+          required: ["razonSocial"] // Solo la razón social es obligatoria para no fallar si falta el resto
+        }
+      }
+    });
+
+    const result = JSON.parse(response.text || '{}');
+    // Fix: Extract grounding sources from the AI response metadata
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente AFIP'), uri: String(chunk.web?.uri) })) || [];
+
+    if (!result.razonSocial) return null;
+    return { ...result, sources };
+  } catch (error) { 
+    console.error("Error fetching company by CUIT:", error);
+    return null; 
+  }
+};
