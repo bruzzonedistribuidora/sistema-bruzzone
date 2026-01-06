@@ -7,26 +7,18 @@ import {
     ChevronRight, Boxes, ListFilter, Zap
 } from 'lucide-react';
 import { Product, Brand, Category, Provider } from '../types';
+import { productDB } from '../services/storageService';
 
 const MassProductUpdate: React.FC = () => {
-    // --- DATOS MAESTROS ---
-    const [products, setProducts] = useState<Product[]>(() => {
-        const saved = localStorage.getItem('ferrecloud_products');
-        return saved ? JSON.parse(saved) : [];
-    });
-
+    const [products, setProducts] = useState<Product[]>([]);
     const [brands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
     const [categories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
     const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
 
-    // --- FILTROS DE BÚSQUEDA ---
     const [searchTerm, setSearchTerm] = useState('');
     const [searchCode, setSearchCode] = useState('');
-    
-    // --- ESTADO DE SELECCIÓN ---
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-    // --- ESTADO DE CAMBIOS MASIVOS ---
     const [massForm, setMassForm] = useState({
         brand: '',
         category: '',
@@ -37,18 +29,27 @@ const MassProductUpdate: React.FC = () => {
 
     const [isApplying, setIsApplying] = useState(false);
 
-    // --- LÓGICA DE FILTRADO ---
+    const loadProducts = async () => {
+        const all = await productDB.getAll();
+        setProducts(all);
+    };
+
+    useEffect(() => {
+        loadProducts();
+        window.addEventListener('ferrecloud_products_updated', loadProducts);
+        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+    }, []);
+
     const filteredProducts = useMemo(() => {
         return products.filter(p => {
             const matchName = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchCode = !searchCode || 
-                p.internalCodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase())) ||
-                p.barcodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase()));
+                (p.internalCodes && p.internalCodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase()))) ||
+                (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase())));
             return matchName && matchCode;
-        });
+        }).slice(0, 200); // Limitamos la vista por performance, pero el cambio se aplica a todos los seleccionados
     }, [products, searchTerm, searchCode]);
 
-    // --- MANEJADORES DE SELECCIÓN ---
     const toggleSelectAll = () => {
         if (selectedIds.size === filteredProducts.length) {
             setSelectedIds(new Set());
@@ -64,8 +65,7 @@ const MassProductUpdate: React.FC = () => {
         setSelectedIds(next);
     };
 
-    // --- APLICAR CAMBIOS ---
-    const handleApplyMassChanges = () => {
+    const handleApplyMassChanges = async () => {
         if (selectedIds.size === 0) {
             alert("Seleccione al menos un artículo para modificar.");
             return;
@@ -81,35 +81,31 @@ const MassProductUpdate: React.FC = () => {
 
         setIsApplying(true);
 
-        setTimeout(() => {
-            const updatedProducts = products.map(p => {
-                if (selectedIds.has(p.id)) {
-                    return {
-                        ...p,
-                        brand: massForm.brand || p.brand,
-                        category: massForm.category || p.category,
-                        provider: massForm.provider || p.provider,
-                        reorderPoint: massForm.reorderPoint !== '' ? parseFloat(massForm.reorderPoint) : p.reorderPoint,
-                        desiredStock: massForm.desiredStock !== '' ? parseFloat(massForm.desiredStock) : p.desiredStock
-                    };
-                }
-                return p;
-            });
+        const updatedProducts = products.map(p => {
+            if (selectedIds.has(p.id)) {
+                return {
+                    ...p,
+                    brand: massForm.brand || p.brand,
+                    category: massForm.category || p.category,
+                    provider: massForm.provider || p.provider,
+                    reorderPoint: massForm.reorderPoint !== '' ? parseFloat(massForm.reorderPoint) : p.reorderPoint,
+                    desiredStock: massForm.desiredStock !== '' ? parseFloat(massForm.desiredStock) : p.desiredStock
+                };
+            }
+            return p;
+        });
 
-            setProducts(updatedProducts);
-            localStorage.setItem('ferrecloud_products', JSON.stringify(updatedProducts));
-            
-            setIsApplying(false);
-            setSelectedIds(new Set());
-            setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', desiredStock: '' });
-            alert("Cambios masivos aplicados con éxito.");
-        }, 800);
+        const changedOnly = updatedProducts.filter(p => selectedIds.has(p.id));
+        await productDB.saveBulk(changedOnly);
+        
+        setIsApplying(false);
+        setSelectedIds(new Set());
+        setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', desiredStock: '' });
+        alert("Cambios masivos aplicados con éxito.");
     };
 
     return (
         <div className="p-4 md:p-6 h-full flex flex-col space-y-4 bg-slate-50 overflow-hidden font-sans">
-            
-            {/* CABECERA Y BUSCADORES */}
             <div className="bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
@@ -145,7 +141,6 @@ const MassProductUpdate: React.FC = () => {
                 </div>
             </div>
 
-            {/* TABLA DE RESULTADOS */}
             <div className="flex-1 bg-white border border-gray-200 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
                 <div className="flex-1 overflow-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse">
@@ -180,27 +175,12 @@ const MassProductUpdate: React.FC = () => {
                                     <td className="px-4 py-3 text-center font-black text-slate-900">{p.reorderPoint}</td>
                                 </tr>
                             ))}
-                            {filteredProducts.length === 0 && (
-                                <tr>
-                                    <td colSpan={7} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest italic">
-                                        No se encontraron artículos con los filtros actuales
-                                    </td>
-                                </tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* PANEL DE ACCIÓN MASIVA (CONSOLA) */}
             <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl space-y-6 shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><RefreshCw size={180}/></div>
-                
-                <div className="flex items-center gap-3 border-b border-white/10 pb-4 mb-2">
-                    <Zap className="text-indigo-400" size={20}/>
-                    <h3 className="text-sm font-black uppercase tracking-widest">Aplicar nuevos valores a la selección</h3>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Nueva Marca</label>
@@ -237,23 +217,11 @@ const MassProductUpdate: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Punto de Pedido</label>
-                        <input 
-                            type="number" 
-                            placeholder="Ej: 10" 
-                            className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-center"
-                            value={massForm.reorderPoint}
-                            onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})}
-                        />
+                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})}/>
                     </div>
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Stock Deseado</label>
-                        <input 
-                            type="number" 
-                            placeholder="Ej: 50" 
-                            className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-center"
-                            value={massForm.desiredStock}
-                            onChange={e => setMassForm({...massForm, desiredStock: e.target.value})}
-                        />
+                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.desiredStock} onChange={e => setMassForm({...massForm, desiredStock: e.target.value})}/>
                     </div>
                 </div>
 
