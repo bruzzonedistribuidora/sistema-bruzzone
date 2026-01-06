@@ -76,12 +76,9 @@ const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(() => {
-    // Si la URL contiene /shop, arrancar en la tienda directamente
     if (window.location.pathname.includes('/shop')) return ViewState.SHOP;
     return ViewState.DASHBOARD;
   });
-  const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
-  const [quickNavSearch, setQuickNavSearch] = useState("");
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
 
@@ -95,7 +92,6 @@ const App: React.FC = () => {
         setOpenViews(prev => [...prev, view]);
     }
     setActiveView(view);
-    setIsQuickNavOpen(false);
   };
 
   const closeView = (view: ViewState, e?: React.MouseEvent) => {
@@ -150,7 +146,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Vistas públicas que no requieren sidebar ni login de admin
   const isPublicView = activeView === ViewState.SHOP || activeView === ViewState.PUBLIC_PORTAL;
 
   if (isPublicView) {
@@ -198,14 +193,6 @@ const App: React.FC = () => {
                     </button>
                 );
             })}
-            
-            <button 
-                onClick={() => setIsQuickNavOpen(!isQuickNavOpen)}
-                className={`p-2 rounded-lg ml-2 transition-all ${isQuickNavOpen ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                title="Abrir nueva ventana"
-            >
-                <Plus size={20} className={`transition-transform duration-300 ${isQuickNavOpen ? 'rotate-45' : ''}`} />
-            </button>
         </header>
 
         <main className="flex-1 relative bg-slate-50 overflow-hidden">
