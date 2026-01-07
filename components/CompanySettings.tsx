@@ -355,6 +355,21 @@ const CompanySettings: React.FC = () => {
                                 {isAiSearching ? 'Escaneando Tasas...' : 'Sincronizar con IA'}
                             </button>
                         )}
+                        {/* Fix: Added display of AI grounding sources for finance rates as required */}
+                        {lastSources.length > 0 && (
+                            <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 animate-fade-in">
+                                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                    <Info size={10}/> Fuentes de información IA:
+                                </p>
+                                <div className="space-y-1">
+                                    {lastSources.map((s, idx) => (
+                                        <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[9px] font-bold text-blue-600 hover:underline">
+                                            <ExternalLink size={10}/> {s.title}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
