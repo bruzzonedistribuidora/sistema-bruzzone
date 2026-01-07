@@ -6,7 +6,7 @@ import {
     Percent, Activity, Database, Boxes, RefreshCw, 
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
-    PlusSquare, MinusCircle, Scaling
+    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB } from '../services/storageService';
@@ -16,6 +16,7 @@ const Inventory: React.FC = () => {
   const [inventoryTab, setInventoryTab] = useState<'PRODUCTS' | 'BRANDS' | 'CATEGORIES' | 'PROVIDERS'>('PRODUCTS');
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
@@ -42,7 +43,7 @@ const Inventory: React.FC = () => {
           const results = await productDB.search(searchTerm);
           setProducts(results);
       } else {
-          const initial = await productDB.getAll(100);
+          const initial = await productDB.getAll(150);
           setProducts(initial);
       }
   };
@@ -53,6 +54,58 @@ const Inventory: React.FC = () => {
     window.addEventListener('ferrecloud_products_updated', handleSync);
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
   }, [searchTerm]);
+
+  const sortedProducts = useMemo(() => {
+    let sortableItems = [...products];
+    sortableItems.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.key) {
+            case 'code':
+                aValue = a.internalCodes?.[0] || '';
+                bValue = b.internalCodes?.[0] || '';
+                break;
+            case 'name':
+                aValue = (a.name || '').toLowerCase();
+                bValue = (b.name || '').toLowerCase();
+                break;
+            case 'category':
+                aValue = (a.category || '').toLowerCase();
+                bValue = (b.category || '').toLowerCase();
+                break;
+            case 'stock':
+                aValue = a.stock || 0;
+                bValue = b.stock || 0;
+                break;
+            case 'price':
+                aValue = a.priceFinal || 0;
+                bValue = b.priceFinal || 0;
+                break;
+            default:
+                aValue = a[sortConfig.key as keyof Product] || '';
+                bValue = b[sortConfig.key as keyof Product] || '';
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+    return sortableItems;
+  }, [products, sortConfig]);
+
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig.key !== key) return <div className="w-4 h-4 opacity-20"><ChevronUp size={14}/></div>;
+    return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-indigo-400"/> : <ChevronDown size={14} className="text-indigo-400"/>;
+  };
 
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
@@ -205,16 +258,26 @@ const Inventory: React.FC = () => {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
                                 <tr>
-                                    <th className="px-6 py-5">Identificación / Códigos</th>
-                                    <th className="px-6 py-5">Descripción Comercial</th>
-                                    <th className="px-6 py-5 text-center">Rubro / Marca</th>
-                                    <th className="px-6 py-5 text-right">Stock</th>
-                                    <th className="px-6 py-5 text-right bg-slate-800">Precio Venta</th>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
+                                        <div className="flex items-center gap-2">Identificación / Códigos {getSortIcon('code')}</div>
+                                    </th>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('name')}>
+                                        <div className="flex items-center gap-2">Descripción Comercial {getSortIcon('name')}</div>
+                                    </th>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
+                                        <div className="flex items-center justify-center gap-2">Rubro / Marca {getSortIcon('category')}</div>
+                                    </th>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-right" onClick={() => requestSort('stock')}>
+                                        <div className="flex items-center justify-end gap-2">Stock {getSortIcon('stock')}</div>
+                                    </th>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-700 transition-colors text-right bg-slate-800" onClick={() => requestSort('price')}>
+                                        <div className="flex items-center justify-end gap-2">Precio Venta {getSortIcon('price')}</div>
+                                    </th>
                                     <th className="px-6 py-5 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-[11px]">
-                                {products.map(p => (
+                                {sortedProducts.map(p => (
                                     <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
                                         <td className="px-6 py-5">
                                             <p className="font-mono font-black text-indigo-600">{p.internalCodes?.[0] || 'S/C'}</p>
@@ -428,7 +491,6 @@ const Inventory: React.FC = () => {
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Unidades por Bulto</label>
                                                   <div className="relative group">
                                                       <Scaling className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
-                                                      {/* Fix: defined 'e' parameter for the onChange handler to resolve 'Cannot find name e' */}
                                                       <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={(e) => handleBulkCalc(bulkCost, parseFloat(e.target.value) || 1)} />
                                                   </div>
                                               </div>
