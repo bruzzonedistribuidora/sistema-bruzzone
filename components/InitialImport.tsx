@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
@@ -17,7 +16,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const [fileRows, setFileRows] = useState<string[][]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [mapping, setMapping] = useState<Record<string, number>>({});
-    const [matchKey, setMatchKey] = useState<string>('internalCodes'); // Campo para buscar duplicados
+    const [matchKey, setMatchKey] = useState<string>('internalCodes'); 
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [stats, setStats] = useState({ created: 0, updated: 0 });
@@ -94,8 +93,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         setIsProcessing(true);
         setProgress(0);
         
-        // Cargar mapa de productos actuales para búsqueda rápida (O(1))
-        // Dado que son 140k, usamos los códigos como llaves
         const currentProducts = await productDB.getAll();
         const productMap = new Map<string, Product>();
         
@@ -120,8 +117,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
-                
-                // Identificar si el producto existe
                 const keyInFile = row[mapping[matchKey]]?.toString().toUpperCase();
                 const existingProduct = keyInFile ? productMap.get(keyInFile) : null;
 
