@@ -7,7 +7,7 @@ import {
     RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
     Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
     LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud, Laptop,
-    ShoppingCart as OrderIcon
+    ShoppingCart as OrderIcon, AlertTriangle, PackagePlus
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -46,6 +46,8 @@ import MassProductUpdate from './components/MassProductUpdate';
 import StockTransfers from './components/StockTransfers';
 import CloudHub from './components/CloudHub';
 import Login from './components/Login';
+import Replenishment from './components/Replenishment';
+import Shortages from './components/Shortages';
 import { ViewState, User, Client, InvoiceItem } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -75,6 +77,8 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
     [ViewState.BACKUP]: { icon: HardDrive, label: "Respaldo Datos", color: "bg-slate-600" },
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
+    [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Monitor Faltantes", color: "bg-orange-600" },
+    [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Armado Pedido", color: "bg-emerald-600" },
 };
 
 const App: React.FC = () => {
@@ -148,6 +152,8 @@ const App: React.FC = () => {
       case ViewState.CREDIT_NOTES: return <CreditNotes />;
       case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
       case ViewState.CLOUD_HUB: return <CloudHub />;
+      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { setItemsToBill(null); handleNavigate(ViewState.REPLENISHMENT); }} />;
+      case ViewState.REPLENISHMENT: return <Replenishment />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
