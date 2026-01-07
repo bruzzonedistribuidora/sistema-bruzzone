@@ -113,7 +113,7 @@ const Inventory: React.FC = () => {
     const costAfterDiscounts = listCost * coefBonif;
     const margin = Number(formData.profitMargin) || 0;
     const priceNeto = costAfterDiscounts * (1 + margin / 100);
-    const vatRate = Number(formData.vatRate) || 21;
+    const vatRate = Number(formData.vatRate) || 0;
     const priceFinal = priceNeto * (1 + vatRate / 100);
 
     setFormData(prev => ({
@@ -135,7 +135,8 @@ const Inventory: React.FC = () => {
             otrosCodigos2: p.otrosCodigos2 || '',
             otrosCodigos3: p.otrosCodigos3 || '',
             otrosCodigos4: p.otrosCodigos4 || '',
-            purchasePackageQuantity: p.purchasePackageQuantity || 1
+            purchasePackageQuantity: p.purchasePackageQuantity || 1,
+            vatRate: p.vatRate !== undefined ? p.vatRate : 21
         });
         setBulkCost((p.listCost || 0) * (p.purchasePackageQuantity || 1));
     } else {
@@ -550,6 +551,18 @@ const Inventory: React.FC = () => {
                                       <div className="space-y-6">
                                           <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] border-b pb-4 flex items-center gap-2"><Settings2 size={16}/> Configuración Fiscal</h4>
                                           <div className="grid grid-cols-2 gap-6">
+                                              <div className="col-span-2">
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Alícuota IVA (%)</label>
+                                                  <select 
+                                                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xl outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                                                      value={formData.vatRate}
+                                                      onChange={e => setFormData({...formData, vatRate: parseFloat(e.target.value) || 0})}
+                                                  >
+                                                      <option value={0}>IVA 0% (Exento / No Gravado)</option>
+                                                      <option value={10.5}>IVA 10.5% (Reducida)</option>
+                                                      <option value={21}>IVA 21% (General)</option>
+                                                  </select>
+                                              </div>
                                               <div>
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Tasa ($)</label>
                                                   <input type="number" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xl" value={formData.tasa} onChange={e => setFormData({...formData, tasa: parseFloat(e.target.value) || 0})} />
