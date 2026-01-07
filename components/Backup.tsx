@@ -1,12 +1,13 @@
-
 import React, { useState, useRef } from 'react';
 import { 
     Database, Cloud, HardDrive, RotateCcw, Download, CheckCircle, 
     AlertTriangle, RefreshCw, Trash2, AlertOctagon, FileJson, 
     Save, Eraser, Settings2, CheckSquare, Square, 
     Package, Tag, Layers, ShoppingBag, ClipboardList, 
-    FileText, Users, Truck, Wallet, Landmark, UploadCloud, FileUp, X
+    FileText, Users, Truck, Wallet, Landmark, UploadCloud, FileUp, X,
+    History, ArrowLeftRight
 } from 'lucide-react';
+import { productDB } from '../services/storageService';
 
 const Backup: React.FC = () => {
   const [lastBackup, setLastBackup] = useState(localStorage.getItem('ferrecloud_last_backup_date') || 'Nunca');
@@ -28,8 +29,8 @@ const Backup: React.FC = () => {
   });
 
   const backups = [
-      { id: 1, date: '26/10/2023 20:00', size: '45 MB', type: 'Automático', location: 'Nube' },
-      { id: 2, date: '25/10/2023 19:45', size: '44 MB', type: 'Manual', location: 'Local' },
+      { id: 1, date: '26/10/2024 20:00', size: '45 MB', type: 'Automático', location: 'Nube' },
+      { id: 2, date: '25/10/2024 19:45', size: '44 MB', type: 'Manual', location: 'Local' },
       { id: 3, date: '24/10/2024 20:00', size: '43 MB', type: 'Automático', location: 'Nube' },
   ];
 
@@ -45,8 +46,16 @@ const Backup: React.FC = () => {
       { id: 'treasury', label: 'Caja y Fondos', icon: Wallet, key: 'ferrecloud_treasury_movements' },
   ];
 
-  const triggerFileDownload = () => {
+  const triggerFileDownload = async () => {
       const appData: Record<string, any> = {};
+      
+      // Para el backup, incluimos también los productos de IndexedDB
+      try {
+          appData['ferrecloud_products_db'] = await productDB.getAll();
+      } catch (e) {
+          console.error("Error al exportar base de datos IndexedDB", e);
+      }
+
       const keysToExport = [
           'ferrecloud_products', 'ferrecloud_clients', 'ferrecloud_sales_history',
           'ferrecloud_providers', 'ferrecloud_purchases', 'ferrecloud_employees',
@@ -56,7 +65,8 @@ const Backup: React.FC = () => {
           'ferrecloud_registers', 'ferrecloud_treasury_movements',
           'ferrecloud_provider_movements', 'ferrecloud_movements',
           'ferrecloud_manual_shortages', 'ferrecloud_remitos',
-          'ferrecloud_budgets', 'ferrecloud_sales_orders', 'ferrecloud_stock_transfers'
+          'ferrecloud_budgets', 'ferrecloud_sales_orders', 'ferrecloud_stock_transfers',
+          'ferrecloud_brands', 'ferrecloud_categories'
       ];
 
       keysToExport.forEach(key => {
@@ -90,71 +100,108 @@ const Backup: React.FC = () => {
       }, 2000);
   };
 
-  const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processRestoreData = async (data: any) => {
+    if (typeof data !== 'object') throw new Error("Formato inválido");
+
+    // Restaurar productos en IndexedDB si existen en el backup
+    if (data['ferrecloud_products_db']) {
+        await productDB.clearAll();
+        await productDB.saveBulk(data['ferrecloud_products_db']);
+        delete data['ferrecloud_products_db'];
+    } else if (data['ferrecloud_products']) {
+        // Fallback si los productos venían en el formato viejo de localStorage
+        await productDB.clearAll();
+        await productDB.saveBulk(data['ferrecloud_products']);
+    }
+
+    // Restaurar el resto en localStorage
+    Object.entries(data).forEach(([key, value]) => {
+        if (typeof value === 'string') {
+            localStorage.setItem(key, value);
+        } else {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+    });
+
+    setTimeout(() => {
+        setIsRestoring(false);
+        alert("✅ Datos restaurados con éxito. El sistema se reiniciará para aplicar los cambios.");
+        window.location.reload();
+    }, 1500);
+  };
+
+  const handleRestoreFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (!confirm("¡ATENCIÓN! La restauración sobrescribirá todos los datos actuales con los del archivo. ¿Deseas continuar?")) {
+      if (!confirm("¡ATENCIÓN CRÍTICA! La restauración desde archivo reemplazará TODA la información actual del sistema. ¿Deseas continuar?")) {
           e.target.value = '';
           return;
       }
 
       setIsRestoring(true);
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
           try {
               const data = JSON.parse(event.target?.result as string);
-              if (typeof data !== 'object') throw new Error("Formato inválido");
-
-              // Iterar sobre las llaves del JSON y guardarlas en localStorage
-              Object.entries(data).forEach(([key, value]) => {
-                  if (typeof value === 'string') {
-                      localStorage.setItem(key, value);
-                  } else {
-                      localStorage.setItem(key, JSON.stringify(value));
-                  }
-              });
-
-              setTimeout(() => {
-                  setIsRestoring(false);
-                  alert("✅ Datos restaurados con éxito. El sistema se reiniciará para aplicar los cambios.");
-                  window.location.reload();
-              }, 1500);
+              await processRestoreData(data);
           } catch (err) {
               setIsRestoring(false);
-              alert("❌ Error al restaurar: El archivo no tiene un formato de respaldo válido.");
+              alert("❌ Error al restaurar: El archivo no tiene un formato de respaldo (.json) válido.");
           }
       };
       reader.readAsText(file);
+  };
+
+  const handleRestoreFromHistory = (date: string) => {
+    if (!confirm(`¿Deseas restaurar la base de datos a su estado del día ${date}? Se perderán los cambios realizados después de esa fecha.`)) return;
+    
+    setIsRestoring(true);
+    setTimeout(() => {
+        alert("Simulando descarga de respaldo desde la nube...");
+        setIsRestoring(false);
+        alert("Restauración simulada completada. En un entorno productivo los datos se habrían sobrescrito.");
+    }, 2000);
   };
 
   const toggleResetOption = (id: string) => {
       setSelectedToReset(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleSelectiveReset = () => {
-      const selectedKeys = Object.entries(selectedToReset)
+  const handleSelectiveReset = async () => {
+      const selectedIds = Object.entries(selectedToReset)
           .filter(([_, active]) => active)
           .map(([id]) => id);
 
-      if (selectedKeys.length === 0) {
+      if (selectedIds.length === 0) {
           alert("Debe seleccionar al menos una categoría para borrar.");
           return;
       }
 
-      const confirmMsg = `¿ESTÁ SEGURO? Se borrarán todos los datos de: ${selectedKeys.map(k => k.toUpperCase()).join(', ')}. Esta acción no se puede deshacer.`;
+      const confirmMsg = `¿ESTÁ SEGURO? Se borrarán todos los datos de: ${selectedIds.map(k => k.toUpperCase()).join(', ')}. Esta acción no se puede deshacer.`;
       
       if (window.confirm(confirmMsg)) {
           if (window.confirm("ÚLTIMA ADVERTENCIA: Los datos seleccionados serán eliminados permanentemente. ¿Proceder?")) {
-              selectedKeys.forEach(id => {
+              setIsRestoring(true); // Usamos el estado de carga para bloquear UI
+              
+              for (const id of selectedIds) {
                   const option = resetOptions.find(o => o.id === id);
                   if (option) {
+                      // Caso especial: Artículos (IndexedDB)
+                      if (id === 'products') {
+                          await productDB.clearAll();
+                          localStorage.removeItem('ferrecloud_products'); // Limpia también rastro en localStorage
+                      }
+                      
+                      // Limpiar localStorage para la opción seleccionada
                       localStorage.removeItem(option.key);
-                      // Casos especiales (llaves relacionadas)
+
+                      // Limpiar dependencias
                       if (id === 'treasury') {
                           localStorage.removeItem('ferrecloud_registers');
                           localStorage.removeItem('ferrecloud_checks');
                           localStorage.removeItem('daily_movements');
+                          localStorage.removeItem('ferrecloud_treasury_movements');
                       }
                       if (id === 'clients') {
                           localStorage.removeItem('ferrecloud_movements');
@@ -163,8 +210,11 @@ const Backup: React.FC = () => {
                           localStorage.removeItem('ferrecloud_purchases');
                           localStorage.removeItem('ferrecloud_provider_movements');
                       }
+                      if (id === 'sales') {
+                          localStorage.removeItem('ferrecloud_sales_history');
+                      }
                   }
-              });
+              }
               
               alert("Limpieza selectiva completada. El sistema se reiniciará.");
               window.location.reload();
@@ -172,9 +222,10 @@ const Backup: React.FC = () => {
       }
   };
 
-  const handleFactoryReset = () => {
+  const handleFactoryReset = async () => {
       if (window.confirm("¡ATENCIÓN CRÍTICA! ¿Deseas borrar TODO el sistema, incluyendo usuarios y configuraciones?")) {
           if (window.confirm("Esta acción es IRREVERSIBLE. ¿Confirmar reinicio de fábrica absoluto?")) {
+              await productDB.clearAll();
               localStorage.clear();
               sessionStorage.clear();
               alert("Sistema reseteado a cero. Redirigiendo...");
@@ -195,10 +246,10 @@ const Backup: React.FC = () => {
                   <Database size={48} />
               </div>
               <div>
-                  <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Mantenimiento de Datos</h2>
-                  <p className="text-gray-500 mt-2 font-medium italic text-lg">Último respaldo local: <span className="font-black text-slate-900 not-italic">{lastBackup}</span></p>
+                  <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase leading-none">Gestión de Copias</h2>
+                  <p className="text-gray-500 mt-2 font-medium italic text-lg">Último respaldo: <span className="font-black text-slate-900 not-italic">{lastBackup}</span></p>
                   <div className="flex items-center gap-2 mt-4 text-green-600 font-black text-xs bg-green-50 w-fit px-3 py-1.5 rounded-full uppercase tracking-widest border border-green-100">
-                      <CheckCircle size={14} /> Sistema Sincronizado en la Nube
+                      <CheckCircle size={14} /> Nube Sincronizada
                   </div>
               </div>
           </div>
@@ -210,10 +261,9 @@ const Backup: React.FC = () => {
                 {isBackingUp ? (
                     <><RefreshCw className="animate-spin" size={20} /> Procesando...</>
                 ) : (
-                    <><Cloud size={20} /> Generar Respaldo</>
+                    <><Cloud size={20} /> Generar Backup</>
                 )}
               </button>
-              <input type="file" ref={restoreFileRef} className="hidden" accept=".json" onChange={handleRestore} />
               <button 
                 onClick={() => restoreFileRef.current?.click()}
                 disabled={isBackingUp || isRestoring}
@@ -224,6 +274,7 @@ const Backup: React.FC = () => {
                     <><RotateCcw size={20} /> Restaurar Datos</>
                 )}
               </button>
+              <input type="file" ref={restoreFileRef} className="hidden" accept=".json" onChange={handleRestoreFromFile} />
           </div>
       </div>
 
@@ -257,7 +308,7 @@ const Backup: React.FC = () => {
                           </div>
                           <div className="flex-1">
                               <p className={`text-xs font-black uppercase tracking-tight ${selectedToReset[opt.id] ? 'text-indigo-900' : 'text-slate-600'}`}>{opt.label}</p>
-                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Resetear a cero</p>
+                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Borrar categoría</p>
                           </div>
                           {selectedToReset[opt.id] ? <CheckSquare className="text-indigo-600" size={18}/> : <Square className="text-slate-200" size={18}/>}
                       </button>
@@ -268,20 +319,21 @@ const Backup: React.FC = () => {
                   <div className="bg-amber-50 p-4 rounded-2xl mb-4 flex items-start gap-3 border border-amber-100">
                       <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-[10px] text-amber-700 font-bold leading-relaxed uppercase">
-                          Atención: Los datos de las categorías seleccionadas serán eliminados de la base de datos local y de la nube permanentemente.
+                          Cuidado: Los datos seleccionados se borrarán de forma permanente tanto local como en la nube.
                       </p>
                   </div>
                   <button 
                     onClick={handleSelectiveReset}
-                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95">
-                    <Trash2 size={18}/> Borrar Datos Seleccionados
+                    disabled={isRestoring}
+                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
+                    <Trash2 size={18}/> {isRestoring ? 'Procesando...' : 'Borrar Datos Seleccionados'}
                   </button>
               </div>
           </div>
 
-          {/* COLUMNA DERECHA: IMPORTACIÓN Y DESCARGAS */}
+          {/* COLUMNA DERECHA: RESTAURACIÓN Y DESCARGAS */}
           <div className="space-y-8">
-              {/* SECCIÓN: RESTAURAR DESDE NUBE / ARCHIVO */}
+              {/* SECCIÓN: RESTAURAR MANUAL */}
               <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
                   <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                       <UploadCloud size={140}/>
@@ -291,34 +343,34 @@ const Backup: React.FC = () => {
                           <RotateCcw size={22} className="text-indigo-300"/> Restauración Manual
                       </h3>
                       <p className="text-indigo-200 text-sm font-medium leading-relaxed">
-                          Sube un archivo de respaldo (.json) generado anteriormente para recuperar toda la información de tu sistema de manera instantánea.
+                          Si tienes un respaldo anterior descargado en formato .json, puedes subirlo aquí para recuperar toda tu información al instante.
                       </p>
                       <button 
                         onClick={() => restoreFileRef.current?.click()}
                         disabled={isRestoring}
                         className="bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-50 transition-all flex items-center justify-center gap-3 active:scale-95">
                         {isRestoring ? <RefreshCw className="animate-spin" size={18}/> : <FileUp size={18}/>}
-                        Cargar Archivo JSON
+                        Seleccionar Archivo JSON
                       </button>
                   </div>
               </div>
 
               <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
                   <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-3 uppercase tracking-tighter">
-                      <HardDrive size={20} className="text-slate-400"/> Descargas Recientes
+                      <History size={20} className="text-indigo-600"/> Historial de Respaldos (Locales)
                   </h3>
                   <div className="overflow-hidden rounded-2xl border border-gray-100">
                       <table className="w-full text-left">
                           <thead className="bg-gray-50 text-[10px] text-gray-400 font-black uppercase tracking-widest">
                               <tr>
-                                  <th className="px-6 py-4">Fecha y Hora</th>
+                                  <th className="px-6 py-4">Fecha / Hora</th>
                                   <th className="px-6 py-4">Origen</th>
-                                  <th className="px-6 py-4 text-right">Acción</th>
+                                  <th className="px-6 py-4 text-right">Acciones</th>
                               </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100 text-sm">
                               {backups.map(b => (
-                                  <tr key={b.id} className="hover:bg-indigo-50/30 transition-colors">
+                                  <tr key={b.id} className="hover:bg-indigo-50/30 transition-colors group">
                                       <td className="px-6 py-4 text-slate-700 font-bold text-xs">{b.date}</td>
                                       <td className="px-6 py-4">
                                           <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${b.type === 'Automático' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -326,11 +378,20 @@ const Backup: React.FC = () => {
                                           </span>
                                       </td>
                                       <td className="px-6 py-4 text-right">
-                                          <button 
-                                            onClick={triggerFileDownload}
-                                            className="text-indigo-600 hover:bg-indigo-100 p-2 rounded-xl transition-all">
-                                              <Download size={16}/>
-                                          </button>
+                                          <div className="flex justify-end gap-2">
+                                              <button 
+                                                onClick={() => handleRestoreFromHistory(b.date)}
+                                                className="text-indigo-600 hover:bg-indigo-100 p-2 rounded-xl transition-all"
+                                                title="Restaurar este respaldo">
+                                                  <RotateCcw size={16}/>
+                                              </button>
+                                              <button 
+                                                onClick={triggerFileDownload}
+                                                className="text-slate-400 hover:bg-slate-100 p-2 rounded-xl transition-all"
+                                                title="Descargar JSON">
+                                                  <Download size={16}/>
+                                              </button>
+                                          </div>
                                       </td>
                                   </tr>
                               ))}
@@ -345,16 +406,16 @@ const Backup: React.FC = () => {
                           <AlertOctagon size={32} />
                       </div>
                       <div>
-                          <h3 className="text-xl font-black text-red-800 uppercase tracking-tighter">Reset de Fábrica</h3>
+                          <h3 className="text-xl font-black text-red-800 uppercase tracking-tighter">Acción de Emergencia</h3>
                           <p className="text-red-700/70 text-xs mt-2 font-medium leading-relaxed">
-                              Elimina **TODOS** los datos del sistema, incluyendo usuarios, certificados AFIP, configuraciones de empresa y traslados.
+                              El borrado total eliminará artículos, clientes, ventas y configuraciones fiscales. Use con precaución.
                           </p>
                       </div>
                   </div>
                   <button 
                     onClick={handleFactoryReset}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-3">
-                      <Trash2 size={18} /> BORRADO TOTAL SISTEMA
+                      <Trash2 size={18} /> VACIAR TODO EL SISTEMA
                   </button>
               </div>
           </div>
