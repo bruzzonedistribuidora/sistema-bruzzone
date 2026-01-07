@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
     RefreshCw, DatabaseZap, Sparkles, Info, X, ChevronRight, Save,
-    Link, Settings2, Boxes, Ruler
+    Link, Settings2, Boxes, Ruler, Percent
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -27,28 +27,27 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'name', label: 'Nombre Artículo', required: true },
         { key: 'listCost', label: 'Costo Lista (Bulto o Unidad)', required: true },
         { key: 'purchasePackageQuantity', label: 'Unidades por Bulto (Pack)', required: false },
+        { key: 'disc1', label: 'Bonificación 1 (%)', required: false },
+        { key: 'disc2', label: 'Bonificación 2 (%)', required: false },
+        { key: 'disc3', label: 'Bonificación 3 (%)', required: false },
+        { key: 'disc4', label: 'Bonificación 4 (%)', required: false },
+        { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonif. Directo', required: false },
+        { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
+        { key: 'vatRate', label: 'Alícuota IVA %', required: false },
         { key: 'stock', label: 'Stock Actual', required: false },
         { key: 'stockMaximo', label: 'Stock Deseado (Máximo)', required: false },
         { key: 'reorderPoint', label: 'Punto de Pedido', required: false },
-        { key: 'measureUnitPurchase', label: 'Unidad de Medida', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro/Categoría', required: false },
         { key: 'provider', label: 'Proveedor (Nombre)', required: false },
-        { key: 'barcodes', label: 'Código Barras (EAN)', required: false },
+        { key: 'barcodes', label: 'Código de Barras (EAN)', required: false },
         { key: 'providerCodes', label: 'Cód. Proveedor Ref.', required: false },
-        { key: 'otrosCodigos1', label: 'Código Adicional 1', required: false },
-        { key: 'otrosCodigos2', label: 'Código Adicional 2', required: false },
-        { key: 'otrosCodigos3', label: 'Código Adicional 3', required: false },
-        { key: 'otrosCodigos4', label: 'Código Adicional 4', required: false },
-        { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
-        { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonificación', required: false },
     ];
 
     const matchKeyOptions = [
         { value: 'internalCodes', label: 'Código Propi (SKU)' },
         { value: 'barcodes', label: 'Código de Barras (EAN)' },
         { value: 'providerCodes', label: 'Código de Proveedor' },
-        { value: 'otrosCodigos1', label: 'Código Adicional 1' },
     ];
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,8 +72,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     h.toLowerCase() === field.label.toLowerCase() ||
                     h.toLowerCase() === field.key.toLowerCase() ||
                     h.toLowerCase().includes(field.label.toLowerCase()) ||
-                    (field.key === 'stockMaximo' && h.toLowerCase().includes('deseado')) ||
-                    (field.key === 'reorderPoint' && h.toLowerCase().includes('pedido'))
+                    (field.key === 'disc1' && (h.toLowerCase().includes('bonif 1') || h.toLowerCase().includes('desc 1'))) ||
+                    (field.key === 'disc2' && (h.toLowerCase().includes('bonif 2') || h.toLowerCase().includes('desc 2'))) ||
+                    (field.key === 'disc3' && (h.toLowerCase().includes('bonif 3') || h.toLowerCase().includes('desc 3'))) ||
+                    (field.key === 'disc4' && (h.toLowerCase().includes('bonif 4') || h.toLowerCase().includes('desc 4')))
                 );
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -86,7 +87,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
     const processImport = async () => {
         if (mapping.internalCodes === undefined || mapping.name === undefined || mapping.listCost === undefined) {
-            alert("Mapeo incompleto de campos obligatorios (SKU, Nombre y Costo).");
+            alert("Mapeo incompleto: SKU, Nombre y Costo son obligatorios.");
             return;
         }
 
@@ -101,7 +102,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             if (matchKey === 'internalCodes') keyVal = p.internalCodes[0];
             else if (matchKey === 'barcodes') keyVal = p.barcodes[0];
             else if (matchKey === 'providerCodes') keyVal = p.providerCodes[0];
-            else if (matchKey === 'otrosCodigos1') keyVal = p.otrosCodigos1 || '';
             
             if (keyVal) productMap.set(keyVal.toString().toUpperCase(), p);
         });
@@ -120,12 +120,27 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const keyInFile = row[mapping[matchKey]]?.toString().toUpperCase();
                 const existingProduct = keyInFile ? productMap.get(keyInFile) : null;
 
+                // 1. Costo Base
                 const packageQty = mapping.purchasePackageQuantity !== undefined ? (parseFloat(row[mapping.purchasePackageQuantity]?.replace(',', '.')) || 1) : 1;
                 const rawCost = parseFloat(row[mapping.listCost]?.replace(',', '.') || '0');
                 const unitListCost = rawCost / (packageQty || 1);
 
+                // 2. Bonificaciones
+                const d1 = mapping.disc1 !== undefined ? (parseFloat(row[mapping.disc1]?.replace(',', '.')) || 0) : 0;
+                const d2 = mapping.disc2 !== undefined ? (parseFloat(row[mapping.disc2]?.replace(',', '.')) || 0) : 0;
+                const d3 = mapping.disc3 !== undefined ? (parseFloat(row[mapping.disc3]?.replace(',', '.')) || 0) : 0;
+                const d4 = mapping.disc4 !== undefined ? (parseFloat(row[mapping.disc4]?.replace(',', '.')) || 0) : 0;
+
+                let coefBonif;
+                if (mapping.disc1 !== undefined || mapping.disc2 !== undefined || mapping.disc3 !== undefined || mapping.disc4 !== undefined) {
+                    coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100) * (1 - d4/100);
+                } else {
+                    coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : (existingProduct?.coeficienteBonificacionCosto || 1);
+                }
+                
+                // 3. Márgenes y Tasas
                 const rawMargin = mapping.profitMargin !== undefined ? parseFloat(row[mapping.profitMargin]?.replace(',', '.') || '30') : (existingProduct?.profitMargin || 30);
-                const coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : (existingProduct?.coeficienteBonificacionCosto || 1);
+                const vatRate = mapping.vatRate !== undefined ? parseFloat(row[mapping.vatRate]?.replace(',', '.') || '21') : (existingProduct?.vatRate || 21);
                 
                 const costAfterDiscounts = unitListCost * coefBonif;
                 const priceNeto = costAfterDiscounts * (1 + rawMargin / 100);
@@ -135,26 +150,22 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     internalCodes: mapping.internalCodes !== undefined ? [row[mapping.internalCodes] || 'S/C'] : (existingProduct?.internalCodes || ['S/C']),
                     barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : (existingProduct?.barcodes || []),
                     providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : (existingProduct?.providerCodes || []),
-                    otrosCodigos1: mapping.otrosCodigos1 !== undefined ? row[mapping.otrosCodigos1] : (existingProduct?.otrosCodigos1 || ''),
-                    otrosCodigos2: mapping.otrosCodigos2 !== undefined ? row[mapping.otrosCodigos2] : (existingProduct?.otrosCodigos2 || ''),
-                    otrosCodigos3: mapping.otrosCodigos3 !== undefined ? row[mapping.otrosCodigos3] : (existingProduct?.otrosCodigos3 || ''),
-                    otrosCodigos4: mapping.otrosCodigos4 !== undefined ? row[mapping.otrosCodigos4] : (existingProduct?.otrosCodigos4 || ''),
                     name: (row[mapping.name] || existingProduct?.name || 'SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : (existingProduct?.brand || 'GENÉRICO')).toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : (existingProduct?.category || 'GENERAL')).toUpperCase(),
                     provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || 'PROVEEDOR')).toUpperCase(),
                     description: existingProduct?.description || '',
-                    measureUnitPurchase: mapping.measureUnitPurchase !== undefined ? row[mapping.measureUnitPurchase] : (existingProduct?.measureUnitPurchase || 'Unidad'),
+                    measureUnitPurchase: existingProduct?.measureUnitPurchase || 'Unidad',
                     purchaseCurrency: existingProduct?.purchaseCurrency || 'ARS',
                     saleCurrency: existingProduct?.saleCurrency || 'ARS',
-                    vatRate: existingProduct?.vatRate || 21,
+                    vatRate: vatRate,
                     listCost: unitListCost,
                     purchasePackageQuantity: packageQty,
                     coeficienteBonificacionCosto: coefBonif,
-                    costAfterDiscounts: costAfterDiscounts,
+                    costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)),
                     profitMargin: rawMargin,
-                    priceNeto: priceNeto,
-                    priceFinal: priceNeto * 1.21,
+                    priceNeto: parseFloat(priceNeto.toFixed(2)),
+                    priceFinal: parseFloat((priceNeto * (1 + vatRate/100)).toFixed(2)),
                     stock: mapping.stock !== undefined ? (parseFloat(row[mapping.stock]?.replace(',', '.')) || 0) : (existingProduct?.stock || 0),
                     stockMaximo: mapping.stockMaximo !== undefined ? (parseFloat(row[mapping.stockMaximo]?.replace(',', '.')) || 0) : (existingProduct?.stockMaximo || 0),
                     reorderPoint: mapping.reorderPoint !== undefined ? (parseFloat(row[mapping.reorderPoint]?.replace(',', '.')) || 0) : (existingProduct?.reorderPoint || 0),
@@ -163,7 +174,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
                     isCombo: existingProduct?.isCombo || false, 
                     comboItems: existingProduct?.comboItems || [],
-                    discounts: existingProduct?.discounts || []
+                    discounts: [d1, d2, d3, d4]
                 };
 
                 if (existingProduct) updatedCount++;
@@ -228,18 +239,16 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                     >
                                         {matchKeyOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                     </select>
-                                    <p className="text-[8px] text-indigo-300 font-bold uppercase mt-3 leading-tight">El sistema buscará este código en tu base actual. Si existe, actualizará stock y precios; si no, creará un nuevo artículo.</p>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Sparkles size={16} className="text-indigo-600"/> Mapeo de Atributos</h3>
-                                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-3">
+                                <div className="space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-3">
                                     {productFields.map(field => (
                                         <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
                                             <div className="flex items-center gap-2">
-                                                {field.key === 'stockMaximo' || field.key === 'reorderPoint' ? <Boxes size={12} className="text-orange-400"/> : null}
-                                                {field.key === 'measureUnitPurchase' ? <Ruler size={12} className="text-blue-400"/> : null}
+                                                {field.key.startsWith('disc') ? <Percent size={12} className="text-orange-400"/> : null}
                                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{field.label} {field.required && '*'}</label>
                                             </div>
                                             <select className="max-w-[160px] p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" value={mapping[field.key] ?? ""} onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}>
