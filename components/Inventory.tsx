@@ -6,7 +6,7 @@ import {
     Percent, Activity, Database, Boxes, RefreshCw, 
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
-    PlusSquare, MinusCircle
+    PlusSquare, MinusCircle, Scaling
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB } from '../services/storageService';
@@ -31,6 +31,9 @@ const Inventory: React.FC = () => {
   const [massInput, setMassInput] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
 
+  // Estado auxiliar para la calculadora de fraccionamiento
+  const [bulkCost, setBulkCost] = useState<number>(0);
+
   const providers: Provider[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'), []);
   const branches: Branch[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_branches') || '[]'), []);
 
@@ -54,7 +57,7 @@ const Inventory: React.FC = () => {
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
   }, [searchTerm]);
 
-  // Lógica de Precios
+  // Lógica de Precios con Fraccionamiento
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
     const coefBonif = Number(formData.coeficienteBonificacionCosto) || 1;
@@ -82,8 +85,10 @@ const Inventory: React.FC = () => {
             otrosCodigos1: p.otrosCodigos1 || '',
             otrosCodigos2: p.otrosCodigos2 || '',
             otrosCodigos3: p.otrosCodigos3 || '',
-            otrosCodigos4: p.otrosCodigos4 || ''
+            otrosCodigos4: p.otrosCodigos4 || '',
+            purchasePackageQuantity: p.purchasePackageQuantity || 1
         });
+        setBulkCost((p.listCost || 0) * (p.purchasePackageQuantity || 1));
     } else {
         setFormData({
             id: Date.now().toString(), 
@@ -91,6 +96,7 @@ const Inventory: React.FC = () => {
             barcodes: [''], 
             providerCodes: [''],
             otrosCodigos1: '', otrosCodigos2: '', otrosCodigos3: '', otrosCodigos4: '',
+            purchasePackageQuantity: 1,
             name: '', brand: '', provider: '', category: '',
             listCost: 0, coeficienteBonificacionCosto: 1, 
             profitMargin: 30,
@@ -102,9 +108,18 @@ const Inventory: React.FC = () => {
             purchaseCurrency: 'ARS', saleCurrency: 'ARS',
             discounts: []
         });
+        setBulkCost(0);
     }
     setModalTab('GENERAL');
     setIsModalOpen(true);
+  };
+
+  const handleBulkCalc = (cost: number, qty: number) => {
+      setBulkCost(cost);
+      if (qty > 0) {
+          const unitCost = cost / qty;
+          setFormData(prev => ({...prev, listCost: unitCost, purchasePackageQuantity: qty}));
+      }
   };
 
   const handleSaveEntity = () => {
@@ -284,7 +299,7 @@ const Inventory: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL ALTA DE PRODUCTO - REDISEÑADO PARA MULTICODIGOS Y CODIGOS ADICIONALES */}
+      {/* MODAL ALTA DE PRODUCTO - REDISEÑADO PARA MULTICODIGOS Y FRACCIONAMIENTO */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -293,7 +308,7 @@ const Inventory: React.FC = () => {
                           <div className="p-4 bg-indigo-600 rounded-3xl shadow-xl"><Package size={32}/></div>
                           <div>
                               <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">{formData.name || 'Nuevo Artículo'}</h3>
-                              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Ficha Técnica Integral</p>
+                              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Ficha Técnica Integral con Fraccionamiento</p>
                           </div>
                       </div>
                       <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={32} /></button>
@@ -302,7 +317,7 @@ const Inventory: React.FC = () => {
                   <div className="flex bg-slate-100 p-1.5 gap-1 border-b border-slate-200 shrink-0">
                       {[
                         { id: 'GENERAL', label: 'Identificación', icon: Tag },
-                        { id: 'PRICING', label: 'Costos y Bonificaciones', icon: DollarSign },
+                        { id: 'PRICING', label: 'Costos y Fraccionamiento', icon: DollarSign },
                         { id: 'TECHNICAL', label: 'Ferretería / Fiscal', icon: Settings2 },
                         { id: 'STOCK', label: 'Logística', icon: Boxes }
                       ].map(tab => (
@@ -408,11 +423,31 @@ const Inventory: React.FC = () => {
                           {modalTab === 'PRICING' && (
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                   <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
+                                      <div className="space-y-6">
+                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Fraccionamiento Bulto -> Unidad</label>
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100">
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Bulto Entero</label>
+                                                  <div className="relative group">
+                                                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
+                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={bulkCost} onChange={e => handleBulkCalc(parseFloat(e.target.value) || 0, formData.purchasePackageQuantity || 1)} />
+                                                  </div>
+                                              </div>
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Unidades por Bulto</label>
+                                                  <div className="relative group">
+                                                      <Scaling className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
+                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={e => handleBulkCalc(bulkCost, parseFloat(e.target.value) || 1)} />
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+
                                       <div className="space-y-4">
-                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Análisis de Costo</label>
+                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Análisis de Costo Unitario</label>
                                           <div className="grid grid-cols-2 gap-6">
                                               <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Lista</label>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Lista Unitario</label>
                                                   <div className="relative group">
                                                       <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600" size={20}/>
                                                       <input type="number" className="w-full pl-11 p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-2xl text-slate-800" value={formData.listCost} onChange={e => setFormData({...formData, listCost: parseFloat(e.target.value) || 0})} />
@@ -432,8 +467,9 @@ const Inventory: React.FC = () => {
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Margen Base (%)</label>
                                                   <input type="number" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-2xl text-indigo-600" value={formData.profitMargin} onChange={e => setFormData({...formData, profitMargin: parseFloat(e.target.value) || 0})} />
                                               </div>
-                                              <div className="flex flex-col justify-end pb-1">
-                                                  <p className="text-[8px] text-slate-400 uppercase font-bold italic leading-tight">Este margen determinará el Precio Neto antes de IVA.</p>
+                                              <div className="flex flex-col justify-end pb-1 text-right">
+                                                  <p className="text-[8px] text-slate-400 uppercase font-black tracking-widest">Costo c/ Bonif: ${formData.costAfterDiscounts}</p>
+                                                  <p className="text-[8px] text-indigo-400 uppercase font-black tracking-widest">Neto de Venta: ${formData.priceNeto}</p>
                                               </div>
                                           </div>
                                       </div>
