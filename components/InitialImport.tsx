@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
     RefreshCw, DatabaseZap, Sparkles, Info, X, ChevronRight, Save,
-    Link, Settings2, Boxes, Ruler, Percent
+    Link, Settings2, Boxes, Ruler, Percent, DollarSign
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -27,6 +27,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'name', label: 'Nombre Artículo', required: true },
         { key: 'listCost', label: 'Costo Lista (Bulto o Unidad)', required: true },
         { key: 'purchasePackageQuantity', label: 'Unidades por Bulto (Pack)', required: false },
+        { key: 'purchaseCurrency', label: 'Moneda Compra (ARS/USD)', required: false },
+        { key: 'saleCurrency', label: 'Moneda Venta (ARS/USD)', required: false },
         { key: 'disc1', label: 'Bonificación 1 (%)', required: false },
         { key: 'disc2', label: 'Bonificación 2 (%)', required: false },
         { key: 'disc3', label: 'Bonificación 3 (%)', required: false },
@@ -50,13 +52,22 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { value: 'providerCodes', label: 'Código de Proveedor' },
     ];
 
-    // Helper robusto para limpiar y parsear números desde Excel/CSV (maneja 10,5 / 21% / $ 1.000)
-    const parseNumber = (val: string | undefined, defaultValue: number): number => {
-        if (val === undefined || val === null || val.trim() === '') return defaultValue;
-        // Eliminar símbolos comunes y normalizar coma decimal
-        const cleanVal = val.replace(/[%\$\s]/g, '').replace(',', '.');
+    // Helper robusto para limpiar y parsear números desde Excel/CSV (maneja 10,5 / 21% / $ 1.000 / 0)
+    const parseNumber = (val: any, defaultValue: number): number => {
+        if (val === undefined || val === null || val.toString().trim() === '') return defaultValue;
+        // Eliminar símbolos comunes y normalizar coma decimal a punto
+        const cleanVal = val.toString().replace(/[%\$\s]/g, '').replace(',', '.');
         const parsed = parseFloat(cleanVal);
         return isNaN(parsed) ? defaultValue : parsed;
+    };
+
+    // Helper para normalizar monedas desde el archivo (ARS, ARG, $, USD, U$S, DOLAR)
+    const parseCurrency = (val: string | undefined, defaultValue: string): string => {
+        if (!val) return defaultValue;
+        const v = val.toUpperCase().trim();
+        if (v.includes('USD') || v.includes('DOLAR') || v.includes('U$S')) return 'USD';
+        if (v.includes('ARS') || v.includes('ARG') || v.includes('PESO') || v === '$') return 'ARS';
+        return defaultValue;
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,6 +80,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
             if (lines.length < 1) return;
 
+            // Detectar separador (punto y coma o coma)
             const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
             const parsedRows = lines.map(line => line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, '')));
             
@@ -82,6 +94,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     return header === field.label.toLowerCase() ||
                            header === field.key.toLowerCase() ||
                            header.includes(field.label.toLowerCase()) ||
+                           (field.key === 'purchaseCurrency' && (header.includes('moneda c') || header.includes('divisa c'))) ||
+                           (field.key === 'saleCurrency' && (header.includes('moneda v') || header.includes('divisa v'))) ||
                            (field.key === 'vatRate' && (header === 'iva' || header === 'tasa iva' || header === 'alicuota')) ||
                            (field.key === 'disc1' && (header.includes('bonif 1') || header.includes('desc 1'))) ||
                            (field.key === 'disc2' && (header.includes('bonif 2') || header.includes('desc 2'))) ||
@@ -139,7 +153,16 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const rawCost = parseNumber(row[mapping.listCost], 0);
                 const unitListCost = rawCost / (packageQty || 1);
 
-                // 2. Bonificaciones
+                // 2. Monedas
+                const purchaseCurrency = mapping.purchaseCurrency !== undefined
+                    ? parseCurrency(row[mapping.purchaseCurrency], 'ARS')
+                    : (existingProduct?.purchaseCurrency || 'ARS');
+
+                const saleCurrency = mapping.saleCurrency !== undefined
+                    ? parseCurrency(row[mapping.saleCurrency], 'ARS')
+                    : (existingProduct?.saleCurrency || 'ARS');
+
+                // 3. Bonificaciones
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
                 const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
                 const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
@@ -154,7 +177,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                         : (existingProduct?.coeficienteBonificacionCosto ?? 1);
                 }
                 
-                // 3. Márgenes y Tasas IVA (Lectura mejorada de 0, 10.5, 21)
+                // 4. Márgenes y Tasas IVA (Lectura corregida para 0, 10.5, 21)
                 const rawMargin = mapping.profitMargin !== undefined 
                     ? parseNumber(row[mapping.profitMargin], 30) 
                     : (existingProduct?.profitMargin ?? 30);
@@ -177,8 +200,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || 'PROVEEDOR')).toUpperCase(),
                     description: existingProduct?.description || '',
                     measureUnitPurchase: existingProduct?.measureUnitPurchase || 'Unidad',
-                    purchaseCurrency: existingProduct?.purchaseCurrency || 'ARS',
-                    saleCurrency: existingProduct?.saleCurrency || 'ARS',
+                    purchaseCurrency: purchaseCurrency,
+                    saleCurrency: saleCurrency,
                     vatRate: vatRate,
                     listCost: unitListCost,
                     purchasePackageQuantity: packageQty,
@@ -270,6 +293,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                         <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
                                             <div className="flex items-center gap-2">
                                                 {field.key.startsWith('disc') ? <Percent size={12} className="text-orange-400"/> : null}
+                                                {field.key.includes('Currency') ? <DollarSign size={12} className="text-green-500"/> : null}
                                                 {field.key === 'vatRate' ? <div className="w-3 h-3 bg-blue-500 rounded-full"/> : null}
                                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{field.label} {field.required && '*'}</label>
                                             </div>
