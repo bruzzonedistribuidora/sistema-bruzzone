@@ -78,7 +78,11 @@ const Inventory: React.FC = () => {
             ...p,
             internalCodes: p.internalCodes || [''],
             barcodes: p.barcodes || [''],
-            providerCodes: p.providerCodes || ['']
+            providerCodes: p.providerCodes || [''],
+            otrosCodigos1: p.otrosCodigos1 || '',
+            otrosCodigos2: p.otrosCodigos2 || '',
+            otrosCodigos3: p.otrosCodigos3 || '',
+            otrosCodigos4: p.otrosCodigos4 || ''
         });
     } else {
         setFormData({
@@ -86,6 +90,7 @@ const Inventory: React.FC = () => {
             internalCodes: [''], 
             barcodes: [''], 
             providerCodes: [''],
+            otrosCodigos1: '', otrosCodigos2: '', otrosCodigos3: '', otrosCodigos4: '',
             name: '', brand: '', provider: '', category: '',
             listCost: 0, coeficienteBonificacionCosto: 1, 
             profitMargin: 30,
@@ -279,7 +284,7 @@ const Inventory: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL ALTA DE PRODUCTO - REDISEÑADO PARA MULTICODIGOS */}
+      {/* MODAL ALTA DE PRODUCTO - REDISEÑADO PARA MULTICODIGOS Y CODIGOS ADICIONALES */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -288,7 +293,7 @@ const Inventory: React.FC = () => {
                           <div className="p-4 bg-indigo-600 rounded-3xl shadow-xl"><Package size={32}/></div>
                           <div>
                               <h3 className="text-2xl font-black uppercase tracking-tighter leading-none">{formData.name || 'Nuevo Artículo'}</h3>
-                              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Ficha Técnica con Multicódigos</p>
+                              <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-2">Ficha Técnica Integral</p>
                           </div>
                       </div>
                       <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={32} /></button>
@@ -346,6 +351,28 @@ const Inventory: React.FC = () => {
                                               <option value="">-- SELECCIONE PROVEEDOR --</option>
                                               {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                                           </select>
+                                      </div>
+
+                                      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                          <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-4 border-b pb-2">Códigos Adicionales Personalizados</h4>
+                                          <div className="grid grid-cols-2 gap-4">
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase">Código 1</label>
+                                                  <input className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono text-[10px] font-bold uppercase outline-none focus:bg-white focus:border-indigo-400" value={formData.otrosCodigos1} onChange={e => setFormData({...formData, otrosCodigos1: e.target.value.toUpperCase()})} />
+                                              </div>
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase">Código 2</label>
+                                                  <input className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono text-[10px] font-bold uppercase outline-none focus:bg-white focus:border-indigo-400" value={formData.otrosCodigos2} onChange={e => setFormData({...formData, otrosCodigos2: e.target.value.toUpperCase()})} />
+                                              </div>
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase">Código 3</label>
+                                                  <input className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono text-[10px] font-bold uppercase outline-none focus:bg-white focus:border-indigo-400" value={formData.otrosCodigos3} onChange={e => setFormData({...formData, otrosCodigos3: e.target.value.toUpperCase()})} />
+                                              </div>
+                                              <div>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase">Código 4</label>
+                                                  <input className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-mono text-[10px] font-bold uppercase outline-none focus:bg-white focus:border-indigo-400" value={formData.otrosCodigos4} onChange={e => setFormData({...formData, otrosCodigos4: e.target.value.toUpperCase()})} />
+                                              </div>
+                                          </div>
                                       </div>
                                   </div>
 
