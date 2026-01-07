@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, CheckSquare, Square, ShoppingCart, ArrowRight, BarChart3, Filter, Search, Plus, Trash2, X } from 'lucide-react';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { AlertTriangle, CheckSquare, Square, ShoppingCart, ArrowRight, BarChart3, Filter, Search, Plus, Trash2, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { Product, ReplenishmentItem } from '../types';
 
 interface ShortagesProps {
@@ -11,6 +12,7 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
   const [shortages, setShortages] = useState<Product[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [manualReorders, setManualReorders] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -33,6 +35,53 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
       const criticalIds = combined.filter(p => p.stock <= (p.stockMinimo || 0) || manualIds.includes(p.id)).map(p => p.id);
       setSelectedIds(criticalIds);
   }, []);
+
+  const sortedShortages = useMemo(() => {
+      let items = [...shortages];
+      items.sort((a, b) => {
+          let aValue: any;
+          let bValue: any;
+
+          switch (sortConfig.key) {
+              case 'name':
+                  aValue = (a.name || '').toLowerCase();
+                  bValue = (b.name || '').toLowerCase();
+                  break;
+              case 'sku':
+                  aValue = (a.internalCodes?.[0] || '').toLowerCase();
+                  bValue = (b.internalCodes?.[0] || '').toLowerCase();
+                  break;
+              case 'stock':
+                  aValue = a.stock || 0;
+                  bValue = b.stock || 0;
+                  break;
+              case 'toOrder':
+                  aValue = Math.max(1, (a.stockMaximo || 0) - a.stock);
+                  bValue = Math.max(1, (b.stockMaximo || 0) - b.stock);
+                  break;
+              default:
+                  aValue = ''; bValue = '';
+          }
+
+          if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+          if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+          return 0;
+      });
+      return items;
+  }, [shortages, sortConfig]);
+
+  const requestSort = (key: string) => {
+      let direction: 'asc' | 'desc' = 'asc';
+      if (sortConfig.key === key && sortConfig.direction === 'asc') {
+          direction = 'desc';
+      }
+      setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: string) => {
+      if (sortConfig.key !== key) return <div className="w-3 h-3 opacity-20"><ChevronUp size={12}/></div>;
+      return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-indigo-400"/> : <ChevronDown size={12} className="text-indigo-400"/>;
+  };
 
   const toggleSelection = (id: string) => {
       setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -137,19 +186,25 @@ const Shortages: React.FC<ShortagesProps> = ({ onGenerateOrders }) => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto">
               <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0 z-10 shadow-sm">
+                  <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest sticky top-0 z-10 shadow-sm">
                       <tr>
                           <th className="px-6 py-4 w-12 text-center">
                               <button onClick={toggleSelectAll}>{selectedIds.length === shortages.length && shortages.length > 0 ? <CheckSquare size={18} className="text-indigo-600"/> : <Square size={18} className="text-gray-400"/>}</button>
                           </th>
-                          <th className="px-6 py-4">Artículo / SKU</th>
-                          <th className="px-6 py-4 text-center">Stock</th>
-                          <th className="px-6 py-4 text-center text-indigo-800 font-bold bg-indigo-50">A Pedir</th>
+                          <th className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => requestSort('name')}>
+                              <div className="flex items-center gap-2">Artículo / SKU {getSortIcon('name')}</div>
+                          </th>
+                          <th className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors text-center" onClick={() => requestSort('stock')}>
+                              <div className="flex items-center justify-center gap-2">Stock {getSortIcon('stock')}</div>
+                          </th>
+                          <th className="px-6 py-4 cursor-pointer hover:bg-indigo-100 transition-colors text-center text-indigo-800 font-bold bg-indigo-50" onClick={() => requestSort('toOrder')}>
+                              <div className="flex items-center justify-center gap-2">A Pedir {getSortIcon('toOrder')}</div>
+                          </th>
                           <th className="px-6 py-4 text-center">Acciones</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                      {shortages.map(product => (
+                      {sortedShortages.map(product => (
                           <tr key={product.id} className={`hover:bg-gray-50 group ${selectedIds.includes(product.id) ? 'bg-indigo-50/30' : ''}`}>
                               <td className="px-6 py-4 text-center">
                                   <button onClick={() => toggleSelection(product.id)}>{selectedIds.includes(product.id) ? <CheckSquare size={18} className="text-indigo-600"/> : <Square size={18} className="text-gray-300"/>}</button>
