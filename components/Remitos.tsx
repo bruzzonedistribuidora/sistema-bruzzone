@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, CheckSquare, Square, FileText, 
@@ -98,7 +97,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         priceFinal: priceNum,
         stock: 0,
         stockDetails: [],
-        // FIX: Changed minStock to stockMinimo and desiredStock to stockMaximo as per Product interface
         stockMinimo: 0,
         stockMaximo: 0,
         reorderPoint: 0,
