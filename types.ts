@@ -112,7 +112,8 @@ export interface Product {
   description: string;
   
   // Costos y Bonificaciones Técnicas
-  listCost: number; // "Costo"
+  listCost: number; // "Costo" (Unitario)
+  purchasePackageQuantity?: number; // Unidades por bulto de compra
   precioCostoSinBonificar?: number;
   coeficienteBonificacionCosto?: number;
   porcentajesBonificacionCosto?: string;
