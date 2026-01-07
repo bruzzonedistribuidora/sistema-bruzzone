@@ -6,7 +6,8 @@ import {
     TrendingUp, FileBarChart2, HardDrive, Store, Bot, 
     Layers, Zap, Shield, ShoppingCart, Globe, Tag, 
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
-    Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2
+    Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
+    LayoutGrid, ShoppingCart as OrderIcon
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
@@ -162,7 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
                     <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />
                     <DropdownItem view={ViewState.INITIAL_IMPORT} label="Carga Masiva" icon={FileUp} active={activeView === ViewState.INITIAL_IMPORT} onClick={() => handleNav(ViewState.INITIAL_IMPORT)} />
-                    <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />
+                    <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios & Listas" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />
                     <DropdownItem view={ViewState.MASS_PRODUCT_UPDATE} label="Cambios Masivos" icon={Zap} active={activeView === ViewState.MASS_PRODUCT_UPDATE} onClick={() => handleNav(ViewState.MASS_PRODUCT_UPDATE)} />
                 </NavDropdown>
 
@@ -170,7 +171,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 <NavItem view={ViewState.TREASURY} label="Tesorería" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
                 
                 <NavDropdown id="presencia" label="Digital" icon={Globe}>
-                    <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="E-commerce" icon={Laptop} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />
+                    <DropdownItem view={ViewState.ONLINE_SALES} label="Pedidos Online" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />
+                    <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Catálogo Web" icon={Laptop} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />
                     <DropdownItem view={ViewState.PUBLIC_PORTAL} label="Portal Fidelidad" icon={Smartphone} active={activeView === ViewState.PUBLIC_PORTAL} onClick={() => handleNav(ViewState.PUBLIC_PORTAL)} />
                 </NavDropdown>
 
