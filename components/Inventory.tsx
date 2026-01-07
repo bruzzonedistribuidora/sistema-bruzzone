@@ -424,7 +424,7 @@ const Inventory: React.FC = () => {
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                   <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
                                       <div className="space-y-6">
-                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Fraccionamiento Bulto -> Unidad</label>
+                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">{"Fraccionamiento Bulto -> Unidad"}</label>
                                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100">
                                               <div>
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Bulto Entero</label>
