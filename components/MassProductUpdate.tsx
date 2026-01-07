@@ -1,10 +1,10 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, Save, X, Layers, CheckCircle, Trash2, Filter, 
     ArrowRight, Info, AlertTriangle, Package, Tag, Building2, 
     Percent, DollarSign, RefreshCw, Smartphone, Plus, CheckSquare, Square,
-    ChevronRight, Boxes, ListFilter, Zap, ChevronUp, ChevronDown
+    ChevronRight, Boxes, ListFilter, Zap, ChevronUp, ChevronDown,
+    Calculator
 } from 'lucide-react';
 import { Product, Brand, Category, Provider } from '../types';
 import { productDB } from '../services/storageService';
@@ -25,7 +25,12 @@ const MassProductUpdate: React.FC = () => {
         category: '',
         provider: '',
         reorderPoint: '',
-        stockMaximo: ''
+        stockMaximo: '',
+        // Nuevos campos para bonificaciones
+        disc1: '',
+        disc2: '',
+        disc3: '',
+        disc4: ''
     });
 
     const [isApplying, setIsApplying] = useState(false);
@@ -37,8 +42,9 @@ const MassProductUpdate: React.FC = () => {
 
     useEffect(() => {
         loadProducts();
-        window.addEventListener('ferrecloud_products_updated', loadProducts);
-        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+        const handleUpdate = () => loadProducts();
+        window.addEventListener('ferrecloud_products_updated', handleUpdate);
+        return () => window.removeEventListener('ferrecloud_products_updated', handleUpdate);
     }, []);
 
     const filteredAndSortedProducts = useMemo(() => {
@@ -105,7 +111,7 @@ const MassProductUpdate: React.FC = () => {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === filteredAndSortedProducts.length) {
+        if (selectedIds.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0) {
             setSelectedIds(new Set());
         } else {
             setSelectedIds(new Set(filteredAndSortedProducts.map(p => p.id)));
@@ -135,27 +141,56 @@ const MassProductUpdate: React.FC = () => {
 
         setIsApplying(true);
 
-        const updatedProducts = products.map(p => {
-            if (selectedIds.has(p.id)) {
-                return {
-                    ...p,
-                    brand: massForm.brand || p.brand,
-                    category: massForm.category || p.category,
-                    provider: massForm.provider || p.provider,
-                    reorderPoint: massForm.reorderPoint !== '' ? parseFloat(massForm.reorderPoint) : p.reorderPoint,
-                    stockMaximo: massForm.stockMaximo !== '' ? parseFloat(massForm.stockMaximo) : p.stockMaximo
-                };
+        // Lógica de cálculo de bonificación masiva
+        const d1 = parseFloat(massForm.disc1) || 0;
+        const d2 = parseFloat(massForm.disc2) || 0;
+        const d3 = parseFloat(massForm.disc3) || 0;
+        const d4 = parseFloat(massForm.disc4) || 0;
+        
+        const changeDiscounts = massForm.disc1 !== '' || massForm.disc2 !== '' || massForm.disc3 !== '' || massForm.disc4 !== '';
+        const newCoef = changeDiscounts ? (1 - d1/100) * (1 - d2/100) * (1 - d3/100) * (1 - d4/100) : null;
+
+        const updatedProducts = products.filter(p => selectedIds.has(p.id)).map(p => {
+            const finalBrand = massForm.brand || p.brand;
+            const finalCategory = massForm.category || p.category;
+            const finalProvider = massForm.provider || p.provider;
+            const finalReorderPoint = massForm.reorderPoint !== '' ? parseFloat(massForm.reorderPoint) : p.reorderPoint;
+            const finalStockMaximo = massForm.stockMaximo !== '' ? parseFloat(massForm.stockMaximo) : p.stockMaximo;
+            
+            // Si hay cambio de descuentos, recalculamos costos y precios
+            let finalCoef = p.coeficienteBonificacionCosto || 1;
+            let finalDiscounts = p.discounts || [0, 0, 0, 0];
+
+            if (changeDiscounts) {
+                finalCoef = newCoef!;
+                finalDiscounts = [d1, d2, d3, d4];
             }
-            return p;
+
+            const costAfterDiscounts = p.listCost * finalCoef;
+            const priceNeto = costAfterDiscounts * (1 + (p.profitMargin || 30) / 100);
+            const priceFinal = priceNeto * (1 + (p.vatRate || 21) / 100);
+
+            return {
+                ...p,
+                brand: finalBrand,
+                category: finalCategory,
+                provider: finalProvider,
+                reorderPoint: finalReorderPoint,
+                stockMaximo: finalStockMaximo,
+                discounts: finalDiscounts,
+                coeficienteBonificacionCosto: finalCoef,
+                costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)),
+                priceNeto: parseFloat(priceNeto.toFixed(2)),
+                priceFinal: parseFloat(priceFinal.toFixed(2))
+            };
         });
 
-        const changedOnly = updatedProducts.filter(p => selectedIds.has(p.id));
-        await productDB.saveBulk(changedOnly);
+        await productDB.saveBulk(updatedProducts);
         
         setIsApplying(false);
         setSelectedIds(new Set());
-        setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', stockMaximo: '' });
-        alert("Cambios masivos aplicados con éxito.");
+        setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', stockMaximo: '', disc1: '', disc2: '', disc3: '', disc4: '' });
+        alert("Cambios masivos aplicados con éxito. Se han recalculado costos y precios finales.");
     };
 
     return (
@@ -220,9 +255,7 @@ const MassProductUpdate: React.FC = () => {
                                 <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('provider')}>
                                     <div className="flex items-center gap-2">Proveedor Actual {getSortIcon('provider')}</div>
                                 </th>
-                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('reorderPoint')}>
-                                    <div className="flex items-center justify-center gap-2">P. Pedido {getSortIcon('reorderPoint')}</div>
-                                </th>
+                                <th className="px-4 py-4 text-right">Bonif. Actual</th>
                             </tr>
                         </thead>
                         <tbody className="text-[11px] font-medium text-slate-700 divide-y divide-gray-100">
@@ -238,7 +271,11 @@ const MassProductUpdate: React.FC = () => {
                                     <td className="px-4 py-3 uppercase text-slate-500">{p.brand}</td>
                                     <td className="px-4 py-3 uppercase text-slate-500">{p.category}</td>
                                     <td className="px-4 py-3 uppercase text-slate-400 font-bold">{p.provider}</td>
-                                    <td className="px-4 py-3 text-center font-black text-slate-900">{p.reorderPoint}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <span className="text-[10px] font-mono bg-slate-100 px-2 py-0.5 rounded">
+                                            {p.discounts?.filter(d => d > 0).join('+') || '0%'}
+                                        </span>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -246,9 +283,9 @@ const MassProductUpdate: React.FC = () => {
                 </div>
             </div>
 
-            <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl space-y-6 shrink-0 relative overflow-hidden">
+            <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-2xl space-y-8 shrink-0 relative overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                    <div>
+                    <div className="md:col-span-1">
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Nueva Marca</label>
                         <select 
                             className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all uppercase"
@@ -283,11 +320,41 @@ const MassProductUpdate: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Punto de Pedido</label>
-                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})}/>
+                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" placeholder="Mantener" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})}/>
                     </div>
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Stock Deseado</label>
-                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})}/>
+                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" placeholder="Mantener" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})}/>
+                    </div>
+                </div>
+
+                <div className="bg-white/5 p-6 rounded-[2.5rem] border border-white/10 space-y-6">
+                    <div className="flex items-center gap-3 mb-2">
+                        <Calculator size={16} className="text-indigo-400"/>
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Actualización Masiva de Bonificaciones (Cadena de Descuentos)</h4>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4].map(num => (
+                            <div key={num} className="space-y-1">
+                                <label className="text-[8px] font-black text-slate-500 uppercase ml-2 tracking-widest">Desc. {num} (%)</label>
+                                <div className="relative">
+                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={12}/>
+                                    <input 
+                                        type="number" 
+                                        placeholder="0"
+                                        className="w-full pl-8 p-3 bg-white/5 border border-white/10 rounded-xl text-sm font-black text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                        value={massForm[`disc${num}` as keyof typeof massForm]}
+                                        onChange={e => setMassForm({...massForm, [`disc${num}`]: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="bg-indigo-500/10 p-4 rounded-2xl flex items-start gap-3 border border-indigo-500/20">
+                        <Info size={16} className="text-indigo-400 shrink-0 mt-0.5"/>
+                        <p className="text-[9px] text-indigo-300 font-medium leading-relaxed uppercase">
+                            Si completa estos campos, el sistema sobrescribirá las bonificaciones actuales de los productos seleccionados y recalculará automáticamente los costos netos y precios finales basados en la lista de precios base.
+                        </p>
                     </div>
                 </div>
 
@@ -295,10 +362,10 @@ const MassProductUpdate: React.FC = () => {
                     <button 
                         onClick={handleApplyMassChanges}
                         disabled={selectedIds.size === 0 || isApplying}
-                        className="bg-indigo-500 hover:bg-indigo-400 text-white px-12 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl transition-all active:scale-95 disabled:opacity-20 flex items-center gap-3"
+                        className="bg-indigo-500 hover:bg-indigo-400 text-white px-12 py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 disabled:opacity-20 flex items-center gap-3 text-xs"
                     >
                         {isApplying ? <RefreshCw className="animate-spin" size={18}/> : <CheckCircle size={18}/>}
-                        {isApplying ? 'Procesando cambios...' : `Actualizar ${selectedIds.size} Artículos`}
+                        {isApplying ? 'Procesando cambios...' : `Impactar Cambios en ${selectedIds.size} Artículos`}
                     </button>
                 </div>
             </div>
