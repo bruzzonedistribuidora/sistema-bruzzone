@@ -6,9 +6,9 @@ import {
     TrendingUp, FileBarChart2, HardDrive, Store, Bot, 
     Layers, Zap, Shield, ShoppingCart, Globe, Tag, 
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
-    Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff
+    Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2
 } from 'lucide-react';
-import { ViewState, User, CloudSyncStatus } from '../types';
+import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
 interface SidebarProps {
     activeView: ViewState;
@@ -64,24 +64,72 @@ const DropdownItem: React.FC<{ view: ViewState, label: string, icon: any, onClic
 const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
     const handleNav = (view: ViewState) => onNavigate(view);
     const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>('OFFLINE');
+    const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null);
+
+    const loadConfig = () => {
+        const savedSync = JSON.parse(localStorage.getItem('ferrecloud_sync_config') || '{"enabled": false}');
+        const savedCompany = JSON.parse(localStorage.getItem('company_config') || '{}');
+        setSyncStatus(savedSync.enabled ? 'ONLINE' : 'OFFLINE');
+        setCompanyConfig(savedCompany);
+    };
 
     useEffect(() => {
-        const config = JSON.parse(localStorage.getItem('ferrecloud_sync_config') || '{"enabled": false}');
-        setSyncStatus(config.enabled ? 'ONLINE' : 'OFFLINE');
+        loadConfig();
+        // Escuchar cambios globales en la configuración
+        window.addEventListener('company_config_updated', loadConfig);
+        window.addEventListener('storage', loadConfig);
+        return () => {
+            window.removeEventListener('company_config_updated', loadConfig);
+            window.removeEventListener('storage', loadConfig);
+        };
     }, []);
+
+    const renderHeader = () => {
+        const mode = companyConfig?.headerDisplayMode || 'BOTH';
+        const hasLogo = !!companyConfig?.logo;
+        const name = companyConfig?.fantasyName || 'Bruzzone';
+
+        return (
+            <div className="flex flex-col gap-4 mb-6">
+                {(mode === 'LOGO' || (mode === 'BOTH' && hasLogo)) && (
+                    <div className="flex items-center justify-center">
+                        {hasLogo ? (
+                            <img 
+                                src={companyConfig!.logo!} 
+                                alt="Logo" 
+                                className="max-h-16 w-auto object-contain drop-shadow-sm transition-transform hover:scale-105"
+                            />
+                        ) : (
+                            <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-ferre-orange shadow-lg">
+                                <Zap size={32} fill="currentColor" />
+                            </div>
+                        )}
+                    </div>
+                )}
+                
+                {(mode === 'NAME' || mode === 'BOTH') && (
+                    <div className={mode === 'BOTH' ? 'text-center' : 'flex items-center gap-3'}>
+                        {mode === 'NAME' && !hasLogo && (
+                             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-ferre-orange shrink-0">
+                                <Building2 size={20} />
+                            </div>
+                        )}
+                        <div className="min-w-0">
+                            <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none truncate">
+                                {name}
+                            </h1>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Cloud System</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="w-64 bg-white border-r border-slate-200 h-full flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
             <div className="p-6 border-b border-slate-100">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-ferre-orange">
-                        <Zap size={24} fill="currentColor" />
-                    </div>
-                    <div>
-                        <h1 className="text-sm font-black text-slate-900 uppercase tracking-tighter leading-none">Bruzzone</h1>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Cloud System</p>
-                    </div>
-                </div>
+                {renderHeader()}
                 
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3">
