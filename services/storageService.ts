@@ -74,6 +74,7 @@ class ProductDB {
             const store = transaction.objectStore(STORE_NAME);
             const request = store.put(product);
             request.onsuccess = () => {
+                // Fix: Dispatched the custom event to notify components about product updates
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
                 resolve();
             };
@@ -96,6 +97,7 @@ class ProductDB {
             });
 
             transaction.oncomplete = () => {
+                // Fix: Dispatched the custom event on transaction completion for bulk saves
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
                 resolve();
             };
@@ -121,6 +123,7 @@ class ProductDB {
             const store = transaction.objectStore(STORE_NAME);
             const request = store.delete(id);
             request.onsuccess = () => {
+                // Fix: Dispatched the custom event when a product is deleted
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
                 resolve();
             };
