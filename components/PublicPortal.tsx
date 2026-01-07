@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Star, Gift, Sparkles, Smartphone, QrCode, Search, 
@@ -101,9 +102,38 @@ const PublicPortal: React.FC = () => {
     const handleCloudSync = () => {
         setIsLoading(true);
         setTimeout(() => {
+            // Fix: Added missing required properties to demo clients to match Client interface.
             const demoClients: Client[] = [
-                { id: 'demo-1', name: 'CLIENTE PRUEBA', cuit: '30000287', dni: '30000287', balance: 0, limit: 50000, points: 1250, phone: '1122334455', address: 'Calle 123' },
-                { id: 'demo-2', name: 'JUAN PEREZ', cuit: '20123456789', dni: '12345678', balance: 0, limit: 10000, points: 450, phone: '1199887766', address: 'Av Siempre Viva 742' }
+                { 
+                    id: 'demo-1', 
+                    name: 'CLIENTE PRUEBA', 
+                    cuit: '30000287', 
+                    dni: '30000287', 
+                    balance: 0, 
+                    limit: 50000, 
+                    points: 1250, 
+                    phone: '1122334455', 
+                    address: 'Calle 123',
+                    isCurrentAccountActive: true,
+                    isLimitEnabled: false,
+                    useAdvance: false,
+                    authorizedContacts: []
+                },
+                { 
+                    id: 'demo-2', 
+                    name: 'JUAN PEREZ', 
+                    cuit: '20123456789', 
+                    dni: '12345678', 
+                    balance: 0, 
+                    limit: 10000, 
+                    points: 450, 
+                    phone: '1199887766', 
+                    address: 'Av Siempre Viva 742',
+                    isCurrentAccountActive: true,
+                    isLimitEnabled: false,
+                    useAdvance: false,
+                    authorizedContacts: []
+                }
             ];
             
             const existing = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
@@ -254,7 +284,7 @@ const PublicPortal: React.FC = () => {
                             <button 
                                 type="submit"
                                 disabled={isLoading || !dniInput.trim()}
-                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
+                                className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30">
                                 {isLoading ? <RefreshCw className="animate-spin" size={18}/> : <><ArrowRight size={18}/> Acceder</>}
                             </button>
                             
@@ -548,7 +578,7 @@ const PublicPortal: React.FC = () => {
                         className={`w-16 h-16 rounded-[1.8rem] flex items-center justify-center shadow-2xl transition-all active:scale-90 ${cart.length > 0 ? 'bg-indigo-600 text-white rotate-3' : 'bg-slate-200 text-slate-400'}`}>
                         <ShoppingCart size={24}/>
                         {cart.length > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">
                                 {cart.length}
                             </span>
                         )}
