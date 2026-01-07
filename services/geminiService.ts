@@ -2,12 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
-declare var process: {
-  env: {
-    API_KEY: string;
-  };
-};
-
 export const fetchLatestFinancingRates = async (platformName: string, targetUrl?: string): Promise<{installments: CreditInstallment[], sources: {title: string, uri: string}[]}> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
