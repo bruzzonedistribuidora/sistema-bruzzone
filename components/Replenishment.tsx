@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, ShoppingCart, Truck, Send, Trash2, Mail, FileText, ChevronDown, Check, Package, X, Printer, Download, Building2, Calendar, DollarSign, MessageCircle } from 'lucide-react';
 import { Product, Provider, ReplenishmentItem, ReplenishmentOrder } from '../types';
@@ -8,15 +7,12 @@ interface ReplenishmentProps {
     onItemsConsumed?: () => void;
 }
 
-// Mock Data Factories
-// FIX: Updated createMockProduct to use correct stock property names: stockMinimo and stockMaximo
 const createMockProduct = (id: string, internalCode: string, name: string, providerName: string, providerCode: string, stock: number, cost: number): Product => ({
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [providerCode], 
   name, brand: 'Generico', provider: providerName, category: 'General', description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: cost, discounts: [0,0,0,0], costAfterDiscounts: cost, profitMargin: 40,
   priceNeto: cost * 1.4, priceFinal: cost * 1.4 * 1.21, stock, stockDetails: [], 
-  // FIX: stockMinimo and stockMaximo according to interface
   stockMinimo: 10, stockMaximo: 50, reorderPoint: 20,
   location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
   isCombo: false,
@@ -28,7 +24,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintModal, setShowPrintModal] = useState<ReplenishmentOrder | null>(null);
   
-  // Data
   const [providers] = useState<Provider[]>(() => {
       const saved = localStorage.getItem('ferrecloud_providers');
       return saved ? JSON.parse(saved) : [
@@ -46,13 +41,9 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
     createMockProduct('5', 'LIJ-180', 'Lija al agua 180', 'Pinturas del Centro', 'LIJ-AA', 20, 210),
   ]);
 
-  // Cart State
   const [cartItems, setCartItems] = useState<ReplenishmentItem[]>([]);
-  
-  // Orders State (Pending)
   const [orders, setOrders] = useState<ReplenishmentOrder[]>([]);
 
-  // --- EFFECT: LOAD ITEMS FROM SHORTAGES ---
   useEffect(() => {
       if (initialItems && initialItems.length > 0) {
           setCartItems(prev => {
@@ -75,7 +66,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
       const existing = cartItems.find(i => i.product.id === product.id);
       if (existing) return;
       const defaultProvider = providers.find(p => p.name === product.provider);
-      // FIX: Changed product.desiredStock to product.stockMaximo
       const newItem: ReplenishmentItem = {
           product,
           quantity: (product.stockMaximo || 0) - product.stock > 0 ? (product.stockMaximo || 0) - product.stock : 1,
@@ -161,7 +151,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
         alert("Pedido marcado como enviado en el sistema.");
     };
   
-    // --- LOGICA DE ENVIO EXTERNO ---
     const sendViaWhatsApp = (order: ReplenishmentOrder) => {
         const provider = providers.find(p => p.id === order.providerId);
         if (!provider || !provider.orderPhone) {
@@ -263,9 +252,7 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                             <div className="text-xs text-gray-500 font-mono">{p.internalCodes[0]}</div>
                                         </td>
                                         <td className="px-4 py-3 text-sm">
-                                            {/* FIX: Changed p.minStock to p.stockMinimo */}
                                             <span className={`font-bold ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600' : 'text-gray-700'}`}>{p.stock}</span> 
-                                            {/* FIX: Changed p.desiredStock to p.stockMaximo */}
                                             <span className="text-gray-400"> / {p.stockMaximo}</span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right font-bold text-gray-800">${p.listCost.toLocaleString('es-AR')}</td>
@@ -417,12 +404,10 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
             </div>
         )}
   
-        {/* --- MODAL DE IMPRESIÓN PROFESIONAL --- */}
         {showPrintModal && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 print:p-0">
                 <div className="bg-white w-full max-w-3xl h-[90vh] shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col print:h-auto print:shadow-none print:rounded-none animate-fade-in print:fixed print:inset-0 print:z-[200]">
                     
-                    {/* Botones de acción modal (Hidden when printing) */}
                     <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50 print:hidden">
                         <div className="flex items-center gap-3">
                           <div className="bg-indigo-600 p-2 rounded-xl text-white">
@@ -442,11 +427,9 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                         </div>
                     </div>
   
-                    {/* DOCUMENTO REAL (PRINTABLE) */}
                     <div className="flex-1 overflow-y-auto p-12 bg-white print:overflow-visible print:p-0">
                         <div className="border border-gray-100 p-10 shadow-sm print:border-none print:shadow-none">
                             
-                            {/* Membrete */}
                             <div className="flex justify-between items-start mb-12 border-b-4 border-slate-900 pb-8">
                                 <div>
                                     <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-2">Ferretería Bruzzone</h1>
@@ -467,7 +450,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                 </div>
                             </div>
   
-                            {/* Info Proveedor */}
                             <div className="mb-10 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 flex justify-between items-end">
                                 <div>
                                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Proveedor Destinatario</p>
@@ -482,7 +464,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                 </div>
                             </div>
   
-                            {/* Tabla de Items */}
                             <table className="w-full text-left mb-12">
                                 <thead>
                                     <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
@@ -509,7 +490,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                 </tbody>
                             </table>
   
-                            {/* Resumen de Precios */}
                             <div className="flex justify-end mb-12">
                                   <div className="w-full max-w-xs bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-2xl shadow-slate-200">
                                       <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">Total Estimado de Orden</p>
@@ -521,7 +501,6 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                   </div>
                             </div>
   
-                            {/* Footer del Documento */}
                             <div className="mt-20 flex flex-col md:flex-row justify-between items-end border-t-2 border-dashed border-gray-200 pt-10 gap-8">
                                 <div className="max-w-md">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Notas u Observaciones</p>
@@ -537,14 +516,12 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                                     <p className="text-[9px] text-gray-400 font-black uppercase mt-1 tracking-widest">Bruzzone Cloud System</p>
                                 </div>
                             </div>
-  
                         </div>
                     </div>
                 </div>
             </div>
         )}
   
-        {/* Estilos para impresión (Clean Print Mode) */}
         <style>{`
             @media print {
                 body * { visibility: hidden; pointer-events: none; }
