@@ -50,6 +50,15 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { value: 'providerCodes', label: 'Código de Proveedor' },
     ];
 
+    // Helper robusto para limpiar y parsear números desde Excel/CSV (maneja 10,5 / 21% / $ 1.000)
+    const parseNumber = (val: string | undefined, defaultValue: number): number => {
+        if (val === undefined || val === null || val.trim() === '') return defaultValue;
+        // Eliminar símbolos comunes y normalizar coma decimal
+        const cleanVal = val.replace(/[%\$\s]/g, '').replace(',', '.');
+        const parsed = parseFloat(cleanVal);
+        return isNaN(parsed) ? defaultValue : parsed;
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -68,15 +77,17 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             
             const autoMap: Record<string, number> = {};
             productFields.forEach(field => {
-                const index = parsedRows[0].findIndex(h => 
-                    h.toLowerCase() === field.label.toLowerCase() ||
-                    h.toLowerCase() === field.key.toLowerCase() ||
-                    h.toLowerCase().includes(field.label.toLowerCase()) ||
-                    (field.key === 'disc1' && (h.toLowerCase().includes('bonif 1') || h.toLowerCase().includes('desc 1'))) ||
-                    (field.key === 'disc2' && (h.toLowerCase().includes('bonif 2') || h.toLowerCase().includes('desc 2'))) ||
-                    (field.key === 'disc3' && (h.toLowerCase().includes('bonif 3') || h.toLowerCase().includes('desc 3'))) ||
-                    (field.key === 'disc4' && (h.toLowerCase().includes('bonif 4') || h.toLowerCase().includes('desc 4')))
-                );
+                const index = parsedRows[0].findIndex(h => {
+                    const header = h.toLowerCase();
+                    return header === field.label.toLowerCase() ||
+                           header === field.key.toLowerCase() ||
+                           header.includes(field.label.toLowerCase()) ||
+                           (field.key === 'vatRate' && (header === 'iva' || header === 'tasa iva' || header === 'alicuota')) ||
+                           (field.key === 'disc1' && (header.includes('bonif 1') || header.includes('desc 1'))) ||
+                           (field.key === 'disc2' && (header.includes('bonif 2') || header.includes('desc 2'))) ||
+                           (field.key === 'disc3' && (header.includes('bonif 3') || header.includes('desc 3'))) ||
+                           (field.key === 'disc4' && (header.includes('bonif 4') || header.includes('desc 4')))
+                });
                 if (index !== -1) autoMap[field.key] = index;
             });
             setMapping(autoMap);
@@ -121,26 +132,36 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const existingProduct = keyInFile ? productMap.get(keyInFile) : null;
 
                 // 1. Costo Base
-                const packageQty = mapping.purchasePackageQuantity !== undefined ? (parseFloat(row[mapping.purchasePackageQuantity]?.replace(',', '.')) || 1) : 1;
-                const rawCost = parseFloat(row[mapping.listCost]?.replace(',', '.') || '0');
+                const packageQty = mapping.purchasePackageQuantity !== undefined 
+                    ? parseNumber(row[mapping.purchasePackageQuantity], 1) 
+                    : 1;
+                
+                const rawCost = parseNumber(row[mapping.listCost], 0);
                 const unitListCost = rawCost / (packageQty || 1);
 
                 // 2. Bonificaciones
-                const d1 = mapping.disc1 !== undefined ? (parseFloat(row[mapping.disc1]?.replace(',', '.')) || 0) : 0;
-                const d2 = mapping.disc2 !== undefined ? (parseFloat(row[mapping.disc2]?.replace(',', '.')) || 0) : 0;
-                const d3 = mapping.disc3 !== undefined ? (parseFloat(row[mapping.disc3]?.replace(',', '.')) || 0) : 0;
-                const d4 = mapping.disc4 !== undefined ? (parseFloat(row[mapping.disc4]?.replace(',', '.')) || 0) : 0;
+                const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
+                const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
+                const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
+                const d4 = mapping.disc4 !== undefined ? parseNumber(row[mapping.disc4], 0) : 0;
 
                 let coefBonif;
                 if (mapping.disc1 !== undefined || mapping.disc2 !== undefined || mapping.disc3 !== undefined || mapping.disc4 !== undefined) {
                     coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100) * (1 - d4/100);
                 } else {
-                    coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : (existingProduct?.coeficienteBonificacionCosto || 1);
+                    coefBonif = mapping.coeficienteBonificacionCosto !== undefined 
+                        ? parseNumber(row[mapping.coeficienteBonificacionCosto], 1) 
+                        : (existingProduct?.coeficienteBonificacionCosto ?? 1);
                 }
                 
-                // 3. Márgenes y Tasas
-                const rawMargin = mapping.profitMargin !== undefined ? parseFloat(row[mapping.profitMargin]?.replace(',', '.') || '30') : (existingProduct?.profitMargin || 30);
-                const vatRate = mapping.vatRate !== undefined ? parseFloat(row[mapping.vatRate]?.replace(',', '.') || '21') : (existingProduct?.vatRate || 21);
+                // 3. Márgenes y Tasas IVA (Lectura mejorada de 0, 10.5, 21)
+                const rawMargin = mapping.profitMargin !== undefined 
+                    ? parseNumber(row[mapping.profitMargin], 30) 
+                    : (existingProduct?.profitMargin ?? 30);
+                
+                const vatRate = mapping.vatRate !== undefined 
+                    ? parseNumber(row[mapping.vatRate], 21) 
+                    : (existingProduct?.vatRate ?? 21);
                 
                 const costAfterDiscounts = unitListCost * coefBonif;
                 const priceNeto = costAfterDiscounts * (1 + rawMargin / 100);
@@ -166,9 +187,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     profitMargin: rawMargin,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
                     priceFinal: parseFloat((priceNeto * (1 + vatRate/100)).toFixed(2)),
-                    stock: mapping.stock !== undefined ? (parseFloat(row[mapping.stock]?.replace(',', '.')) || 0) : (existingProduct?.stock || 0),
-                    stockMaximo: mapping.stockMaximo !== undefined ? (parseFloat(row[mapping.stockMaximo]?.replace(',', '.')) || 0) : (existingProduct?.stockMaximo || 0),
-                    reorderPoint: mapping.reorderPoint !== undefined ? (parseFloat(row[mapping.reorderPoint]?.replace(',', '.')) || 0) : (existingProduct?.reorderPoint || 0),
+                    stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
+                    stockMaximo: mapping.stockMaximo !== undefined ? parseNumber(row[mapping.stockMaximo], 0) : (existingProduct?.stockMaximo || 0),
+                    reorderPoint: mapping.reorderPoint !== undefined ? parseNumber(row[mapping.reorderPoint], 0) : (existingProduct?.reorderPoint || 0),
                     stockDetails: existingProduct?.stockDetails || [],
                     location: existingProduct?.location || '',
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
@@ -249,6 +270,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                         <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
                                             <div className="flex items-center gap-2">
                                                 {field.key.startsWith('disc') ? <Percent size={12} className="text-orange-400"/> : null}
+                                                {field.key === 'vatRate' ? <div className="w-3 h-3 bg-blue-500 rounded-full"/> : null}
                                                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{field.label} {field.required && '*'}</label>
                                             </div>
                                             <select className="max-w-[160px] p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" value={mapping[field.key] ?? ""} onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}>
