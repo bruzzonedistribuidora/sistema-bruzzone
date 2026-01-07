@@ -97,31 +97,26 @@ export interface PrintTemplate {
 
 export interface Product {
   id: string;
-  // Identificación (Mapeo Bruzzone)
-  internalCodes: string[]; // "CODIGO Propi"
-  barcodes: string[]; // "Codigo de Barras"
-  providerCodes: string[]; // "Cod PROV"
+  internalCodes: string[];
+  barcodes: string[];
+  providerCodes: string[];
   otrosCodigos1?: string;
   otrosCodigos2?: string;
   otrosCodigos3?: string;
   otrosCodigos4?: string;
-  name: string; // "Nombre"
-  brand: string; // "Marca"
-  provider: string; // "Proveedor"
-  category: string; // "Rubro"
+  name: string;
+  brand: string;
+  provider: string;
+  category: string;
   description: string;
-  
-  // Costos y Bonificaciones Técnicas
-  listCost: number; // "Costo" (Unitario)
-  purchasePackageQuantity?: number; // Unidades por bulto de compra
+  listCost: number;
+  purchasePackageQuantity?: number;
   precioCostoSinBonificar?: number;
   coeficienteBonificacionCosto?: number;
   porcentajesBonificacionCosto?: string;
   costAfterDiscounts: number;
   discounts: number[];
-  
-  // Venta y Márgenes (Vistas Especiales)
-  profitMargin: number; // "ganancia"
+  profitMargin: number;
   porcentajeGanancia1View?: number;
   porcentajeGanancia2View?: number;
   precioConTasaBonificadoView?: number;
@@ -130,8 +125,6 @@ export interface Product {
   vatRate: number;
   usaPorcentaje?: boolean;
   listaCodigo?: string;
-
-  // Stock
   stock: number;
   stockMinimo?: number;
   stockMaximo?: number;
@@ -141,13 +134,10 @@ export interface Product {
   measureUnitPurchase: string;
   measureUnitSale?: string;
   conversionFactor?: number;
-
-  // Fiscal y Tasas Especiales
   tasa?: number;
   listItemTasa?: number;
   alicuotaImpuestoInterno?: number;
   detalleOtrosCostos?: string;
-
   ecommerce: {
     isPublished?: boolean;
     isOffer?: boolean;
@@ -180,7 +170,49 @@ export interface ComboItem {
 export interface Brand { id: string; name: string; }
 export interface Category { id: string; name: string; }
 export interface Provider { id: string; name: string; cuit: string; contact: string; phone?: string; email?: string; address?: string; balance: number; defaultDiscounts: [number, number, number]; taxCondition?: TaxCondition; orderPhone?: string; orderEmail?: string; }
-export interface Client { id: string; name: string; cuit: string; dni?: string; phone: string; address: string; balance: number; limit: number; points: number; number?: string; razonSocial?: string; fantasyName?: string; taxCondition?: TaxCondition; locality?: string; email?: string; description?: string; specialDiscount?: number; currency?: string; contactName?: string; portalEnabled?: boolean; portalHash?: string; }
+
+export interface AuthorizedContact {
+  id: string;
+  name: string;
+  dni: string;
+  relation: string;
+}
+
+export interface Client { 
+  id: string; 
+  name: string; // Nombre Completo o Razon Social
+  firstName?: string;
+  lastName?: string;
+  fantasyName?: string;
+  number?: string; // Numero de cliente
+  cuit: string; 
+  dni?: string; 
+  phone: string; 
+  email?: string;
+  address: string; 
+  locality?: string;
+  description?: string;
+  taxCondition?: TaxCondition;
+  
+  // Comercial
+  balance: number; 
+  isCurrentAccountActive: boolean;
+  limit: number; 
+  isLimitEnabled: boolean;
+  useAdvance: boolean; // Usar anticipo
+  specialDiscount?: number; 
+  priceListId?: string; // Lista de precio asignada
+  defaultPaymentMethod?: string;
+  
+  // Puntos / Loyalty
+  points: number; 
+  
+  // Seguridad
+  portalEnabled?: boolean; 
+  portalHash?: string; 
+  authorizedContacts: AuthorizedContact[];
+}
+
 export interface User { id: string; name: string; email: string; password?: string; roleId: string; active: boolean; lastLogin: string; branchId: string; }
 export interface Role { id: string; name: string; color: string; permissions: string[]; }
 export interface Branch { id: string; code: string; name: string; address: string; phone: string; manager: string; type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL'; active: boolean; }
