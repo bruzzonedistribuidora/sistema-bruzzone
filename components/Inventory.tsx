@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Package, X, Save, DollarSign, 
