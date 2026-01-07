@@ -6,7 +6,7 @@ import {
     Search as SearchIcon, ChevronRight, Package, ListOrdered,
     RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
     Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
-    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud
+    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud, Laptop
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -59,6 +59,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador Excel", color: "bg-indigo-600" },
     [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Listas de Precios", color: "bg-violet-500" },
     [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Cambios Masivos", color: "bg-amber-500" },
+    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Gestión E-commerce", color: "bg-pink-600" },
     [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda Online", color: "bg-pink-600" },
     [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
     [ViewState.MARKETING]: { icon: Heart, label: "Marketing & Puntos", color: "bg-red-500" },
