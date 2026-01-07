@@ -75,7 +75,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
 
     useEffect(() => {
         loadConfig();
-        // Escuchar cambios globales en la configuración
         window.addEventListener('company_config_updated', loadConfig);
         window.addEventListener('storage', loadConfig);
         return () => {
