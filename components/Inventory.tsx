@@ -6,7 +6,7 @@ import {
     Percent, Activity, Database, Boxes, RefreshCw, 
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
-    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown
+    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB } from '../services/storageService';
@@ -17,6 +17,7 @@ const Inventory: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  const [isExporting, setIsExporting] = useState(false);
   
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
@@ -105,6 +106,57 @@ const Inventory: React.FC = () => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return <div className="w-4 h-4 opacity-20"><ChevronUp size={14}/></div>;
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-indigo-400"/> : <ChevronDown size={14} className="text-indigo-400"/>;
+  };
+
+  const handleExportCatalog = async () => {
+      setIsExporting(true);
+      try {
+          const all = await productDB.getAll();
+          if (all.length === 0) {
+              alert("No hay artículos cargados para exportar.");
+              return;
+          }
+
+          const headers = [
+              "CODIGO PROPIO (SKU)", "NOMBRE ARTICULO", "MARCA", "RUBRO", "PROVEEDOR", 
+              "COSTO LISTA", "COEFICIENTE", "MARGEN %", "IVA %", "PRECIO NETO", "PRECIO FINAL", "STOCK ACTUAL"
+          ];
+
+          const csvRows = all.map(p => [
+              p.internalCodes[0] || '',
+              p.name,
+              p.brand,
+              p.category,
+              p.provider,
+              p.listCost,
+              p.coeficienteBonificacionCosto || 1,
+              p.profitMargin,
+              p.vatRate,
+              p.priceNeto,
+              p.priceFinal,
+              p.stock
+          ]);
+
+          let csvContent = "\uFEFF"; // BOM para Excel
+          csvContent += headers.join(";") + "\n";
+          csvRows.forEach(row => {
+              csvContent += row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(";") + "\n";
+          });
+
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `CATALOGO_BRUZZONE_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      } catch (err) {
+          console.error(err);
+          alert("Error al generar la exportación.");
+      } finally {
+          setIsExporting(false);
+      }
   };
 
   useEffect(() => {
@@ -229,6 +281,11 @@ const Inventory: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
+                {inventoryTab === 'PRODUCTS' && (
+                    <button onClick={handleExportCatalog} disabled={isExporting} className="bg-slate-100 text-slate-700 px-6 py-3.5 rounded-[1.8rem] font-black shadow-sm flex items-center gap-3 hover:bg-white border border-slate-200 transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                        {isExporting ? <RefreshCw className="animate-spin" size={18}/> : <FileSpreadsheet size={18} className="text-emerald-600"/>} Exportar CSV
+                    </button>
+                )}
                 {inventoryTab !== 'PROVIDERS' && (
                     <button onClick={() => inventoryTab === 'PRODUCTS' ? handleOpenModal() : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-8 py-3.5 rounded-[1.8rem] font-black shadow-xl flex items-center gap-3 hover:bg-indigo-600 transition-all uppercase text-[10px] tracking-widest active:scale-95">
                         <Plus size={18} /> Nuevo {inventoryTab === 'PRODUCTS' ? 'Artículo' : inventoryTab === 'BRANDS' ? 'Marca' : 'Rubro'}
