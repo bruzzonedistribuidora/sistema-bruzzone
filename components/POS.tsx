@@ -10,8 +10,20 @@ import {
 import { InvoiceItem, Product, Client, CompanyConfig } from '../types';
 import { productDB } from '../services/storageService';
 
+// Fix: Added missing required properties to DEFAULT_CLIENT to match Client interface
 const DEFAULT_CLIENT: Client = {
-    id: 'cf-default', name: 'Consumidor Final', cuit: '00-00000000-0', phone: '', address: '', balance: 0, limit: 0, points: 0
+    id: 'cf-default', 
+    name: 'Consumidor Final', 
+    cuit: '00-00000000-0', 
+    phone: '', 
+    address: '', 
+    balance: 0, 
+    limit: 0, 
+    points: 0,
+    isCurrentAccountActive: true,
+    isLimitEnabled: false,
+    useAdvance: false,
+    authorizedContacts: []
 };
 
 interface POSProps {
@@ -107,7 +119,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     };
 
     return (
-        <div className="flex h-full bg-slate-100 overflow-hidden flex-col font-sans animate-fade-in">
+        <div className="flex h-full bg-slate-100 overflow-hidden flex-1 flex-col font-sans animate-fade-in">
             <div className="bg-white border-b border-slate-200 px-6 h-14 flex justify-between items-center shrink-0">
                 <div className="flex gap-8 h-full">
                     {['SALES', 'HISTORY'].map(tab => (
@@ -169,7 +181,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                             <tr key={item.product.id} className="hover:bg-slate-50 transition-colors group">
                                                 <td className="px-8 py-5">
                                                     <p className="font-black text-slate-800 text-sm uppercase leading-none mb-1.5">{item.product.name}</p>
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{item.product.internalCodes[0]}</p>
+                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{item.product.internalCodes[0]}</p>
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex items-center justify-center gap-4 bg-slate-100 rounded-2xl p-1.5 w-fit mx-auto border border-slate-200">
