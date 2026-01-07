@@ -4,7 +4,7 @@ import {
     Search, Save, X, Layers, CheckCircle, Trash2, Filter, 
     ArrowRight, Info, AlertTriangle, Package, Tag, Building2, 
     Percent, DollarSign, RefreshCw, Smartphone, Plus, CheckSquare, Square,
-    ChevronRight, Boxes, ListFilter, Zap
+    ChevronRight, Boxes, ListFilter, Zap, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { Product, Brand, Category, Provider } from '../types';
 import { productDB } from '../services/storageService';
@@ -18,13 +18,14 @@ const MassProductUpdate: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [searchCode, setSearchCode] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
     const [massForm, setMassForm] = useState({
         brand: '',
         category: '',
         provider: '',
         reorderPoint: '',
-        desiredStock: ''
+        stockMaximo: ''
     });
 
     const [isApplying, setIsApplying] = useState(false);
@@ -40,21 +41,74 @@ const MassProductUpdate: React.FC = () => {
         return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
     }, []);
 
-    const filteredProducts = useMemo(() => {
-        return products.filter(p => {
+    const filteredAndSortedProducts = useMemo(() => {
+        let items = products.filter(p => {
             const matchName = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
             const matchCode = !searchCode || 
                 (p.internalCodes && p.internalCodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase()))) ||
                 (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase())));
             return matchName && matchCode;
-        }).slice(0, 200); // Limitamos la vista por performance, pero el cambio se aplica a todos los seleccionados
-    }, [products, searchTerm, searchCode]);
+        });
+
+        items.sort((a, b) => {
+            let aValue: any;
+            let bValue: any;
+
+            switch (sortConfig.key) {
+                case 'code':
+                    aValue = a.internalCodes?.[0] || '';
+                    bValue = b.internalCodes?.[0] || '';
+                    break;
+                case 'name':
+                    aValue = (a.name || '').toLowerCase();
+                    bValue = (b.name || '').toLowerCase();
+                    break;
+                case 'brand':
+                    aValue = (a.brand || '').toLowerCase();
+                    bValue = (b.brand || '').toLowerCase();
+                    break;
+                case 'category':
+                    aValue = (a.category || '').toLowerCase();
+                    bValue = (b.category || '').toLowerCase();
+                    break;
+                case 'provider':
+                    aValue = (a.provider || '').toLowerCase();
+                    bValue = (b.provider || '').toLowerCase();
+                    break;
+                case 'reorderPoint':
+                    aValue = a.reorderPoint || 0;
+                    bValue = b.reorderPoint || 0;
+                    break;
+                default:
+                    aValue = ''; bValue = '';
+            }
+
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return items.slice(0, 200);
+    }, [products, searchTerm, searchCode, sortConfig]);
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (key: string) => {
+        if (sortConfig.key !== key) return <div className="w-4 h-4 opacity-20"><ChevronUp size={12}/></div>;
+        return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-indigo-400"/> : <ChevronDown size={12} className="text-indigo-400"/>;
+    };
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === filteredProducts.length) {
+        if (selectedIds.size === filteredAndSortedProducts.length) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+            setSelectedIds(new Set(filteredAndSortedProducts.map(p => p.id)));
         }
     };
 
@@ -89,7 +143,7 @@ const MassProductUpdate: React.FC = () => {
                     category: massForm.category || p.category,
                     provider: massForm.provider || p.provider,
                     reorderPoint: massForm.reorderPoint !== '' ? parseFloat(massForm.reorderPoint) : p.reorderPoint,
-                    desiredStock: massForm.desiredStock !== '' ? parseFloat(massForm.desiredStock) : p.desiredStock
+                    stockMaximo: massForm.stockMaximo !== '' ? parseFloat(massForm.stockMaximo) : p.stockMaximo
                 };
             }
             return p;
@@ -100,7 +154,7 @@ const MassProductUpdate: React.FC = () => {
         
         setIsApplying(false);
         setSelectedIds(new Set());
-        setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', desiredStock: '' });
+        setMassForm({ brand: '', category: '', provider: '', reorderPoint: '', stockMaximo: '' });
         alert("Cambios masivos aplicados con éxito.");
     };
 
@@ -148,19 +202,31 @@ const MassProductUpdate: React.FC = () => {
                             <tr>
                                 <th className="px-6 py-4 w-10 text-center">
                                     <button onClick={toggleSelectAll} className="hover:scale-110 transition-transform">
-                                        {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare size={18} className="text-indigo-400"/> : <Square size={18} className="text-slate-500"/>}
+                                        {selectedIds.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0 ? <CheckSquare size={18} className="text-indigo-400"/> : <Square size={18} className="text-slate-500"/>}
                                     </button>
                                 </th>
-                                <th className="px-4 py-4">Cód. SKU</th>
-                                <th className="px-4 py-4">Descripción Comercial</th>
-                                <th className="px-4 py-4">Marca</th>
-                                <th className="px-4 py-4">Categoría</th>
-                                <th className="px-4 py-4">Proveedor Actual</th>
-                                <th className="px-4 py-4 text-center">P. Pedido</th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
+                                    <div className="flex items-center gap-2">Cód. SKU {getSortIcon('code')}</div>
+                                </th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('name')}>
+                                    <div className="flex items-center gap-2">Descripción Comercial {getSortIcon('name')}</div>
+                                </th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('brand')}>
+                                    <div className="flex items-center gap-2">Marca {getSortIcon('brand')}</div>
+                                </th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('category')}>
+                                    <div className="flex items-center gap-2">Categoría {getSortIcon('category')}</div>
+                                </th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('provider')}>
+                                    <div className="flex items-center gap-2">Proveedor Actual {getSortIcon('provider')}</div>
+                                </th>
+                                <th className="px-4 py-4 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('reorderPoint')}>
+                                    <div className="flex items-center justify-center gap-2">P. Pedido {getSortIcon('reorderPoint')}</div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="text-[11px] font-medium text-slate-700 divide-y divide-gray-100">
-                            {filteredProducts.map(p => (
+                            {filteredAndSortedProducts.map(p => (
                                 <tr key={p.id} className={`hover:bg-indigo-50/30 transition-colors group ${selectedIds.has(p.id) ? 'bg-indigo-50/50' : ''}`}>
                                     <td className="px-6 py-3 text-center">
                                         <button onClick={() => toggleSelectOne(p.id)} className="hover:scale-110 transition-transform">
@@ -221,7 +287,7 @@ const MassProductUpdate: React.FC = () => {
                     </div>
                     <div>
                         <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Stock Deseado</label>
-                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.desiredStock} onChange={e => setMassForm({...massForm, desiredStock: e.target.value})}/>
+                        <input type="number" className="w-full bg-white/10 border border-white/10 rounded-xl p-3 text-xs font-black outline-none" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})}/>
                     </div>
                 </div>
 
