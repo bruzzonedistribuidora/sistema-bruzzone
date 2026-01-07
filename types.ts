@@ -104,6 +104,7 @@ export interface Product {
   otrosCodigos1?: string;
   otrosCodigos2?: string;
   otrosCodigos3?: string;
+  otrosCodigos4?: string;
   name: string; // "Nombre"
   brand: string; // "Marca"
   provider: string; // "Proveedor"
