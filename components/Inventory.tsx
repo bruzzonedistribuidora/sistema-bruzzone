@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Package, X, Save, DollarSign, 
@@ -21,16 +22,13 @@ const Inventory: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
-  const [isMassImportOpen, setIsMassImportOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState<{type: 'BRAND' | 'CATEGORY', active: boolean}>({type: 'BRAND', active: false});
   
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [entityForm, setEntityForm] = useState<{id?: string, name: string}>({ name: '' });
   const [quickAddName, setQuickAddName] = useState('');
-  const [massInput, setMassInput] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
 
-  // Estado auxiliar para la calculadora de fraccionamiento
   const [bulkCost, setBulkCost] = useState<number>(0);
 
   const providers: Provider[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'), []);
@@ -56,7 +54,6 @@ const Inventory: React.FC = () => {
     return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
   }, [searchTerm]);
 
-  // Lógica de Precios con Fraccionamiento
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
     const coefBonif = Number(formData.coeficienteBonificacionCosto) || 1;
@@ -143,7 +140,6 @@ const Inventory: React.FC = () => {
     setIsQuickAddOpen({type: 'BRAND', active: false});
   };
 
-  // Gestión de Arreglos de Códigos
   const updateCodeArray = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number, value: string) => {
       const next = [...(formData[field] || [])];
       next[index] = value.toUpperCase();
@@ -161,7 +157,6 @@ const Inventory: React.FC = () => {
 
   return (
     <div className="p-4 h-full flex flex-col space-y-4 bg-slate-50 overflow-hidden font-sans">
-      {/* HEADER CON PESTAÑAS */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm shrink-0">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-5">
@@ -280,7 +275,6 @@ const Inventory: React.FC = () => {
         {inventoryTab === 'PROVIDERS' && <Providers />}
       </div>
 
-      {/* MODAL: NUEVA ENTIDAD (INDIVIDUAL) */}
       {isEntityModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
@@ -298,7 +292,6 @@ const Inventory: React.FC = () => {
           </div>
       )}
 
-      {/* MODAL ALTA DE PRODUCTO - REDISEÑADO PARA MULTICODIGOS Y FRACCIONAMIENTO */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -391,7 +384,6 @@ const Inventory: React.FC = () => {
                                   </div>
 
                                   <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
-                                      {/* MULTICODIGOS */}
                                       <div className="space-y-8">
                                           <CodeListManager 
                                               label="Códigos SKU / Internos" 
@@ -436,7 +428,8 @@ const Inventory: React.FC = () => {
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Unidades por Bulto</label>
                                                   <div className="relative group">
                                                       <Scaling className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
-                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={e => handleBulkCalc(bulkCost, parseFloat(e.target.value) || 1)} />
+                                                      {/* Fix: defined 'e' parameter for the onChange handler to resolve 'Cannot find name e' */}
+                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={(e) => handleBulkCalc(bulkCost, parseFloat(e.target.value) || 1)} />
                                                   </div>
                                               </div>
                                           </div>
@@ -538,7 +531,6 @@ const Inventory: React.FC = () => {
           </div>
       )}
 
-      {/* QUICK ADD MODAL (BRAND/CATEGORY) */}
       {isQuickAddOpen.active && (
           <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
@@ -566,7 +558,6 @@ const Inventory: React.FC = () => {
   );
 };
 
-// Componente Helper para Listas de Códigos
 const CodeListManager: React.FC<{
     label: string, 
     codes: string[], 
