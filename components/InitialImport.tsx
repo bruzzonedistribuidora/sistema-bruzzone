@@ -23,11 +23,12 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const productFields = [
         { key: 'internalCodes', label: 'CODIGO Propi (SKU)', required: true },
         { key: 'name', label: 'Nombre Artículo', required: true },
-        { key: 'listCost', label: 'Costo Lista', required: true },
+        { key: 'listCost', label: 'Costo Lista (Bulto o Unidad)', required: true },
+        { key: 'purchasePackageQuantity', label: 'Unidades por Bulto (Pack)', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro/Categoría', required: false },
         { key: 'provider', label: 'Proveedor (Nombre)', required: false },
-        { key: 'stock', label: 'Stock Actual', required: false },
+        { key: 'stock', label: 'Stock Actual (Unidades)', required: false },
         { key: 'barcodes', label: 'Código Barras (EAN)', required: false },
         { key: 'providerCodes', label: 'Cód. Proveedor Ref.', required: false },
         { key: 'otrosCodigos1', label: 'Código Adicional 1', required: false },
@@ -59,7 +60,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const index = parsedRows[0].findIndex(h => 
                     h.toLowerCase().includes(field.label.toLowerCase()) || 
                     h.toLowerCase().includes(field.key.toLowerCase()) ||
-                    (field.key === 'provider' && h.toLowerCase() === 'proveedor')
+                    (field.key === 'provider' && h.toLowerCase() === 'proveedor') ||
+                    (field.key === 'purchasePackageQuantity' && (h.toLowerCase().includes('bulto') || h.toLowerCase().includes('pack')))
                 );
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -87,11 +89,18 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
+                
+                // Cálculo de Fraccionamiento
+                const packageQty = mapping.purchasePackageQuantity !== undefined ? (parseFloat(row[mapping.purchasePackageQuantity]?.replace(',', '.')) || 1) : 1;
                 const rawCost = parseFloat(row[mapping.listCost]?.replace(',', '.') || '0');
+                
+                // El costo de lista final es el costo del bulto dividido las unidades
+                const unitListCost = rawCost / (packageQty || 1);
+
                 const rawMargin = mapping.profitMargin !== undefined ? parseFloat(row[mapping.profitMargin]?.replace(',', '.') || '30') : 30;
                 const coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : 1;
                 
-                const costAfterDiscounts = rawCost * coefBonif;
+                const costAfterDiscounts = unitListCost * coefBonif;
                 const priceNeto = costAfterDiscounts * (1 + rawMargin / 100);
 
                 chunkProducts.push({
@@ -112,7 +121,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     purchaseCurrency: 'ARS',
                     saleCurrency: 'ARS',
                     vatRate: 21,
-                    listCost: rawCost,
+                    listCost: unitListCost,
+                    purchasePackageQuantity: packageQty,
                     coeficienteBonificacionCosto: coefBonif,
                     costAfterDiscounts: costAfterDiscounts,
                     profitMargin: rawMargin,
@@ -151,7 +161,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                     <div>
                         <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Importador Masivo</h2>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Sincronización de catálogo de alta escala (+140.000 artículos)</p>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Sincronización de catálogo con soporte de fraccionamiento</p>
                     </div>
                 </div>
             </div>
