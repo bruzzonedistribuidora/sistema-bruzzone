@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Save, Building2, CreditCard, Plus, Trash2, CheckCircle, 
     X, Edit2, RefreshCw, Camera, Upload,
-    Percent, CreditCard as CardIcon, Zap, ChevronRight, Info,
+    Percent, Zap, ChevronRight, Info,
     Calculator, Smartphone, Landmark, Globe, Search, Link2, ExternalLink,
     MapPin, Mail, Phone, Hash, FileText, Calendar, Wallet, QrCode,
-    CheckSquare, Square, ToggleRight, ToggleLeft
+    CheckSquare, Square, ToggleRight, ToggleLeft, Layout, Type, Image as ImageIcon
 } from 'lucide-react';
 import { CompanyConfig, PaymentSystem, PaymentAccount, TaxCondition } from '../types';
 import { fetchLatestFinancingRates } from '../services/geminiService';
@@ -39,7 +39,8 @@ const CompanySettings: React.FC = () => {
           defaultProfitMargin: 30,
           paymentAccounts: [],
           paymentMethods: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'],
-          paymentSystems: []
+          paymentSystems: [],
+          headerDisplayMode: 'BOTH'
       };
 
       if (saved) {
@@ -134,21 +135,46 @@ const CompanySettings: React.FC = () => {
 
         {activeTab === 'GENERAL' && (
             <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-1 bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm text-center">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-8">Imagen de Marca</label>
-                    <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-56 h-56 bg-slate-50 border-4 border-dashed border-slate-100 rounded-[3.5rem] mx-auto flex items-center justify-center relative group cursor-pointer hover:border-indigo-400 transition-all overflow-hidden"
-                    >
-                        {formData.logo ? (
-                            <img src={formData.logo} alt="Logo" className="w-full h-full object-contain p-6" />
-                        ) : (
-                            <div className="flex flex-col items-center gap-2 text-slate-300 group-hover:text-indigo-500">
-                                <Camera size={48} />
-                                <span className="text-[10px] font-black uppercase">Subir Logo</span>
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-indigo-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-black text-xs uppercase">Cambiar</div>
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm text-center">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-8">Imagen de Marca</label>
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-56 h-56 bg-slate-50 border-4 border-dashed border-slate-100 rounded-[3.5rem] mx-auto flex items-center justify-center relative group cursor-pointer hover:border-indigo-400 transition-all overflow-hidden"
+                        >
+                            {formData.logo ? (
+                                <img src={formData.logo} alt="Logo" className="w-full h-full object-contain p-6" />
+                            ) : (
+                                <div className="flex flex-col items-center gap-2 text-slate-300 group-hover:text-indigo-500">
+                                    <Camera size={48} />
+                                    <span className="text-[10px] font-black uppercase">Subir Logo</span>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-indigo-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white font-black text-xs uppercase">Cambiar</div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-[3rem] border border-gray-200 shadow-sm space-y-6">
+                        <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-widest border-b pb-4 flex items-center gap-2">
+                            <Layout size={16} className="text-indigo-600"/> Visualización en Menú
+                        </h3>
+                        <div className="grid grid-cols-1 gap-2">
+                            {[
+                                { id: 'LOGO', label: 'Solo Logo', icon: ImageIcon },
+                                { id: 'NAME', label: 'Solo Nombre', icon: Type },
+                                { id: 'BOTH', label: 'Logo y Nombre', icon: Layout }
+                            ].map(option => (
+                                <button 
+                                    key={option.id}
+                                    onClick={() => setFormData({...formData, headerDisplayMode: option.id as any})}
+                                    className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left ${formData.headerDisplayMode === option.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-50 hover:border-slate-200 bg-white text-slate-400'}`}
+                                >
+                                    <option.icon size={18} />
+                                    <span className="text-xs font-black uppercase tracking-tight">{option.label}</span>
+                                    {formData.headerDisplayMode === option.id && <CheckCircle size={16} className="ml-auto text-indigo-600" />}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
