@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
-    RefreshCw, DatabaseZap, Sparkles, Info, X, ChevronRight, Save
+    RefreshCw, DatabaseZap, Sparkles, Info, X, ChevronRight, Save,
+    Link, Settings2, Boxes, Ruler
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -16,8 +17,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const [fileRows, setFileRows] = useState<string[][]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [mapping, setMapping] = useState<Record<string, number>>({});
+    const [matchKey, setMatchKey] = useState<string>('internalCodes'); // Campo para buscar duplicados
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [stats, setStats] = useState({ created: 0, updated: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const productFields = [
@@ -25,10 +28,13 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'name', label: 'Nombre Artículo', required: true },
         { key: 'listCost', label: 'Costo Lista (Bulto o Unidad)', required: true },
         { key: 'purchasePackageQuantity', label: 'Unidades por Bulto (Pack)', required: false },
+        { key: 'stock', label: 'Stock Actual', required: false },
+        { key: 'stockMaximo', label: 'Stock Deseado (Máximo)', required: false },
+        { key: 'reorderPoint', label: 'Punto de Pedido', required: false },
+        { key: 'measureUnitPurchase', label: 'Unidad de Medida', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro/Categoría', required: false },
         { key: 'provider', label: 'Proveedor (Nombre)', required: false },
-        { key: 'stock', label: 'Stock Actual (Unidades)', required: false },
         { key: 'barcodes', label: 'Código Barras (EAN)', required: false },
         { key: 'providerCodes', label: 'Cód. Proveedor Ref.', required: false },
         { key: 'otrosCodigos1', label: 'Código Adicional 1', required: false },
@@ -37,6 +43,13 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'otrosCodigos4', label: 'Código Adicional 4', required: false },
         { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
         { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonificación', required: false },
+    ];
+
+    const matchKeyOptions = [
+        { value: 'internalCodes', label: 'Código Propi (SKU)' },
+        { value: 'barcodes', label: 'Código de Barras (EAN)' },
+        { value: 'providerCodes', label: 'Código de Proveedor' },
+        { value: 'otrosCodigos1', label: 'Código Adicional 1' },
     ];
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,10 +71,11 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             const autoMap: Record<string, number> = {};
             productFields.forEach(field => {
                 const index = parsedRows[0].findIndex(h => 
-                    h.toLowerCase().includes(field.label.toLowerCase()) || 
-                    h.toLowerCase().includes(field.key.toLowerCase()) ||
-                    (field.key === 'provider' && h.toLowerCase() === 'proveedor') ||
-                    (field.key === 'purchasePackageQuantity' && (h.toLowerCase().includes('bulto') || h.toLowerCase().includes('pack')))
+                    h.toLowerCase() === field.label.toLowerCase() ||
+                    h.toLowerCase() === field.key.toLowerCase() ||
+                    h.toLowerCase().includes(field.label.toLowerCase()) ||
+                    (field.key === 'stockMaximo' && h.toLowerCase().includes('deseado')) ||
+                    (field.key === 'reorderPoint' && h.toLowerCase().includes('pedido'))
                 );
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -73,15 +87,32 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
     const processImport = async () => {
         if (mapping.internalCodes === undefined || mapping.name === undefined || mapping.listCost === undefined) {
-            alert("Mapeo incompleto de campos obligatorios.");
+            alert("Mapeo incompleto de campos obligatorios (SKU, Nombre y Costo).");
             return;
         }
 
         setIsProcessing(true);
         setProgress(0);
+        
+        // Cargar mapa de productos actuales para búsqueda rápida (O(1))
+        // Dado que son 140k, usamos los códigos como llaves
+        const currentProducts = await productDB.getAll();
+        const productMap = new Map<string, Product>();
+        
+        currentProducts.forEach(p => {
+            let keyVal = '';
+            if (matchKey === 'internalCodes') keyVal = p.internalCodes[0];
+            else if (matchKey === 'barcodes') keyVal = p.barcodes[0];
+            else if (matchKey === 'providerCodes') keyVal = p.providerCodes[0];
+            else if (matchKey === 'otrosCodigos1') keyVal = p.otrosCodigos1 || '';
+            
+            if (keyVal) productMap.set(keyVal.toString().toUpperCase(), p);
+        });
 
         const CHUNK_SIZE = 5000;
         let index = 0;
+        let createdCount = 0;
+        let updatedCount = 0;
 
         const processChunk = async () => {
             const limit = Math.min(index + CHUNK_SIZE, fileRows.length);
@@ -90,37 +121,38 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
                 
-                // Cálculo de Fraccionamiento
+                // Identificar si el producto existe
+                const keyInFile = row[mapping[matchKey]]?.toString().toUpperCase();
+                const existingProduct = keyInFile ? productMap.get(keyInFile) : null;
+
                 const packageQty = mapping.purchasePackageQuantity !== undefined ? (parseFloat(row[mapping.purchasePackageQuantity]?.replace(',', '.')) || 1) : 1;
                 const rawCost = parseFloat(row[mapping.listCost]?.replace(',', '.') || '0');
-                
-                // El costo de lista final es el costo del bulto dividido las unidades
                 const unitListCost = rawCost / (packageQty || 1);
 
-                const rawMargin = mapping.profitMargin !== undefined ? parseFloat(row[mapping.profitMargin]?.replace(',', '.') || '30') : 30;
-                const coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : 1;
+                const rawMargin = mapping.profitMargin !== undefined ? parseFloat(row[mapping.profitMargin]?.replace(',', '.') || '30') : (existingProduct?.profitMargin || 30);
+                const coefBonif = mapping.coeficienteBonificacionCosto !== undefined ? parseFloat(row[mapping.coeficienteBonificacionCosto]?.replace(',', '.') || '1') : (existingProduct?.coeficienteBonificacionCosto || 1);
                 
                 const costAfterDiscounts = unitListCost * coefBonif;
                 const priceNeto = costAfterDiscounts * (1 + rawMargin / 100);
 
-                chunkProducts.push({
-                    id: `prod-${Date.now()}-${i}`,
-                    internalCodes: [row[mapping.internalCodes] || 'S/C'],
-                    barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : [],
-                    providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : [],
-                    otrosCodigos1: mapping.otrosCodigos1 !== undefined ? row[mapping.otrosCodigos1] : '',
-                    otrosCodigos2: mapping.otrosCodigos2 !== undefined ? row[mapping.otrosCodigos2] : '',
-                    otrosCodigos3: mapping.otrosCodigos3 !== undefined ? row[mapping.otrosCodigos3] : '',
-                    otrosCodigos4: mapping.otrosCodigos4 !== undefined ? row[mapping.otrosCodigos4] : '',
-                    name: (row[mapping.name] || 'SIN NOMBRE').toUpperCase(),
-                    brand: (mapping.brand !== undefined ? row[mapping.brand] : 'GENÉRICO').toUpperCase(),
-                    category: (mapping.category !== undefined ? row[mapping.category] : 'GENERAL').toUpperCase(),
-                    provider: (mapping.provider !== undefined ? row[mapping.provider] : 'PROVEEDOR').toUpperCase(),
-                    description: '',
-                    measureUnitPurchase: 'Unidad',
-                    purchaseCurrency: 'ARS',
-                    saleCurrency: 'ARS',
-                    vatRate: 21,
+                const productData: Product = {
+                    id: existingProduct?.id || `prod-${Date.now()}-${i}`,
+                    internalCodes: mapping.internalCodes !== undefined ? [row[mapping.internalCodes] || 'S/C'] : (existingProduct?.internalCodes || ['S/C']),
+                    barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : (existingProduct?.barcodes || []),
+                    providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : (existingProduct?.providerCodes || []),
+                    otrosCodigos1: mapping.otrosCodigos1 !== undefined ? row[mapping.otrosCodigos1] : (existingProduct?.otrosCodigos1 || ''),
+                    otrosCodigos2: mapping.otrosCodigos2 !== undefined ? row[mapping.otrosCodigos2] : (existingProduct?.otrosCodigos2 || ''),
+                    otrosCodigos3: mapping.otrosCodigos3 !== undefined ? row[mapping.otrosCodigos3] : (existingProduct?.otrosCodigos3 || ''),
+                    otrosCodigos4: mapping.otrosCodigos4 !== undefined ? row[mapping.otrosCodigos4] : (existingProduct?.otrosCodigos4 || ''),
+                    name: (row[mapping.name] || existingProduct?.name || 'SIN NOMBRE').toUpperCase(),
+                    brand: (mapping.brand !== undefined ? row[mapping.brand] : (existingProduct?.brand || 'GENÉRICO')).toUpperCase(),
+                    category: (mapping.category !== undefined ? row[mapping.category] : (existingProduct?.category || 'GENERAL')).toUpperCase(),
+                    provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || 'PROVEEDOR')).toUpperCase(),
+                    description: existingProduct?.description || '',
+                    measureUnitPurchase: mapping.measureUnitPurchase !== undefined ? row[mapping.measureUnitPurchase] : (existingProduct?.measureUnitPurchase || 'Unidad'),
+                    purchaseCurrency: existingProduct?.purchaseCurrency || 'ARS',
+                    saleCurrency: existingProduct?.saleCurrency || 'ARS',
+                    vatRate: existingProduct?.vatRate || 21,
                     listCost: unitListCost,
                     purchasePackageQuantity: packageQty,
                     coeficienteBonificacionCosto: coefBonif,
@@ -128,15 +160,21 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     profitMargin: rawMargin,
                     priceNeto: priceNeto,
                     priceFinal: priceNeto * 1.21,
-                    stock: mapping.stock !== undefined ? (parseFloat(row[mapping.stock]?.replace(',', '.')) || 0) : 0,
-                    reorderPoint: 0,
-                    stockDetails: [],
-                    location: '',
-                    ecommerce: { isPublished: false },
-                    isCombo: false, 
-                    comboItems: [],
-                    discounts: []
-                });
+                    stock: mapping.stock !== undefined ? (parseFloat(row[mapping.stock]?.replace(',', '.')) || 0) : (existingProduct?.stock || 0),
+                    stockMaximo: mapping.stockMaximo !== undefined ? (parseFloat(row[mapping.stockMaximo]?.replace(',', '.')) || 0) : (existingProduct?.stockMaximo || 0),
+                    reorderPoint: mapping.reorderPoint !== undefined ? (parseFloat(row[mapping.reorderPoint]?.replace(',', '.')) || 0) : (existingProduct?.reorderPoint || 0),
+                    stockDetails: existingProduct?.stockDetails || [],
+                    location: existingProduct?.location || '',
+                    ecommerce: existingProduct?.ecommerce || { isPublished: false },
+                    isCombo: existingProduct?.isCombo || false, 
+                    comboItems: existingProduct?.comboItems || [],
+                    discounts: existingProduct?.discounts || []
+                };
+
+                if (existingProduct) updatedCount++;
+                else createdCount++;
+
+                chunkProducts.push(productData);
             }
 
             await productDB.saveBulk(chunkProducts);
@@ -146,6 +184,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             if (index < fileRows.length) {
                 setTimeout(processChunk, 1);
             } else {
+                setStats({ created: createdCount, updated: updatedCount });
                 setIsProcessing(false);
                 setStep(3);
             }
@@ -160,8 +199,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                     <div>
-                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Importador Masivo</h2>
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Sincronización de catálogo con soporte de fraccionamiento</p>
+                        <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Sincronizador Maestro</h2>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Gestión de Catálogo Inteligente (+140.000 artículos)</p>
                     </div>
                 </div>
             </div>
@@ -182,28 +221,50 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
                 {step === 2 && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in pb-10">
-                        <div className="lg:col-span-5 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-6">
-                            <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Sparkles size={16} className="text-indigo-600"/> Mapeo de Columnas</h3>
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-3">
-                                {productFields.map(field => (
-                                    <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
-                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest pr-4">{field.label} {field.required && '*'}</label>
-                                        <select className="max-w-[180px] p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" value={mapping[field.key] ?? ""} onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}>
-                                            <option value="">-- Ignorar --</option>
-                                            {headers.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
-                                        </select>
-                                    </div>
-                                ))}
+                        <div className="lg:col-span-5 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm space-y-8">
+                            <div className="space-y-4">
+                                <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Link size={16} className="text-indigo-600"/> Criterio de Sincronización</h3>
+                                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                                    <label className="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-2">Clave Única de Vinculación</label>
+                                    <select 
+                                        className="w-full p-3 bg-white border border-indigo-200 rounded-xl text-xs font-black uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                        value={matchKey}
+                                        onChange={e => setMatchKey(e.target.value)}
+                                    >
+                                        {matchKeyOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                    <p className="text-[8px] text-indigo-300 font-bold uppercase mt-3 leading-tight">El sistema buscará este código en tu base actual. Si existe, actualizará stock y precios; si no, creará un nuevo artículo.</p>
+                                </div>
                             </div>
+
+                            <div className="space-y-4">
+                                <h3 className="font-black text-slate-800 uppercase tracking-tight border-b pb-4 flex items-center gap-2"><Sparkles size={16} className="text-indigo-600"/> Mapeo de Atributos</h3>
+                                <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-3">
+                                    {productFields.map(field => (
+                                        <div key={field.key} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between group">
+                                            <div className="flex items-center gap-2">
+                                                {field.key === 'stockMaximo' || field.key === 'reorderPoint' ? <Boxes size={12} className="text-orange-400"/> : null}
+                                                {field.key === 'measureUnitPurchase' ? <Ruler size={12} className="text-blue-400"/> : null}
+                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{field.label} {field.required && '*'}</label>
+                                            </div>
+                                            <select className="max-w-[160px] p-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all" value={mapping[field.key] ?? ""} onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}>
+                                                <option value="">-- Ignorar --</option>
+                                                {headers.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            
                             <button onClick={processImport} disabled={isProcessing} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-widest shadow-2xl flex items-center justify-center gap-3 hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50">
                                 {isProcessing ? <RefreshCw className="animate-spin"/> : <CheckCircle size={20}/>}
-                                {isProcessing ? `Procesando ${progress}%` : 'Iniciar Sincronización Masiva'}
+                                {isProcessing ? `Sincronizando ${progress}%` : 'Ejecutar Sincronización Inteligente'}
                             </button>
                         </div>
 
-                        <div className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[680px]">
+                        <div className="lg:col-span-7 bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[750px]">
                             <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                                <h3 className="font-black text-sm uppercase tracking-widest">Vista Previa ({fileRows.length.toLocaleString()} artículos)</h3>
+                                <h3 className="font-black text-sm uppercase tracking-widest">Vista Previa de Archivo ({fileRows.length.toLocaleString()} filas)</h3>
                             </div>
                             <div className="overflow-x-auto flex-1 custom-scrollbar">
                                 <table className="w-full text-left">
@@ -227,10 +288,23 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
                 {step === 3 && (
                     <div className="h-full flex items-center justify-center animate-fade-in">
-                        <div className="max-w-xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-8">
+                        <div className="max-w-2xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-8">
                             <div className="w-24 h-24 bg-green-50 text-green-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><CheckCircle size={48}/></div>
-                            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">¡Éxito!</h3>
-                            <p className="text-slate-500 font-medium px-10">Se han integrado {fileRows.length.toLocaleString()} artículos al maestro local de forma óptima.</p>
+                            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Proceso Finalizado</h3>
+                            
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Artículos Nuevos</p>
+                                    <p className="text-5xl font-black text-indigo-600 tracking-tighter">{stats.created.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Artículos Actualizados</p>
+                                    <p className="text-5xl font-black text-green-600 tracking-tighter">{stats.updated.toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            <p className="text-slate-500 font-medium px-10 italic">Se han procesado un total de {(stats.created + stats.updated).toLocaleString()} registros de forma exitosa.</p>
+                            
                             <button onClick={onComplete} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95">Ir al Catálogo Actualizado <ArrowRight size={20}/></button>
                         </div>
                     </div>
