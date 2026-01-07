@@ -1,101 +1,221 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+    X, Smartphone, ShoppingBag, Plus, LayoutDashboard, Database, 
+    Receipt, Truck, Wallet, Bot, Settings, FileUp, Layers, Zap, 
+    Search as SearchIcon, ChevronRight, Package, ListOrdered,
+    RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
+    Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
+    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud, Laptop,
+    ShoppingCart as OrderIcon
+} from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import POS from './components/POS';
-import Clients from './components/Clients';
-import Treasury from './components/Treasury';
 import Purchases from './components/Purchases';
-import ConfigPanel from './components/ConfigPanel';
-import MassProductUpdate from './components/MassProductUpdate';
-import PriceUpdates from './components/PriceUpdates';
-import EcommerceAdmin from './components/EcommerceAdmin';
-import PublicPortal from './components/PublicPortal';
-import Shop from './components/Shop';
-import Assistant from './components/Assistant';
-import Login from './components/Login';
-import InitialImport from './components/InitialImport';
-import CloudHub from './components/CloudHub';
-import CompanySettings from './components/CompanySettings';
-import AfipConfig from './components/AfipConfig';
-import UsersComponent from './components/Users';
-import Branches from './components/Branches';
-import PrintSettings from './components/PrintSettings';
-import Backup from './components/Backup';
+import Clients from './components/Clients';
+import Providers from './components/Providers';
+import Treasury from './components/Treasury';
 import Accounting from './components/Accounting';
 import Statistics from './components/Statistics';
 import Reports from './components/Reports';
-import Marketing from './components/Marketing';
-import PriceAudit from './components/PriceAudit';
+import Backup from './components/Backup';
+import Branches from './components/Branches';
+import UsersComponent from './components/Users';
+import PriceUpdates from './components/PriceUpdates';
+import Assistant from './components/Assistant';
+import CompanySettings from './components/CompanySettings';
+import AfipConfig from './components/AfipConfig';
 import DailyMovements from './components/DailyMovements';
 import Employees from './components/Employees';
+import ConfigPanel from './components/ConfigPanel';
+import Marketing from './components/Marketing';
+import PriceAudit from './components/PriceAudit';
+import OnlineSales from './components/OnlineSales';
+import EcommerceAdmin from './components/EcommerceAdmin';
+import PublicPortal from './components/PublicPortal';
+import Shop from './components/Shop';
+import InitialImport from './components/InitialImport';
+import CustomerPortal from './components/CustomerPortal';
+import Remitos from './components/Remitos';
+import Presupuestos from './components/Presupuestos';
+import SalesOrders from './components/SalesOrders';
+import CreditNotes from './components/CreditNotes';
+import MassProductUpdate from './components/MassProductUpdate';
 import StockTransfers from './components/StockTransfers';
-import { ViewState, User } from './types';
-import SalesManagement from './components/SalesManagement';
-import Replenishment from './components/Replenishment';
-import Shortages from './components/Shortages';
+import CloudHub from './components/CloudHub';
+import Login from './components/Login';
+import { ViewState, User, Client, InvoiceItem } from './types';
+
+const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
+    [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
+    [ViewState.INVENTORY]: { icon: Database, label: "Inventario Maestro", color: "bg-indigo-500" },
+    [ViewState.POS]: { icon: Receipt, label: "Punto de Venta", color: "bg-emerald-500" },
+    [ViewState.PURCHASES]: { icon: Truck, label: "Compras / Gastos", color: "bg-blue-500" },
+    [ViewState.TREASURY]: { icon: Wallet, label: "Tesorería", color: "bg-orange-500" },
+    [ViewState.ACCOUNTING]: { icon: Calculator, label: "Contabilidad", color: "bg-violet-600" },
+    [ViewState.AI_ASSISTANT]: { icon: Bot, label: "Asistente IA", color: "bg-pink-500" },
+    [ViewState.CONFIG_PANEL]: { icon: Settings, label: "Configuración", color: "bg-slate-700" },
+    [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador Excel", color: "bg-indigo-600" },
+    [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Precios & Listas", color: "bg-violet-500" },
+    [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Cambios Masivos", color: "bg-amber-500" },
+    [ViewState.ONLINE_SALES]: { icon: OrderIcon, label: "Hub de Ventas Online", color: "bg-indigo-600" },
+    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Gestión Catálogo Web", color: "bg-pink-600" },
+    [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda Online", color: "bg-pink-600" },
+    [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
+    [ViewState.MARKETING]: { icon: Heart, label: "Marketing & Puntos", color: "bg-red-500" },
+    [ViewState.CLIENTS]: { icon: Users, label: "Fichero Clientes", color: "bg-sky-500" },
+    [ViewState.REMITOS]: { icon: ListOrdered, label: "Remitos", color: "bg-blue-600" },
+    [ViewState.PRESUPUESTOS]: { icon: FileSpreadsheet, label: "Presupuestos", color: "bg-teal-500" },
+    [ViewState.SALES_ORDERS]: { icon: Package, label: "Pedidos", color: "bg-green-600" },
+    [ViewState.CREDIT_NOTES]: { icon: RotateCcw, label: "Notas de Crédito", color: "bg-red-500" },
+    [ViewState.PROVIDERS]: { icon: Truck, label: "Proveedores", color: "bg-slate-800" },
+    [ViewState.STATISTICS]: { icon: TrendingUp, label: "Estadísticas", color: "bg-cyan-500" },
+    [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
+    [ViewState.BACKUP]: { icon: HardDrive, label: "Respaldo Datos", color: "bg-slate-600" },
+    [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
+};
 
 const App: React.FC = () => {
-    const [user, setUser] = useState<User | null>(null);
-    const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
+  const [activeView, setActiveView] = useState<ViewState>(() => {
+    if (window.location.pathname.includes('/shop')) return ViewState.SHOP;
+    return ViewState.DASHBOARD;
+  });
+  const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
+  const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
 
-    // Public portals handle their own layouts
-    if (view === ViewState.PUBLIC_PORTAL) return <PublicPortal />;
-    if (view === ViewState.SHOP) return <Shop />;
+  useEffect(() => {
+    const savedSession = localStorage.getItem('ferrecloud_session');
+    if (savedSession) setLoggedInUser(JSON.parse(savedSession));
+  }, []);
 
-    if (!user) {
-        return <Login onLogin={setUser} />;
+  const handleNavigate = (view: ViewState) => {
+    if (!openViews.includes(view)) {
+        setOpenViews(prev => [...prev, view]);
     }
+    setActiveView(view);
+  };
 
-    const renderView = () => {
-        switch (view) {
-            case ViewState.DASHBOARD: return <Dashboard onNavigate={setView} />;
-            case ViewState.INVENTORY: return <Inventory />;
-            case ViewState.POS: return <SalesManagement initialTab="POS" onCartUsed={() => {}} />;
-            case ViewState.REMITOS: return <SalesManagement initialTab="REMITOS" onCartUsed={() => {}} />;
-            case ViewState.PRESUPUESTOS: return <SalesManagement initialTab="BUDGETS" onCartUsed={() => {}} />;
-            case ViewState.SALES_ORDERS: return <SalesManagement initialTab="ORDERS" onCartUsed={() => {}} />;
-            case ViewState.CREDIT_NOTES: return <SalesManagement initialTab="CREDIT_NOTES" onCartUsed={() => {}} />;
-            case ViewState.CLIENTS: return <Clients />;
-            case ViewState.TREASURY: return <Treasury />;
-            case ViewState.PURCHASES: return <Purchases />;
-            case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
-            case ViewState.PRICE_UPDATES: return <PriceUpdates />;
-            // Fix: Corrected mapping for EcommerceAdmin view
-            case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
-            case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => setView(ViewState.INVENTORY)} />;
-            case ViewState.CLOUD_HUB: return <CloudHub />;
-            case ViewState.AI_ASSISTANT: return <Assistant />;
-            case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={setView} />;
-            case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
-            case ViewState.AFIP_CONFIG: return <AfipConfig />;
-            case ViewState.USERS: return <UsersComponent />;
-            case ViewState.BRANCHES: return <Branches />;
-            case ViewState.PRINT_CONFIG: return <PrintSettings />;
-            case ViewState.BACKUP: return <Backup />;
-            case ViewState.ACCOUNTING: return <Accounting />;
-            case ViewState.STATISTICS: return <Statistics />;
-            case ViewState.REPORTS: return <Reports />;
-            case ViewState.MARKETING: return <Marketing />;
-            case ViewState.PRICE_AUDIT: return <PriceAudit />;
-            case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
-            case ViewState.EMPLOYEES: return <Employees />;
-            case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
-            case ViewState.REPLENISHMENT: return <Replenishment />;
-            case ViewState.SHORTAGES: return <Shortages />;
-            default: return <Dashboard onNavigate={setView} />;
-        }
-    };
+  const closeView = (view: ViewState, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (view === ViewState.DASHBOARD) return; 
+    
+    const newViews = openViews.filter(v => v !== view);
+    setOpenViews(newViews);
+    
+    if (activeView === view) {
+        setActiveView(newViews[newViews.length - 1]);
+    }
+  };
 
-    return (
-        <div className="flex h-screen bg-slate-100 font-sans">
-            <Sidebar activeView={view} onNavigate={setView} user={user} />
-            <div className="flex-1 h-full overflow-hidden">
-                {renderView()}
+  const renderViewContent = (view: ViewState) => {
+    switch (view) {
+      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
+      case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.PROVIDERS: return <Providers />;
+      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
+      case ViewState.TREASURY: return <Treasury />;
+      case ViewState.CLIENTS: return <Clients onOpenPortal={(c) => { setPortalPreviewClient(c); handleNavigate(ViewState.CUSTOMER_PORTAL); }} />;
+      case ViewState.ONLINE_SALES: return <OnlineSales />;
+      case ViewState.ACCOUNTING: return <Accounting />;
+      case ViewState.STATISTICS: return <Statistics />;
+      case ViewState.REPORTS: return <Reports />;
+      case ViewState.BACKUP: return <Backup />;
+      case ViewState.BRANCHES: return <Branches />;
+      case ViewState.USERS: return <UsersComponent />;
+      case ViewState.PRICE_UPDATES: return <PriceUpdates />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
+      case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
+      case ViewState.AFIP_CONFIG: return <AfipConfig />;
+      case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
+      case ViewState.EMPLOYEES: return <Employees />;
+      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
+      case ViewState.MARKETING: return <Marketing />;
+      case ViewState.PRICE_AUDIT: return <PriceAudit />;
+      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
+      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      case ViewState.SHOP: return <Shop />;
+      case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
+      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.PURCHASES: return <Purchases />;
+      case ViewState.REMITOS: return <Remitos onBillRemitos={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
+      case ViewState.SALES_ORDERS: return <SalesOrders />;
+      case ViewState.CREDIT_NOTES: return <CreditNotes />;
+      case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
+      case ViewState.CLOUD_HUB: return <CloudHub />;
+      default: return <Dashboard onNavigate={handleNavigate} />;
+    }
+  };
+
+  const isPublicView = activeView === ViewState.SHOP || activeView === ViewState.PUBLIC_PORTAL;
+
+  if (isPublicView) {
+      return <div className="h-screen w-full bg-white overflow-hidden">{renderViewContent(activeView)}</div>;
+  }
+
+  if (!loggedInUser) {
+    return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
+  }
+
+  return (
+    <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
+      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} />
+      
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
+            {openViews.map((view) => {
+                const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
+                const Icon = config.icon;
+                return (
+                    <button 
+                        key={view} 
+                        onClick={() => setActiveView(view)} 
+                        className={`flex items-center gap-3 px-4 h-10 rounded-t-xl transition-all border-x border-t relative group min-w-[140px] max-w-[200px] ${
+                            activeView === view 
+                            ? 'bg-slate-50 text-indigo-600 border-slate-200 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] font-black' 
+                            : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
+                        }`}
+                    >
+                        <Icon size={14} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
+                        <span className="text-[10px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                            {config.label}
+                        </span>
+                        {view !== ViewState.DASHBOARD && (
+                            <div 
+                                onClick={(e) => closeView(view, e)}
+                                className={`p-1 rounded-md transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
+                            >
+                                <X size={12} />
+                            </div>
+                        )}
+                        {activeView === view && (
+                            <div className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-indigo-600"></div>
+                        )}
+                    </button>
+                );
+            })}
+        </header>
+
+        <main className="flex-1 relative bg-slate-50 overflow-hidden">
+          {openViews.map((view) => (
+            <div 
+              key={view} 
+              className={`absolute inset-0 transition-opacity duration-200 ${
+                activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
+              {renderViewContent(view)}
             </div>
-        </div>
-    );
+          ))}
+        </main>
+      </div>
+    </div>
+  );
 };
 
 export default App;
