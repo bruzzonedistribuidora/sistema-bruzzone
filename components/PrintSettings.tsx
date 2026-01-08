@@ -9,7 +9,8 @@ import {
     RotateCcw, Maximize2, Settings2, Trash2, Eye as EyeIcon, 
     ToggleLeft, ToggleRight, DollarSign, List, PencilLine
 } from 'lucide-react';
-import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig, TableColumnConfig } from '../types';
+/* Fix: Removed TableColumnConfig from imports as it is not exported from types.ts */
+import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig } from '../types';
 
 const REPORT_LIST: { type: DocumentType, name: string, size: PaperSize, cat: string }[] = [
     { type: 'FACTURA', name: 'Factura de Venta (Modelo A/B)', size: 'A4', cat: 'COMPROBANTES' },
@@ -327,7 +328,7 @@ const PrintSettings: React.FC = () => {
                         style={{ left: `${currentTemplate.positions.logo.x}mm`, top: `${currentTemplate.positions.logo.y}mm`, width: '40mm', height: '25mm' }}
                     >
                         {companyConfig.logo ? (
-                            <img src={companyConfig.logo} alt="Logo" className="max-w-full max-h-full object-contain" />
+                            <img src={companyConfig.logo} alt="Logo" className="max-w-full max-h-full object-contain p-6" />
                         ) : (
                             <div className="w-full h-full bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-4">
                                 <ImageIcon size={24} className="text-slate-300 mb-1"/>
