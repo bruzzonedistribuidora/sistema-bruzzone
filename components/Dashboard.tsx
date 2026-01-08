@@ -2,16 +2,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
-    Calculator, Settings, Layers, ClipboardList, TrendingUp, 
-    Activity, ArrowUpRight, ArrowRight, Search, FileText, Bot, Tags,
-    History, Globe, Landmark, ShieldCheck, FileSpreadsheet,
-    FileBarChart2, AlertTriangle, Star, Check, Edit3, X, Plus,
-    ListOrdered, Tag, CalendarDays, Shield, ArrowLeftRight,
-    Building2, HardDrive, LayoutTemplate, Store, DollarSign,
-    Zap, Boxes, FileUp, Smartphone, UserCheck, CheckCircle,
-    Sparkles, ShieldAlert, RotateCcw, ArrowDownRight, ArrowDownLeft,
-    ShoppingBag, Laptop, Heart, PackagePlus, Settings2, Eye, EyeOff,
-    LayoutGrid
+    Calculator, Layers, ClipboardList, Bot, X, Plus,
+    FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
+    ShoppingBag, Laptop, PackagePlus, Globe
 } from 'lucide-react';
 import { ViewState } from '../types';
 
@@ -42,8 +35,6 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.REMITOS, label: "Remitos", category: "Ventas", icon: ClipboardList, color: "bg-blue-600" },
     { id: ViewState.PRESUPUESTOS, label: "Presupuestos", category: "Ventas", icon: FileSpreadsheet, color: "bg-teal-500" },
     { id: ViewState.AI_ASSISTANT, label: "FerreBot IA", category: "Inteligencia", icon: Bot, color: "bg-indigo-900" },
-    { id: ViewState.DAILY_MOVEMENTS, label: "Gastos Diarios", category: "Finanzas", icon: DollarSign, color: "bg-red-500" },
-    { id: ViewState.EMPLOYEES, label: "Personal", category: "RRHH", icon: Users, color: "bg-blue-400" },
     { id: ViewState.CLOUD_HUB, label: "Nube Central", category: "Sistema", icon: Globe, color: "bg-indigo-800" },
 ];
 
@@ -164,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                       <button 
                         onClick={() => setIsEditMode(false)}
                         className="bg-slate-900 text-white px-20 py-5 rounded-[2rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-4">
-                          <Check size={20}/> Guardar Preferencias
+                          Guardar Preferencias
                       </button>
                   </div>
               </div>
