@@ -44,7 +44,17 @@ export enum ViewState {
   SHOP = 'SHOP',
   ECOMMERCE_ADMIN = 'ECOMMERCE_ADMIN',
   INITIAL_IMPORT = 'INITIAL_IMPORT',
-  CLOUD_HUB = 'CLOUD_HUB'
+  CLOUD_HUB = 'CLOUD_HUB',
+  LICENSE_MANAGER = 'LICENSE_MANAGER'
+}
+
+export interface SystemLicense {
+  status: 'ACTIVE' | 'EXPIRED' | 'TRIAL' | 'LOCKED';
+  expiryDate: string;
+  clientName: string;
+  planName: string;
+  enabledModules: Record<string, boolean>;
+  creatorKey: string;
 }
 
 export interface StockAdjustmentLog {
@@ -58,176 +68,126 @@ export interface StockAdjustmentLog {
   reason: string;
   user: string;
 }
-
+// ... resto de interfaces se mantienen iguales ...
 export type CloudSyncStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING' | 'ERROR';
-
-export interface CloudConfig {
-  enabled: boolean;
-  vaultId: string;
-  lastSync: string;
-  autoSync: boolean;
-  apiUrl: string;
-}
-
+export interface CloudConfig { enabled: boolean; vaultId: string; lastSync: string; autoSync: boolean; apiUrl: string; }
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
-
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
 export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
+export interface Position { x: number; y: number; visible: boolean; }
+export interface TableColumnConfig { id: string; label: string; visible: boolean; }
+export interface PrintTemplate { id: string; name: string; paperSize: PaperSize; orientation: 'VERTICAL' | 'HORIZONTAL'; titleText: string; docLetterText: string; docCodeText: string; headerText: string; subHeaderText: string; footerText: string; totalsLabel: string; voucherPointOfSale: string; voucherNumber: string; voucherCuitEmisor: string; voucherIIBBEmisor: string; showPrices: boolean; showSkus: boolean; showBrands: boolean; showIvaColumn: boolean; positions: Record<string, Position>; }
 
-export interface Position {
-  x: number;
-  y: number;
-  visible: boolean;
-}
-
-export interface TableColumnConfig {
-  id: string;
-  label: string;
-  visible: boolean;
-}
-
-export interface PrintTemplate {
-  id: string;
-  name: string;
-  paperSize: PaperSize;
-  orientation: 'VERTICAL' | 'HORIZONTAL';
-  titleText: string;
-  docLetterText: string;
-  docCodeText: string;
-  headerText: string;
-  subHeaderText: string;
-  footerText: string;
-  totalsLabel: string;
-  voucherPointOfSale: string;
-  voucherNumber: string;
-  voucherCuitEmisor: string;
-  voucherIIBBEmisor: string;
-  showPrices: boolean;
-  showSkus: boolean;
-  showBrands: boolean;
-  showIvaColumn: boolean;
-  positions: Record<string, Position>;
-}
-
-export interface Product {
-  id: string;
-  internalCodes: string[];
-  barcodes: string[];
-  providerCodes: string[];
-  otrosCodigos1?: string;
-  otrosCodigos2?: string;
-  otrosCodigos3?: string;
-  otrosCodigos4?: string;
-  name: string;
-  brand: string;
-  provider: string;
-  category: string;
-  description: string;
-  listCost: number;
-  purchasePackageQuantity?: number;
-  precioCostoSinBonificar?: number;
-  coeficienteBonificacionCosto?: number;
-  porcentajesBonificacionCosto?: string;
-  costAfterDiscounts: number;
-  discounts: number[];
-  profitMargin: number;
-  porcentajeGanancia1View?: number;
-  porcentajeGanancia2View?: number;
-  precioConTasaBonificadoView?: number;
-  priceNeto: number;
-  priceFinal: number;
-  vatRate: number;
-  usaPorcentaje?: boolean;
-  listaCodigo?: string;
-  stock: number;
-  stockPrincipal: number;
-  stockDeposito: number;
-  stockSucursal: number;
-  stockMinimo?: number;
-  stockMaximo?: number;
-  reorderPoint: number;
-  stockDetails: ProductStock[];
-  location: string;
-  measureUnitPurchase: string;
-  measureUnitSale?: string;
-  conversionFactor?: number;
+/**
+ * Updated Product interface to include missing fiscal and ecommerce properties.
+ */
+export interface Product { 
+  id: string; 
+  internalCodes: string[]; 
+  barcodes: string[]; 
+  providerCodes: string[]; 
+  otrosCodigos1?: string; 
+  otrosCodigos2?: string; 
+  otrosCodigos3?: string; 
+  otrosCodigos4?: string; 
+  name: string; 
+  brand: string; 
+  provider: string; 
+  category: string; 
+  description: string; 
+  listCost: number; 
+  purchasePackageQuantity?: number; 
+  costAfterDiscounts: number; 
+  discounts: number[]; 
+  profitMargin: number; 
+  priceNeto: number; 
+  priceFinal: number; 
+  vatRate: number; 
+  /* Added fiscal fields used in Inventory.tsx */
   tasa?: number;
-  listItemTasa?: number;
   alicuotaImpuestoInterno?: number;
-  detalleOtrosCostos?: string;
-  ecommerce: {
-    isPublished?: boolean;
-    isOffer?: boolean;
-    offerPrice?: number | null;
-    isFeatured?: boolean;
-    imageUrl?: string;
+  stock: number; 
+  stockPrincipal: number; 
+  stockDeposito: number; 
+  stockSucursal: number; 
+  stockMinimo?: number; 
+  stockMaximo?: number; 
+  reorderPoint: number; 
+  stockDetails: ProductStock[]; 
+  location: string; 
+  measureUnitPurchase: string; 
+  measureUnitSale?: string; 
+  conversionFactor?: number; 
+  ecommerce: { 
+    isPublished?: boolean; 
+    isOffer?: boolean; 
+    offerPrice?: number | null; 
+    isFeatured?: boolean; 
+    imageUrl?: string; 
+    /* Added platform-specific fields used in EcommerceAdmin.tsx */
     mercadoLibre?: boolean;
     tiendaNube?: boolean;
     webPropia?: boolean;
-  };
-  isCombo: boolean;
-  comboItems: ComboItem[];
-  purchaseCurrency: string;
-  saleCurrency: string;
+  }; 
+  isCombo: boolean; 
+  comboItems: ComboItem[]; 
+  purchaseCurrency: string; 
+  saleCurrency: string; 
+  coeficienteBonificacionCosto?: number; 
 }
 
-export interface ProductStock {
-  branchId: string;
-  branchName: string;
-  quantity: number;
-}
-
-export interface ComboItem {
-  productId: string;
-  productName: string;
-  quantity: number;
-  unitCost: number;
-}
-
+export interface ProductStock { branchId: string; branchName: string; quantity: number; }
+export interface ComboItem { productId: string; productName: string; quantity: number; unitCost: number; }
 export interface Brand { id: string; name: string; }
 export interface Category { id: string; name: string; }
-export interface Provider { id: string; name: string; cuit: string; contact: string; phone?: string; email?: string; address?: string; balance: number; defaultDiscounts: [number, number, number]; taxCondition?: TaxCondition; orderPhone?: string; orderEmail?: string; }
 
-export interface AuthorizedContact {
-  id: string;
-  name: string;
-  dni: string;
-  relation: string;
+/**
+ * Defined PurchaseItem interface for Purchases.tsx
+ */
+export interface PurchaseItem {
+  descripcion: string;
+  cantidad: number;
+  costoUnitario: number;
+  bonificacion?: number;
+  subtotal: number;
 }
 
+export interface Provider { id: string; name: string; cuit: string; contact: string; phone?: string; email?: string; address?: string; balance: number; defaultDiscounts: [number, number, number]; taxCondition?: TaxCondition; orderPhone?: string; orderEmail?: string; }
+export interface AuthorizedContact { id: string; name: string; dni: string; relation: string; }
+
+/**
+ * Updated Client interface to include missing properties used in Clients.tsx
+ */
 export interface Client { 
   id: string; 
-  name: string; // Nombre Completo o Razon Social
+  /* Added number field used in list filtering */
+  number?: string;
+  name: string; 
+  /* Added descriptive name fields used in modal form */
   firstName?: string;
   lastName?: string;
   fantasyName?: string;
-  number?: string; // Numero de cliente
   cuit: string; 
   dni?: string; 
   phone: string; 
-  email?: string;
+  email?: string; 
   address: string; 
-  locality?: string;
-  description?: string;
-  taxCondition?: TaxCondition;
-  
-  // Comercial
+  locality?: string; 
+  description?: string; 
+  taxCondition?: TaxCondition; 
   balance: number; 
-  isCurrentAccountActive: boolean;
+  isCurrentAccountActive: boolean; 
   limit: number; 
-  isLimitEnabled: boolean;
-  useAdvance: boolean; // Usar anticipo
-  specialDiscount?: number; 
-  priceListId?: string; // Lista de precio asignada
-  defaultPaymentMethod?: string;
-  
-  // Puntos / Loyalty
+  isLimitEnabled: boolean; 
+  useAdvance: boolean; 
   points: number; 
-  
-  // Seguridad
   portalEnabled?: boolean; 
   portalHash?: string; 
-  authorizedContacts: AuthorizedContact[];
+  authorizedContacts: AuthorizedContact[]; 
+  /* Added pricing and payment fields used in modal form */
+  specialDiscount?: number;
+  priceListId?: string;
+  defaultPaymentMethod?: string;
 }
 
 export interface User { id: string; name: string; email: string; password?: string; roleId: string; active: boolean; lastLogin: string; branchId: string; }
@@ -241,7 +201,6 @@ export interface CashRegister { id: string; name: string; balance: number; isOpe
 export interface Check { id: string; number: string; bank: string; issuer: string; amount: number; dueDate: string; status: 'PENDING' | 'DEPOSITED' | 'REJECTED'; type: 'FISICO' | 'ECHEQ'; }
 export interface TreasuryMovement { id: string; date: string; type: 'INCOME' | 'EXPENSE'; subtype: string; paymentMethod: 'EFECTIVO' | 'TRANSFERENCIA' | 'MERCADO_PAGO'; amount: number; description: string; cashRegisterId: string; }
 export interface Purchase { id: string; providerId: string; providerName: string; date: string; type: string; items: number; total: number; status: 'PENDING' | 'COMPLETED'; }
-export interface PurchaseItem { descripcion: string; cantidad: number; costoUnitario: number; subtotal: number; }
 export interface CurrentAccountMovement { id: string; clientId?: string; providerId?: string; date: string; voucherType: string; description: string; debit: number; credit: number; balance: number; }
 export interface CompanyConfig { name: string; fantasyName: string; cuit: string; taxCondition: TaxCondition; iibb: string; startDate: string; address: string; city: string; zipCode: string; phone: string; email: string; web: string; logo: string | null; slogan: string; whatsappNumber: string; defaultProfitMargin: number; paymentAccounts: PaymentAccount[]; paymentMethods: string[]; paymentSystems: PaymentSystem[]; loyalty?: LoyaltyConfig; currencies?: CurrencyQuote[]; headerDisplayMode?: 'LOGO' | 'NAME' | 'BOTH'; }
 export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; bankName: string; alias: string; cbu: string; owner: string; active: boolean; qrImage?: string; }
@@ -249,15 +208,7 @@ export interface PaymentSystem { id: string; name: string; debitSurcharge: numbe
 export interface CreditInstallment { id: string; installments: number; surcharge: number; label: string; }
 export interface LoyaltyConfig { enabled: boolean; pointsPerPeso: number; minPointsToRedeem: number; valuePerPoint: number; }
 export interface CurrencyQuote { id: string; name: string; code: string; value: number; lastUpdate: string; }
-export interface PriceList { 
-  id: string; 
-  name: string; 
-  type: 'BASE' | 'CUSTOM'; 
-  fixedMargin?: number; 
-  baseListId?: string; // ID de la lista de la que hereda
-  adjustmentPercentage?: number; // % de recargo (+) o descuento (-)
-  active: boolean; 
-}
+export interface PriceList { id: string; name: string; type: 'BASE' | 'CUSTOM'; fixedMargin?: number; baseListId?: string; adjustmentPercentage?: number; active: boolean; }
 export interface ReplenishmentItem { product: Product; quantity: number; selectedProviderId: string; selectedProviderName: string; }
 export interface ReplenishmentOrder { id: string; date: string; providerId: string; providerName: string; items: ReplenishmentItem[]; status: 'DRAFT' | 'SENT'; totalItems: number; estimatedCost: number; notes?: string; }
 export interface StockTransfer { id: string; date: string; sourceBranchId: string; sourceBranchName: string; destBranchId: string; destBranchName: string; items: StockTransferItem[]; notes: string; status: 'PENDING' | 'COMPLETED' | 'CANCELLED'; }
