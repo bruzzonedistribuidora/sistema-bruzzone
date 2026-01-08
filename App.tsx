@@ -52,7 +52,7 @@ import Login from './components/Login';
 import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
-import LicenseManager from './components/LicenseManager';
+import LicenseManager from './components/LicenseManager.tsx';
 import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
