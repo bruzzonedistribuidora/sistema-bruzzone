@@ -6,7 +6,6 @@ import {
     RefreshCw, AlertTriangle, Key, Activity,
     Database, Receipt, Truck, Calculator,
     Smartphone, Star, Users, DollarSign, Wallet,
-    /* Fix: Added missing icons used in moduleCategories */
     ClipboardList, FileText, BarChart3, Cloud
 } from 'lucide-react';
 import { SystemLicense, ViewState } from '../types';
