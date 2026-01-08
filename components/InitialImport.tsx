@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
@@ -23,7 +24,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const productFields = [
-        { key: 'internalCodes', label: 'CODIGO Propi (SKU)', required: true },
+        { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: true },
         { key: 'name', label: 'Nombre Artículo', required: true },
         { key: 'listCost', label: 'Costo Lista (Bulto o Unidad)', required: true },
         { key: 'purchasePackageQuantity', label: 'Unidades por Bulto (Pack)', required: false },
@@ -32,7 +33,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'disc1', label: 'Bonificación 1 (%)', required: false },
         { key: 'disc2', label: 'Bonificación 2 (%)', required: false },
         { key: 'disc3', label: 'Bonificación 3 (%)', required: false },
-        { key: 'disc4', label: 'Bonificación 4 (%)', required: false },
         { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonif. Directo', required: false },
         { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
         { key: 'vatRate', label: 'Alícuota IVA %', required: false },
@@ -47,21 +47,18 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     ];
 
     const matchKeyOptions = [
-        { value: 'internalCodes', label: 'Código Propi (SKU)' },
+        { value: 'internalCodes', label: 'Código Propio (SKU)' },
         { value: 'barcodes', label: 'Código de Barras (EAN)' },
         { value: 'providerCodes', label: 'Código de Proveedor' },
     ];
 
-    // Helper robusto para limpiar y parsear números desde Excel/CSV (maneja 10,5 / 21% / $ 1.000 / 0)
     const parseNumber = (val: any, defaultValue: number): number => {
         if (val === undefined || val === null || val.toString().trim() === '') return defaultValue;
-        // Eliminar símbolos comunes y normalizar coma decimal a punto
         const cleanVal = val.toString().replace(/[%\$\s]/g, '').replace(',', '.');
         const parsed = parseFloat(cleanVal);
         return isNaN(parsed) ? defaultValue : parsed;
     };
 
-    // Helper para normalizar monedas desde el archivo (ARS, ARG, $, USD, U$S, DOLAR)
     const parseCurrency = (val: string | undefined, defaultValue: string): string => {
         if (!val) return defaultValue;
         const v = val.toUpperCase().trim();
@@ -80,7 +77,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
             if (lines.length < 1) return;
 
-            // Detectar separador (punto y coma o coma)
             const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
             const parsedRows = lines.map(line => line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, '')));
             
@@ -95,12 +91,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                            header === field.key.toLowerCase() ||
                            header.includes(field.label.toLowerCase()) ||
                            (field.key === 'purchaseCurrency' && (header.includes('moneda c') || header.includes('divisa c'))) ||
-                           (field.key === 'saleCurrency' && (header.includes('moneda v') || header.includes('divisa v'))) ||
                            (field.key === 'vatRate' && (header === 'iva' || header === 'tasa iva' || header === 'alicuota')) ||
                            (field.key === 'disc1' && (header.includes('bonif 1') || header.includes('desc 1'))) ||
                            (field.key === 'disc2' && (header.includes('bonif 2') || header.includes('desc 2'))) ||
-                           (field.key === 'disc3' && (header.includes('bonif 3') || header.includes('desc 3'))) ||
-                           (field.key === 'disc4' && (header.includes('bonif 4') || header.includes('desc 4')))
+                           (field.key === 'disc3' && (header.includes('bonif 3') || header.includes('desc 3')))
                 });
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -145,7 +139,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const keyInFile = row[mapping[matchKey]]?.toString().toUpperCase();
                 const existingProduct = keyInFile ? productMap.get(keyInFile) : null;
 
-                // 1. Costo Base
                 const packageQty = mapping.purchasePackageQuantity !== undefined 
                     ? parseNumber(row[mapping.purchasePackageQuantity], 1) 
                     : 1;
@@ -153,7 +146,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const rawCost = parseNumber(row[mapping.listCost], 0);
                 const unitListCost = rawCost / (packageQty || 1);
 
-                // 2. Monedas
                 const purchaseCurrency = mapping.purchaseCurrency !== undefined
                     ? parseCurrency(row[mapping.purchaseCurrency], 'ARS')
                     : (existingProduct?.purchaseCurrency || 'ARS');
@@ -162,22 +154,18 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     ? parseCurrency(row[mapping.saleCurrency], 'ARS')
                     : (existingProduct?.saleCurrency || 'ARS');
 
-                // 3. Bonificaciones
+                // Lógica de 3 descuentos
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
                 const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
                 const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
-                const d4 = mapping.disc4 !== undefined ? parseNumber(row[mapping.disc4], 0) : 0;
 
-                let coefBonif;
-                if (mapping.disc1 !== undefined || mapping.disc2 !== undefined || mapping.disc3 !== undefined || mapping.disc4 !== undefined) {
-                    coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100) * (1 - d4/100);
-                } else {
-                    coefBonif = mapping.coeficienteBonificacionCosto !== undefined 
-                        ? parseNumber(row[mapping.coeficienteBonificacionCosto], 1) 
-                        : (existingProduct?.coeficienteBonificacionCosto ?? 1);
+                let coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100);
+                
+                // Si no se mapearon descuentos pero sí un coeficiente directo
+                if (mapping.disc1 === undefined && mapping.disc2 === undefined && mapping.disc3 === undefined && mapping.coeficienteBonificacionCosto !== undefined) {
+                    coefBonif = parseNumber(row[mapping.coeficienteBonificacionCosto], 1);
                 }
                 
-                // 4. Márgenes y Tasas IVA (Lectura corregida para 0, 10.5, 21)
                 const rawMargin = mapping.profitMargin !== undefined 
                     ? parseNumber(row[mapping.profitMargin], 30) 
                     : (existingProduct?.profitMargin ?? 30);
@@ -205,7 +193,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     vatRate: vatRate,
                     listCost: unitListCost,
                     purchasePackageQuantity: packageQty,
-                    coeficienteBonificacionCosto: coefBonif,
+                    coeficienteBonificacionCosto: parseFloat(coefBonif.toFixed(5)),
                     costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)),
                     profitMargin: rawMargin,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
@@ -218,7 +206,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
                     isCombo: existingProduct?.isCombo || false, 
                     comboItems: existingProduct?.comboItems || [],
-                    discounts: [d1, d2, d3, d4]
+                    discounts: [d1, d2, d3, 0]
                 };
 
                 if (existingProduct) updatedCount++;
