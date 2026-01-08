@@ -128,7 +128,8 @@ const Inventory: React.FC = () => {
 
           const headers = [
               "CODIGO PROPIO (SKU)", "NOMBRE ARTICULO", "MARCA", "RUBRO", "PROVEEDOR", 
-              "COSTO LISTA", "DESC 1", "DESC 2", "DESC 3", "MARGEN %", "IVA %", "PRECIO NETO", "PRECIO FINAL", "STOCK ACTUAL"
+              "COSTO LISTA", "DESC 1", "DESC 2", "DESC 3", "MARGEN %", "IVA %", "PRECIO NETO", "PRECIO FINAL", 
+              "STOCK TOTAL", "STOCK PRINCIPAL", "STOCK DEPOSITO", "STOCK SUCURSAL"
           ];
 
           const csvRows = all.map(p => [
@@ -145,7 +146,10 @@ const Inventory: React.FC = () => {
               p.vatRate,
               p.priceNeto,
               p.priceFinal,
-              p.stock
+              p.stock,
+              p.stockPrincipal || 0,
+              p.stockDeposito || 0,
+              p.stockSucursal || 0
           ]);
 
           let csvContent = "\uFEFF"; // BOM para Excel
@@ -186,14 +190,21 @@ const Inventory: React.FC = () => {
     const vatRate = Number(formData.vatRate) || 0;
     const priceFinal = priceNeto * (1 + vatRate / 100);
 
+    // Cálculo de stock total dinámico
+    const sP = Number(formData.stockPrincipal) || 0;
+    const sD = Number(formData.stockDeposito) || 0;
+    const sS = Number(formData.stockSucursal) || 0;
+    const totalStock = sP + sD + sS;
+
     setFormData(prev => ({
         ...prev,
         coeficienteBonificacionCosto: parseFloat(coefBonif.toFixed(5)),
         costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)),
         priceNeto: parseFloat(priceNeto.toFixed(2)),
-        priceFinal: parseFloat(priceFinal.toFixed(2))
+        priceFinal: parseFloat(priceFinal.toFixed(2)),
+        stock: totalStock
     }));
-  }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate]);
+  }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate, formData.stockPrincipal, formData.stockDeposito, formData.stockSucursal]);
 
   const handleOpenModal = (p?: Product) => {
     if (p) {
@@ -208,7 +219,10 @@ const Inventory: React.FC = () => {
             otrosCodigos4: p.otrosCodigos4 || '',
             purchasePackageQuantity: p.purchasePackageQuantity || 1,
             vatRate: p.vatRate !== undefined ? p.vatRate : 21,
-            discounts: p.discounts || [0, 0, 0, 0]
+            discounts: p.discounts || [0, 0, 0, 0],
+            stockPrincipal: p.stockPrincipal || 0,
+            stockDeposito: p.stockDeposito || 0,
+            stockSucursal: p.stockSucursal || 0
         });
         setBulkCost((p.listCost || 0) * (p.purchasePackageQuantity || 1));
     } else {
@@ -223,7 +237,11 @@ const Inventory: React.FC = () => {
             listCost: 0, 
             coeficienteBonificacionCosto: 1, 
             profitMargin: 30,
-            vatRate: 21, stock: 0,
+            vatRate: 21, 
+            stock: 0,
+            stockPrincipal: 0,
+            stockDeposito: 0,
+            stockSucursal: 0,
             tasa: 0, alicuotaImpuestoInterno: 0,
             stockDetails: branches.map(b => ({ branchId: b.id, branchName: b.name, quantity: 0 })),
             ecommerce: { isPublished: false },
@@ -352,8 +370,8 @@ const Inventory: React.FC = () => {
                                     <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
                                         <div className="flex items-center justify-center gap-2">Rubro / Marca {getSortIcon('category')}</div>
                                     </th>
-                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-right" onClick={() => requestSort('stock')}>
-                                        <div className="flex items-center justify-end gap-2">Stock {getSortIcon('stock')}</div>
+                                    <th className="px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('stock')}>
+                                        <div className="flex items-center justify-center gap-2">Stock Desglosado {getSortIcon('stock')}</div>
                                     </th>
                                     <th className="px-6 py-5 cursor-pointer hover:bg-slate-700 transition-colors text-right bg-slate-800" onClick={() => requestSort('price')}>
                                         <div className="flex items-center justify-end gap-2">Precio Venta {getSortIcon('price')}</div>
@@ -376,8 +394,15 @@ const Inventory: React.FC = () => {
                                             <span className="bg-slate-100 text-slate-500 px-2 py-1 rounded-lg border text-[9px] font-black uppercase mb-1 block w-fit mx-auto">{p.category}</span>
                                             <span className="text-[8px] text-indigo-400 font-black uppercase tracking-widest">{p.brand}</span>
                                         </td>
-                                        <td className="px-6 py-5 text-right font-black text-lg tracking-tighter">
-                                            {p.stock?.toLocaleString()}
+                                        <td className="px-6 py-5 text-center">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="text-lg font-black text-slate-900 tracking-tighter">Total: {p.stock?.toLocaleString()}</span>
+                                                <div className="flex gap-2 text-[8px] font-black uppercase tracking-widest">
+                                                    <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">P: {p.stockPrincipal || 0}</span>
+                                                    <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">D: {p.stockDeposito || 0}</span>
+                                                    <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100">S: {p.stockSucursal || 0}</span>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-5 text-right font-black text-slate-900 bg-indigo-50/10">
                                             <p className="text-lg tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
@@ -675,18 +700,65 @@ const Inventory: React.FC = () => {
                           )}
 
                           {modalTab === 'STOCK' && (
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in">
-                                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
-                                      <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Stock Mínimo</p>
-                                      <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-4xl text-center text-red-600" value={formData.stockMinimo} onChange={e => setFormData({...formData, stockMinimo: parseFloat(e.target.value) || 0})} />
+                              <div className="space-y-10 animate-fade-in">
+                                  {/* DESGLOSE DE STOCK POR UBICACIÓN */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                      <div className="bg-indigo-50 p-8 rounded-[2.5rem] border border-indigo-100 shadow-sm text-center space-y-4">
+                                          <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Stock Principal</p>
+                                          <input 
+                                            type="number" 
+                                            className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-indigo-600 outline-none font-black text-4xl text-center text-indigo-900" 
+                                            value={formData.stockPrincipal} 
+                                            onChange={e => setFormData({...formData, stockPrincipal: parseFloat(e.target.value) || 0})} 
+                                          />
+                                          <p className="text-[8px] font-bold text-indigo-400 uppercase">Mercadería en Salón / Mostrador</p>
+                                      </div>
+                                      <div className="bg-emerald-50 p-8 rounded-[2.5rem] border border-emerald-100 shadow-sm text-center space-y-4">
+                                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Stock Depósito</p>
+                                          <input 
+                                            type="number" 
+                                            className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-emerald-600 outline-none font-black text-4xl text-center text-emerald-900" 
+                                            value={formData.stockDeposito} 
+                                            onChange={e => setFormData({...formData, stockDeposito: parseFloat(e.target.value) || 0})} 
+                                          />
+                                          <p className="text-[8px] font-bold text-emerald-400 uppercase">Reserva / Almacén Central</p>
+                                      </div>
+                                      <div className="bg-orange-50 p-8 rounded-[2.5rem] border border-orange-100 shadow-sm text-center space-y-4">
+                                          <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Stock Sucursal</p>
+                                          <input 
+                                            type="number" 
+                                            className="w-full p-4 bg-white border-2 border-transparent rounded-2xl focus:border-orange-600 outline-none font-black text-4xl text-center text-orange-900" 
+                                            value={formData.stockSucursal} 
+                                            onChange={e => setFormData({...formData, stockSucursal: parseFloat(e.target.value) || 0})} 
+                                          />
+                                          <p className="text-[8px] font-bold text-orange-400 uppercase">Transferencias / Otros Puntos</p>
+                                      </div>
                                   </div>
-                                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
-                                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Punto de Pedido</p>
-                                      <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-4xl text-center text-indigo-600" value={formData.reorderPoint} onChange={e => setFormData({...formData, reorderPoint: parseFloat(e.target.value) || 0})} />
+
+                                  <div className="bg-slate-900 p-8 rounded-[3rem] text-white flex justify-between items-center shadow-xl">
+                                      <div>
+                                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Total Consolidado</p>
+                                          <h4 className="text-4xl font-black text-white">{formData.stock}</h4>
+                                      </div>
+                                      <div className="text-right">
+                                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cálculo Automático</p>
+                                          <p className="text-[8px] font-medium text-slate-600">Suma de Principal + Depósito + Sucursal</p>
+                                      </div>
                                   </div>
-                                  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
-                                      <p className="text-[10px] font-black text-green-400 uppercase tracking-widest">Stock Máximo / Ideal</p>
-                                      <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-green-600 outline-none font-black text-4xl text-center text-green-600" value={formData.stockMaximo} onChange={e => setFormData({...formData, stockMaximo: parseFloat(e.target.value) || 0})} />
+
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
+                                          <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">Stock Mínimo (Alerta)</p>
+                                          <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-red-600 outline-none font-black text-4xl text-center text-red-600" value={formData.stockMinimo} onChange={e => setFormData({...formData, stockMinimo: parseFloat(e.target.value) || 0})} />
+                                      </div>
+                                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
+                                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Punto de Pedido</p>
+                                          <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-4xl text-center text-indigo-600" value={formData.reorderPoint} onChange={e => setFormData({...formData, reorderPoint: parseFloat(e.target.value) || 0})} />
+                                      </div>
+                                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm text-center space-y-3">
+                                          <p className="text-[10px] font-black text-green-400 uppercase tracking-widest">Stock Máximo / Ideal</p>
+                                          <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-green-600 outline-none font-black text-4xl text-center text-green-600" value={formData.stockMaximo} onChange={e => setFormData({...formData, stockMaximo: parseFloat(e.target.value) || 0})} />
+                                      </div>
                                   </div>
                               </div>
                           )}
