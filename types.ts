@@ -57,30 +57,17 @@ export interface SystemLicense {
   creatorKey: string;
 }
 
-export interface StockAdjustmentLog {
+export interface User {
   id: string;
-  date: string;
-  productId: string;
-  productName: string;
-  location: 'PRINCIPAL' | 'DEPOSITO' | 'SUCURSAL';
-  oldQty: number;
-  newQty: number;
-  reason: string;
-  user: string;
+  name: string;
+  email: string;
+  password?: string;
+  roleId: 'creator' | 'admin' | 'seller' | 'stock' | 'accountant';
+  active: boolean;
+  lastLogin: string;
+  branchId: string;
 }
-// ... resto de interfaces se mantienen iguales ...
-export type CloudSyncStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING' | 'ERROR';
-export interface CloudConfig { enabled: boolean; vaultId: string; lastSync: string; autoSync: boolean; apiUrl: string; }
-export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
-export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
-export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
-export interface Position { x: number; y: number; visible: boolean; }
-export interface TableColumnConfig { id: string; label: string; visible: boolean; }
-export interface PrintTemplate { id: string; name: string; paperSize: PaperSize; orientation: 'VERTICAL' | 'HORIZONTAL'; titleText: string; docLetterText: string; docCodeText: string; headerText: string; subHeaderText: string; footerText: string; totalsLabel: string; voucherPointOfSale: string; voucherNumber: string; voucherCuitEmisor: string; voucherIIBBEmisor: string; showPrices: boolean; showSkus: boolean; showBrands: boolean; showIvaColumn: boolean; positions: Record<string, Position>; }
 
-/**
- * Updated Product interface to include missing fiscal and ecommerce properties.
- */
 export interface Product { 
   id: string; 
   internalCodes: string[]; 
@@ -103,7 +90,6 @@ export interface Product {
   priceNeto: number; 
   priceFinal: number; 
   vatRate: number; 
-  /* Added fiscal fields used in Inventory.tsx */
   tasa?: number;
   alicuotaImpuestoInterno?: number;
   stock: number; 
@@ -124,7 +110,6 @@ export interface Product {
     offerPrice?: number | null; 
     isFeatured?: boolean; 
     imageUrl?: string; 
-    /* Added platform-specific fields used in EcommerceAdmin.tsx */
     mercadoLibre?: boolean;
     tiendaNube?: boolean;
     webPropia?: boolean;
@@ -140,57 +125,18 @@ export interface ProductStock { branchId: string; branchName: string; quantity: 
 export interface ComboItem { productId: string; productName: string; quantity: number; unitCost: number; }
 export interface Brand { id: string; name: string; }
 export interface Category { id: string; name: string; }
-
-/**
- * Defined PurchaseItem interface for Purchases.tsx
- */
-export interface PurchaseItem {
-  descripcion: string;
-  cantidad: number;
-  costoUnitario: number;
-  bonificacion?: number;
-  subtotal: number;
-}
-
+export interface PurchaseItem { descripcion: string; cantidad: number; costoUnitario: number; bonificacion?: number; subtotal: number; }
 export interface Provider { id: string; name: string; cuit: string; contact: string; phone?: string; email?: string; address?: string; balance: number; defaultDiscounts: [number, number, number]; taxCondition?: TaxCondition; orderPhone?: string; orderEmail?: string; }
 export interface AuthorizedContact { id: string; name: string; dni: string; relation: string; }
-
-/**
- * Updated Client interface to include missing properties used in Clients.tsx
- */
-export interface Client { 
-  id: string; 
-  /* Added number field used in list filtering */
-  number?: string;
-  name: string; 
-  /* Added descriptive name fields used in modal form */
-  firstName?: string;
-  lastName?: string;
-  fantasyName?: string;
-  cuit: string; 
-  dni?: string; 
-  phone: string; 
-  email?: string; 
-  address: string; 
-  locality?: string; 
-  description?: string; 
-  taxCondition?: TaxCondition; 
-  balance: number; 
-  isCurrentAccountActive: boolean; 
-  limit: number; 
-  isLimitEnabled: boolean; 
-  useAdvance: boolean; 
-  points: number; 
-  portalEnabled?: boolean; 
-  portalHash?: string; 
-  authorizedContacts: AuthorizedContact[]; 
-  /* Added pricing and payment fields used in modal form */
-  specialDiscount?: number;
-  priceListId?: string;
-  defaultPaymentMethod?: string;
-}
-
-export interface User { id: string; name: string; email: string; password?: string; roleId: string; active: boolean; lastLogin: string; branchId: string; }
+export interface Client { id: string; number?: string; name: string; firstName?: string; lastName?: string; fantasyName?: string; cuit: string; dni?: string; phone: string; email?: string; address: string; locality?: string; description?: string; taxCondition?: TaxCondition; balance: number; isCurrentAccountActive: boolean; limit: number; isLimitEnabled: boolean; useAdvance: boolean; points: number; portalEnabled?: boolean; portalHash?: string; authorizedContacts: AuthorizedContact[]; specialDiscount?: number; priceListId?: string; defaultPaymentMethod?: string; }
+export type CloudSyncStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING' | 'ERROR';
+export interface CloudConfig { enabled: boolean; vaultId: string; lastSync: string; autoSync: boolean; apiUrl: string; }
+export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
+export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
+export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
+export interface Position { x: number; y: number; visible: boolean; }
+export interface PrintTemplate { id: string; name: string; paperSize: PaperSize; orientation: 'VERTICAL' | 'HORIZONTAL'; titleText: string; docLetterText: string; docCodeText: string; headerText: string; subHeaderText: string; footerText: string; totalsLabel: string; voucherPointOfSale: string; voucherNumber: string; voucherCuitEmisor: string; voucherIIBBEmisor: string; showPrices: boolean; showSkus: boolean; showBrands: boolean; showIvaColumn: boolean; positions: Record<string, Position>; }
+export interface StockAdjustmentLog { id: string; date: string; productId: string; productName: string; location: 'PRINCIPAL' | 'DEPOSITO' | 'SUCURSAL'; oldQty: number; newQty: number; reason: string; user: string; }
 export interface Role { id: string; name: string; color: string; permissions: string[]; }
 export interface Branch { id: string; code: string; name: string; address: string; phone: string; manager: string; type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL'; active: boolean; }
 export interface InvoiceItem { product: Product; quantity: number; appliedPrice: number; subtotal: number; }
