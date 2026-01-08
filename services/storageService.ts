@@ -1,5 +1,5 @@
 
-import { Product } from '../types';
+import { Product, ReplenishmentItem } from '../types';
 
 const DB_NAME = 'FerreCloudDB';
 const STORE_NAME = 'products';
@@ -74,7 +74,6 @@ class ProductDB {
             const store = transaction.objectStore(STORE_NAME);
             const request = store.put(product);
             request.onsuccess = () => {
-                // Properly notify other components of the update
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
                 resolve();
             };
@@ -97,7 +96,6 @@ class ProductDB {
             });
 
             transaction.oncomplete = () => {
-                // Dispatch event once all items are saved
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
                 resolve();
             };
@@ -135,3 +133,23 @@ class ProductDB {
 }
 
 export const productDB = new ProductDB();
+
+// Cola de Reposición (Pedir)
+export const addToReplenishmentQueue = (product: Product, quantity?: number) => {
+    const saved = localStorage.getItem('ferrecloud_replenishment_queue');
+    const queue: ReplenishmentItem[] = saved ? JSON.parse(saved) : [];
+    
+    const existing = queue.find(i => i.product.id === product.id);
+    if (!existing) {
+        queue.push({
+            product,
+            quantity: quantity || Math.max(1, (product.stockMaximo || 0) - product.stock),
+            selectedProviderId: '', // Se elige en el módulo
+            selectedProviderName: product.provider
+        });
+        localStorage.setItem('ferrecloud_replenishment_queue', JSON.stringify(queue));
+        window.dispatchEvent(new Event('replenishment_queue_updated'));
+        return true;
+    }
+    return false;
+};
