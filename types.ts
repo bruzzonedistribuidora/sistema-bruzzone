@@ -4,6 +4,7 @@ export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   ANALYTICS = 'ANALYTICS',
   INVENTORY = 'INVENTORY',
+  STOCK_ADJUSTMENT = 'STOCK_ADJUSTMENT',
   MASS_PRODUCT_UPDATE = 'MASS_PRODUCT_UPDATE',
   POS = 'POS',
   REMITOS = 'REMITOS',
@@ -44,6 +45,18 @@ export enum ViewState {
   ECOMMERCE_ADMIN = 'ECOMMERCE_ADMIN',
   INITIAL_IMPORT = 'INITIAL_IMPORT',
   CLOUD_HUB = 'CLOUD_HUB'
+}
+
+export interface StockAdjustmentLog {
+  id: string;
+  date: string;
+  productId: string;
+  productName: string;
+  location: 'PRINCIPAL' | 'DEPOSITO' | 'SUCURSAL';
+  oldQty: number;
+  newQty: number;
+  reason: string;
+  user: string;
 }
 
 export type CloudSyncStatus = 'ONLINE' | 'OFFLINE' | 'SYNCING' | 'ERROR';
