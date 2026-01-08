@@ -7,7 +7,8 @@ import {
     Layers, Zap, Shield, ShoppingCart, Globe, Tag, 
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
-    LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3
+    LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
+    Scale, Activity
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
@@ -171,7 +172,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 </NavDropdown>
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
-                <NavItem view={ViewState.TREASURY} label="Tesorería" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
+                
+                {/* NUEVA SECCIÓN DE FINANZAS AGRUPADA */}
+                <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
+                    <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />
+                    <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
+                    <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
+                </NavDropdown>
                 
                 <NavDropdown id="presencia" label="Digital" icon={Globe}>
                     <DropdownItem view={ViewState.ONLINE_SALES} label="Pedidos Online" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />
