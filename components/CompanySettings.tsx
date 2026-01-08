@@ -8,7 +8,7 @@ import {
     MapPin, Mail, Phone, Hash, FileText, Calendar, Wallet, QrCode,
     CheckSquare, Square, ToggleRight, ToggleLeft, Layout, Type, Image as ImageIcon
 } from 'lucide-react';
-import { CompanyConfig, PaymentSystem, PaymentAccount, TaxCondition } from '../types';
+import { CompanyConfig, PaymentSystem, PaymentAccount, TaxCondition, CreditInstallment } from '../types';
 import { fetchLatestFinancingRates } from '../services/geminiService';
 
 const CompanySettings: React.FC = () => {
@@ -111,6 +111,39 @@ const CompanySettings: React.FC = () => {
       } catch (error) {
           alert("Error al sincronizar con IA");
       } finally { setIsAiSearching(false); }
+  };
+
+  const addInstallment = (systemId: string) => {
+      const newInst: CreditInstallment = {
+          id: `inst-${Date.now()}`,
+          installments: 3,
+          surcharge: 0,
+          label: '3 CUOTAS FIJAS'
+      };
+      setFormData(prev => ({
+          ...prev,
+          paymentSystems: prev.paymentSystems?.map(s => s.id === systemId ? { ...s, creditInstallments: [...s.creditInstallments, newInst] } : s)
+      }));
+  };
+
+  const updateInstallment = (systemId: string, instId: string, updates: Partial<CreditInstallment>) => {
+      setFormData(prev => ({
+          ...prev,
+          paymentSystems: prev.paymentSystems?.map(s => s.id === systemId ? { 
+              ...s, 
+              creditInstallments: s.creditInstallments.map(i => i.id === instId ? { ...i, ...updates } : i) 
+          } : s)
+      }));
+  };
+
+  const deleteInstallment = (systemId: string, instId: string) => {
+      setFormData(prev => ({
+          ...prev,
+          paymentSystems: prev.paymentSystems?.map(s => s.id === systemId ? { 
+              ...s, 
+              creditInstallments: s.creditInstallments.filter(i => i.id !== instId) 
+          } : s)
+      }));
   };
 
   return (
@@ -335,9 +368,9 @@ const CompanySettings: React.FC = () => {
                 <div className="lg:col-span-1 space-y-6">
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-sm space-y-6">
                         <div className="flex justify-between items-center border-b pb-4">
-                            <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Plataformas</h3>
+                            <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Plataformas de Cobro</h3>
                             <button onClick={() => {
-                                const name = prompt("Nombre plataforma:");
+                                const name = prompt("Nombre plataforma (ej: MERCADO PAGO, GETNET, NAVE):");
                                 if(name) setFormData(prev => ({...prev, paymentSystems: [...(prev.paymentSystems||[]), {id: `sys-${Date.now()}`, name: name.toUpperCase(), debitSurcharge: 0, ratesUrl: '', creditInstallments: []}]}));
                             }} className="p-2 bg-indigo-600 text-white rounded-xl shadow-md"><Plus size={18}/></button>
                         </div>
@@ -355,7 +388,6 @@ const CompanySettings: React.FC = () => {
                                 {isAiSearching ? 'Escaneando Tasas...' : 'Sincronizar con IA'}
                             </button>
                         )}
-                        {/* Fix: Added display of AI grounding sources for finance rates as required */}
                         {lastSources.length > 0 && (
                             <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 animate-fade-in">
                                 <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -377,18 +409,55 @@ const CompanySettings: React.FC = () => {
                     {selectedSystemId ? (
                         <div className="bg-white p-10 rounded-[3rem] border border-gray-200 shadow-sm space-y-8 animate-fade-in">
                             <div className="flex justify-between items-center border-b pb-6">
-                                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">{formData.paymentSystems?.find(s => s.id === selectedSystemId)?.name}</h3>
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">{formData.paymentSystems?.find(s => s.id === selectedSystemId)?.name}</h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Planes de Pago y Recargos</p>
+                                </div>
                                 <button onClick={() => setFormData(prev => ({...prev, paymentSystems: prev.paymentSystems.filter(s => s.id !== selectedSystemId)}))} className="p-3 text-red-400 hover:text-red-600 transition-colors"><Trash2 size={20}/></button>
                             </div>
                             
-                            <div className="grid grid-cols-1 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL de Tasas Oficiales</label>
-                                    <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold text-xs" value={formData.paymentSystems?.find(s => s.id === selectedSystemId)?.ratesUrl} onChange={e => setFormData(prev => ({...prev, paymentSystems: prev.paymentSystems.map(s => s.id === selectedSystemId ? {...s, ratesUrl: e.target.value} : s)}))} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-6">
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4">
+                                        <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest border-b pb-2">Débito Automático</h4>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Recargo Débito (%)</label>
+                                            <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-xl font-black text-2xl text-indigo-600 outline-none" value={formData.paymentSystems?.find(s => s.id === selectedSystemId)?.debitSurcharge} onChange={e => setFormData(prev => ({...prev, paymentSystems: prev.paymentSystems.map(s => s.id === selectedSystemId ? {...s, debitSurcharge: parseFloat(e.target.value) || 0} : s)}))} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL de Referencia Tasas</label>
+                                        <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-bold text-xs" placeholder="Opcional: link oficial de tasas" value={formData.paymentSystems?.find(s => s.id === selectedSystemId)?.ratesUrl} onChange={e => setFormData(prev => ({...prev, paymentSystems: prev.paymentSystems.map(s => s.id === selectedSystemId ? {...s, ratesUrl: e.target.value} : s)}))} />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Recargo Débito (%)</label>
-                                    <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-2xl text-indigo-600" value={formData.paymentSystems?.find(s => s.id === selectedSystemId)?.debitSurcharge} onChange={e => setFormData(prev => ({...prev, paymentSystems: prev.paymentSystems.map(s => s.id === selectedSystemId ? {...s, debitSurcharge: parseFloat(e.target.value) || 0} : s)}))} />
+
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Planes de Crédito</h4>
+                                        <button onClick={() => addInstallment(selectedSystemId)} className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1 hover:underline"><Plus size={12}/> Añadir Plan</button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {formData.paymentSystems?.find(s => s.id === selectedSystemId)?.creditInstallments.map(plan => (
+                                            <div key={plan.id} className="bg-white p-4 border border-slate-200 rounded-2xl flex items-center gap-4 group">
+                                                <div className="w-16">
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Cuotas</label>
+                                                    <input type="number" className="w-full p-1 bg-slate-50 border rounded font-black text-center" value={plan.installments} onChange={e => updateInstallment(selectedSystemId, plan.id, {installments: parseInt(e.target.value)||1})} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Recargo (%)</label>
+                                                    <input type="number" className="w-full p-1 bg-slate-50 border rounded font-black text-indigo-600" value={plan.surcharge} onChange={e => updateInstallment(selectedSystemId, plan.id, {surcharge: parseFloat(e.target.value)||0})} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Etiqueta</label>
+                                                    <input type="text" className="w-full p-1 bg-slate-50 border rounded font-bold text-[9px] uppercase" value={plan.label} onChange={e => updateInstallment(selectedSystemId, plan.id, {label: e.target.value})} />
+                                                </div>
+                                                <button onClick={() => deleteInstallment(selectedSystemId, plan.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
+                                            </div>
+                                        ))}
+                                        {formData.paymentSystems?.find(s => s.id === selectedSystemId)?.creditInstallments.length === 0 && (
+                                            <p className="text-[10px] text-slate-400 italic text-center py-10">Sin planes de cuotas definidos.</p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
