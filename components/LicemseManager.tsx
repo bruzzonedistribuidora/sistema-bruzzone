@@ -175,7 +175,7 @@ const LicenseManager: React.FC = () => {
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-tight">{mod.label}</span>
                                             </div>
-                                            <div className={`w-10 h-5 rounded-full relative transition-all ${license.enabledModules[mod.id] ? 'bg-green-500' : 'bg-slate-700'}`}>
+                                            <div className={`w-10 h-5 rounded-full relative transition-all ${license.enabledModules[mod.id] ? 'bg-green-50' : 'bg-slate-700'}`}>
                                                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${license.enabledModules[mod.id] ? 'right-1' : 'left-1'}`}></div>
                                             </div>
                                         </div>
