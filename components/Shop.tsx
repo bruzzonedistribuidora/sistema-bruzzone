@@ -35,20 +35,22 @@ const Shop: React.FC = () => {
         };
     }, []);
 
-    // Carga de productos desde IndexedDB (Soporta los 140k artículos)
+    // Carga de productos optimizada usando el índice webPropia
     const loadProducts = async () => {
         setIsLoading(true);
-        // Cargamos una muestra inicial de productos publicados para la web propia
-        const all = await productDB.getAll();
-        // Filtramos solo los que pertenecen a la Web Propia
-        const shopItems = all.filter(p => p.ecommerce?.webPropia === true);
-        setProducts(shopItems);
-        setIsLoading(false);
+        try {
+            // Usamos el nuevo método que solo trae los publicados (ahorra memoria con 140k items)
+            const shopItems = await productDB.getPublished();
+            setProducts(shopItems);
+        } catch (error) {
+            console.error("Error cargando productos de la tienda:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     useEffect(() => {
         loadProducts();
-        // Escuchar actualizaciones desde el panel administrativo
         window.addEventListener('ferrecloud_products_updated', loadProducts);
         return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
     }, []);
@@ -63,6 +65,11 @@ const Shop: React.FC = () => {
 
     const offerProducts = useMemo(() => 
         products.filter(p => p.ecommerce?.isOffer).slice(0, 8),
+    [products]);
+
+    // Muestra los últimos productos publicados aunque no sean destacados
+    const recentProducts = useMemo(() => 
+        [...products].reverse().slice(0, 8),
     [products]);
 
     const filteredCatalog = useMemo(() => {
@@ -176,27 +183,55 @@ const Shop: React.FC = () => {
                             </div>
                         </section>
 
-                        {/* PRODUCTOS DESTACADOS */}
+                        {/* PRODUCTOS DESTACADOS O NOVEDADES */}
                         {isLoading ? (
                             <div className="py-20 text-center flex flex-col items-center gap-4">
                                 <RefreshCw className="animate-spin text-indigo-600" size={40}/>
-                                <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Cargando Catálogo...</p>
+                                <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Sincronizando Catálogo Maestro...</p>
                             </div>
-                        ) : featuredProducts.length > 0 && (
-                            <section className="max-w-7xl mx-auto px-6 md:px-12 py-24 space-y-12">
-                                <div className="flex justify-between items-end border-b border-slate-100 pb-8">
-                                    <div>
-                                        <p className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-2">Selección Premium</p>
-                                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Más Buscados</h3>
+                        ) : (
+                            <>
+                                {featuredProducts.length > 0 && (
+                                    <section className="max-w-7xl mx-auto px-6 md:px-12 py-24 space-y-12">
+                                        <div className="flex justify-between items-end border-b border-slate-100 pb-8">
+                                            <div>
+                                                <p className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-2">Selección Premium</p>
+                                                <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Más Buscados</h3>
+                                            </div>
+                                            <button onClick={() => setView('CATALOG')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Ver todos</button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                                            {featuredProducts.map(p => (
+                                                <ShopProductCard key={p.id} product={p} onAdd={addToCart} />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {recentProducts.length > 0 && featuredProducts.length === 0 && (
+                                    <section className="max-w-7xl mx-auto px-6 md:px-12 py-24 space-y-12">
+                                        <div className="flex justify-between items-end border-b border-slate-100 pb-8">
+                                            <div>
+                                                <p className="text-indigo-600 font-black text-[10px] uppercase tracking-[0.3em] mb-2">Recién Incorporados</p>
+                                                <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Novedades</h3>
+                                            </div>
+                                            <button onClick={() => setView('CATALOG')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Ver Catálogo</button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                                            {recentProducts.map(p => (
+                                                <ShopProductCard key={p.id} product={p} onAdd={addToCart} />
+                                            ))}
+                                        </div>
+                                    </section>
+                                )}
+
+                                {products.length === 0 && !isLoading && (
+                                    <div className="py-20 text-center space-y-4">
+                                        <Package size={64} className="mx-auto text-slate-200" strokeWidth={1} />
+                                        <p className="font-black uppercase tracking-widest text-slate-400 text-xs">Aún no hay productos publicados en la web</p>
                                     </div>
-                                    <button onClick={() => setView('CATALOG')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 transition-colors">Ver todos</button>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                                    {featuredProducts.map(p => (
-                                        <ShopProductCard key={p.id} product={p} onAdd={addToCart} />
-                                    ))}
-                                </div>
-                            </section>
+                                )}
+                            </>
                         )}
 
                         {/* OFERTAS */}
