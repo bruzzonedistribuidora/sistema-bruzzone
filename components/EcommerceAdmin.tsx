@@ -8,7 +8,7 @@ import {
     ArrowRight, ShoppingBag, Plus, Trash2, Layers, Check,
     DollarSign, Smartphone, ShoppingCart, Globe2, 
     CheckSquare, Square, Zap, Power, List, CloudUpload,
-    CloudDownload, ShieldAlert
+    CloudDownload, ShieldAlert, ExternalLink
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -108,7 +108,6 @@ const EcommerceAdmin: React.FC = () => {
             ecommerce: { ...(product.ecommerce || {}), ...updates } 
         };
         
-        // Si activamos cualquier plataforma, marcamos como publicado general
         if (updates.mercadoLibre || updates.tiendaNube || updates.webPropia) {
             updated.ecommerce.isPublished = true;
         }
@@ -120,26 +119,21 @@ const EcommerceAdmin: React.FC = () => {
     const handleBulkPlatformUpdate = async (platform: 'mercadoLibre' | 'tiendaNube' | 'webPropia' | 'ALL', value: boolean) => {
         if (selectedIds.size === 0) return;
 
-        // Validación de canal conectado (Simulada)
         if (value) {
             const meliConfig = JSON.parse(localStorage.getItem('sync_meli') || '{}');
             if (platform === 'mercadoLibre' || platform === 'ALL') {
                 if (meliConfig.status !== 'CONNECTED') {
-                    alert("❌ Error de Sincronización: Mercado Libre no está autenticado. Vincule su cuenta en 'Configuración API' para publicar.");
+                    alert("❌ Error: Mercado Libre no está autenticado.");
                     return;
                 }
             }
         }
 
         setIsApplying(true);
-        
         const updatedProducts = products.filter(p => selectedIds.has(p.id)).map(p => {
             const ecom = { ...(p.ecommerce || {}) };
             if (platform === 'ALL') {
-                ecom.mercadoLibre = value;
-                ecom.tiendaNube = value;
-                ecom.webPropia = value;
-                ecom.isPublished = value;
+                ecom.mercadoLibre = value; ecom.tiendaNube = value; ecom.webPropia = value; ecom.isPublished = value;
             } else {
                 ecom[platform] = value;
                 if (value) ecom.isPublished = true;
@@ -150,24 +144,23 @@ const EcommerceAdmin: React.FC = () => {
         await productDB.saveBulk(updatedProducts);
         await loadProducts();
         setIsApplying(false);
-        if (value) {
-            alert(`✅ Sincronización exitosa: ${selectedIds.size} artículos publicados en la nube.`);
-        } else {
-            alert(`✅ Se han removido ${selectedIds.size} artículos del catálogo web.`);
-        }
         setSelectedIds(new Set());
     };
 
     const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = async (event) => {
             const base64 = event.target?.result as string;
             await handleUpdateProduct(id, { imageUrl: base64 });
         };
         reader.readAsDataURL(file);
+    };
+
+    const openStore = () => {
+        // En una app real esto navegaría a la ruta /shop o abriría una nueva pestaña
+        window.open(window.location.origin + '/shop', '_blank');
     };
 
     return (
@@ -185,44 +178,25 @@ const EcommerceAdmin: React.FC = () => {
                 <div className="p-4 space-y-2 flex-1 overflow-y-auto custom-scrollbar">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-4">Filtrar por Carpeta</p>
                     
-                    <FolderBtn 
-                        active={activeFolder === 'ALL'} 
-                        onClick={() => {setActiveFolder('ALL'); setSelectedIds(new Set());}} 
-                        icon={List} 
-                        label="Todo el Catálogo" 
-                        count={stats.total} 
-                        color="text-slate-500"
-                    />
-                    <FolderBtn 
-                        active={activeFolder === 'PUBLISHED'} 
-                        onClick={() => {setActiveFolder('PUBLISHED'); setSelectedIds(new Set());}} 
-                        icon={Globe} 
-                        label="Escaparate Web" 
-                        count={stats.published} 
-                        color="text-indigo-600"
-                    />
-                    <FolderBtn 
-                        active={activeFolder === 'OFFERS'} 
-                        onClick={() => {setActiveFolder('OFFERS'); setSelectedIds(new Set());}} 
-                        icon={Percent} 
-                        label="Carpeta de Ofertas" 
-                        count={stats.offers} 
-                        color="text-orange-500"
-                    />
-                    <FolderBtn 
-                        active={activeFolder === 'FEATURED'} 
-                        onClick={() => {setActiveFolder('FEATURED'); setSelectedIds(new Set());}} 
-                        icon={Star} 
-                        label="Carpeta Destacados" 
-                        count={stats.featured} 
-                        color="text-yellow-500"
-                    />
+                    <FolderBtn active={activeFolder === 'ALL'} onClick={() => {setActiveFolder('ALL'); setSelectedIds(new Set());}} icon={List} label="Todo el Catálogo" count={stats.total} color="text-slate-500" />
+                    <FolderBtn active={activeFolder === 'PUBLISHED'} onClick={() => {setActiveFolder('PUBLISHED'); setSelectedIds(new Set());}} icon={Globe} label="Escaparate Web" count={stats.published} color="text-indigo-600" />
+                    <FolderBtn active={activeFolder === 'OFFERS'} onClick={() => {setActiveFolder('OFFERS'); setSelectedIds(new Set());}} icon={Percent} label="Carpeta de Ofertas" count={stats.offers} color="text-orange-500" />
+                    <FolderBtn active={activeFolder === 'FEATURED'} onClick={() => {setActiveFolder('FEATURED'); setSelectedIds(new Set());}} icon={Star} label="Carpeta Destacados" count={stats.featured} color="text-yellow-500" />
+                
+                    <div className="pt-8 space-y-3">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Accesos Directos</p>
+                        <button 
+                            onClick={openStore}
+                            className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm">
+                            <ShoppingBag size={18}/> Ver mi Tienda Online
+                        </button>
+                    </div>
                 </div>
 
                 <div className="p-4 bg-slate-50 border-t border-slate-200">
                     <button onClick={loadProducts} disabled={isApplying} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all disabled:opacity-50">
                         {isApplying ? <RefreshCw className="animate-spin" size={14}/> : <CloudDownload size={14}/>} 
-                        {isApplying ? 'Sincronizando...' : 'Recargar Base Local'}
+                        {isApplying ? 'Sincronizando...' : 'Refrescar Datos'}
                     </button>
                 </div>
             </aside>
@@ -242,7 +216,7 @@ const EcommerceAdmin: React.FC = () => {
                     </div>
                     {isApplying && (
                         <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest animate-pulse">
-                            <RefreshCw size={14} className="animate-spin"/> Procesando cambios masivos...
+                            <RefreshCw size={14} className="animate-spin"/> Aplicando cambios masivos...
                         </div>
                     )}
                 </div>
@@ -296,24 +270,9 @@ const EcommerceAdmin: React.FC = () => {
                                             </td>
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center justify-center gap-1.5">
-                                                    <PlatformBtn 
-                                                        active={p.ecommerce?.mercadoLibre} 
-                                                        label="M" 
-                                                        color="bg-[#FFF159] text-gray-800"
-                                                        onClick={() => handleUpdateProduct(p.id, { mercadoLibre: !p.ecommerce?.mercadoLibre })}
-                                                    />
-                                                    <PlatformBtn 
-                                                        active={p.ecommerce?.tiendaNube} 
-                                                        label="N" 
-                                                        color="bg-[#00AEEF] text-white"
-                                                        onClick={() => handleUpdateProduct(p.id, { tiendaNube: !p.ecommerce?.tiendaNube })}
-                                                    />
-                                                    <PlatformBtn 
-                                                        active={p.ecommerce?.webPropia} 
-                                                        label="W" 
-                                                        color="bg-indigo-600 text-white"
-                                                        onClick={() => handleUpdateProduct(p.id, { webPropia: !p.ecommerce?.webPropia })}
-                                                    />
+                                                    <PlatformBtn active={p.ecommerce?.mercadoLibre} label="M" color="bg-[#FFF159] text-gray-800" onClick={() => handleUpdateProduct(p.id, { mercadoLibre: !p.ecommerce?.mercadoLibre })} />
+                                                    <PlatformBtn active={p.ecommerce?.tiendaNube} label="N" color="bg-[#00AEEF] text-white" onClick={() => handleUpdateProduct(p.id, { tiendaNube: !p.ecommerce?.tiendaNube })} />
+                                                    <PlatformBtn active={p.ecommerce?.webPropia} label="W" color="bg-indigo-600 text-white" onClick={() => handleUpdateProduct(p.id, { webPropia: !p.ecommerce?.webPropia })} />
                                                 </div>
                                             </td>
                                             <td className="px-8 py-4">
@@ -345,48 +304,21 @@ const EcommerceAdmin: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap justify-center gap-3">
-                        <button 
-                            onClick={() => handleBulkPlatformUpdate('ALL', true)}
-                            disabled={isApplying}
-                            className="bg-indigo-500 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all active:scale-95 shadow-xl shadow-indigo-500/20">
+                        <button onClick={() => handleBulkPlatformUpdate('ALL', true)} disabled={isApplying} className="bg-indigo-500 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all active:scale-95 shadow-xl shadow-indigo-500/20">
                             {isApplying ? <RefreshCw className="animate-spin" size={16}/> : <CloudUpload size={16}/>}
-                            Sincronizar y Publicar
+                            Sincronizar Canales
                         </button>
                         
                         <div className="h-10 w-px bg-white/10 mx-2 hidden md:block"></div>
 
-                        <BulkPlatformBtn 
-                            onClick={() => handleBulkPlatformUpdate('mercadoLibre', true)} 
-                            icon={ShoppingCart} 
-                            label="M. Libre" 
-                            color="bg-[#FFF159]" 
-                            textColor="text-gray-800"
-                        />
-                        <BulkPlatformBtn 
-                            onClick={() => handleBulkPlatformUpdate('tiendaNube', true)} 
-                            icon={Globe2} 
-                            label="T. Nube" 
-                            color="bg-[#00AEEF]" 
-                            textColor="text-white"
-                        />
-                        <BulkPlatformBtn 
-                            onClick={() => handleBulkPlatformUpdate('webPropia', true)} 
-                            icon={Globe} 
-                            label="Mi Web" 
-                            color="bg-indigo-600" 
-                            textColor="text-white"
-                        />
+                        <BulkPlatformBtn onClick={() => handleBulkPlatformUpdate('mercadoLibre', true)} icon={ShoppingCart} label="M. Libre" color="bg-[#FFF159]" textColor="text-gray-800" />
+                        <BulkPlatformBtn onClick={() => handleBulkPlatformUpdate('tiendaNube', true)} icon={Globe2} label="T. Nube" color="bg-[#00AEEF]" textColor="text-white" />
+                        <BulkPlatformBtn onClick={() => handleBulkPlatformUpdate('webPropia', true)} icon={Globe} label="Mi Web" color="bg-indigo-600" textColor="text-white" />
 
-                        <button 
-                            onClick={() => handleBulkPlatformUpdate('ALL', false)}
-                            className="bg-red-500/20 text-red-500 border border-red-500/50 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-                            Despublicar Todo
-                        </button>
+                        <button onClick={() => handleBulkPlatformUpdate('ALL', false)} className="bg-red-500/20 text-red-500 border border-red-500/50 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Despublicar</button>
                     </div>
 
-                    <button onClick={() => setSelectedIds(new Set())} className="p-3 text-slate-500 hover:text-white transition-colors">
-                        <X size={24}/>
-                    </button>
+                    <button onClick={() => setSelectedIds(new Set())} className="p-3 text-slate-500 hover:text-white transition-colors"><X size={24}/></button>
                 </div>
             )}
         </div>
@@ -396,35 +328,20 @@ const EcommerceAdmin: React.FC = () => {
 // --- COMPONENTES ATÓMICOS ---
 
 const PlatformBtn: React.FC<{ active?: boolean, label: string, color: string, onClick: () => void }> = ({ active, label, color, onClick }) => (
-    <button 
-        onClick={onClick}
-        className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all border-2 ${active ? `${color} border-white shadow-md scale-110` : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}>
-        {label}
-    </button>
+    <button onClick={onClick} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all border-2 ${active ? `${color} border-white shadow-md scale-110` : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}>{label}</button>
 );
 
 const BulkPlatformBtn: React.FC<{ onClick: () => void, icon: any, label: string, color: string, textColor: string }> = ({ onClick, icon: Icon, label, color, textColor }) => (
-    <button 
-        onClick={onClick}
-        className={`${color} ${textColor} px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg`}>
-        <Icon size={14}/> {label}
-    </button>
+    <button onClick={onClick} className={`${color} ${textColor} px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg`}><Icon size={14}/> {label}</button>
 );
 
 const FolderBtn: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string, count: number, color: string }> = ({ active, onClick, icon: Icon, label, count, color }) => (
-    <button 
-        onClick={onClick}
-        className={`w-full flex items-center justify-between p-4 rounded-[1.5rem] transition-all group ${active ? 'bg-slate-900 text-white shadow-2xl scale-[1.02]' : 'hover:bg-slate-50 text-slate-500'}`}
-    >
+    <button onClick={onClick} className={`w-full flex items-center justify-between p-4 rounded-[1.5rem] transition-all group ${active ? 'bg-slate-900 text-white shadow-2xl scale-[1.02]' : 'hover:bg-slate-50 text-slate-500'}`}>
         <div className="flex items-center gap-4">
-            <div className={`p-2.5 rounded-xl ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-white'} transition-colors`}>
-                <Icon size={18}/>
-            </div>
+            <div className={`p-2.5 rounded-xl ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-white'} transition-colors`}><Icon size={18}/></div>
             <span className={`text-[11px] font-black uppercase tracking-tight ${active ? 'text-white' : 'text-slate-600'}`}>{label}</span>
         </div>
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${active ? 'bg-white/10 border-white/20 text-indigo-300' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>
-            {count.toLocaleString()}
-        </span>
+        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${active ? 'bg-white/10 border-white/20 text-indigo-300' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>{count.toLocaleString()}</span>
     </button>
 );
 
@@ -434,15 +351,9 @@ const QuickBadge: React.FC<{ active?: boolean, onClick: () => void, label: strin
         orange: active ? 'bg-orange-500 text-white border-orange-400' : 'text-slate-300 border-slate-100',
         yellow: active ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'text-slate-300 border-slate-100'
     };
-
     return (
-        <button 
-            onClick={onClick}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} hover:border-slate-300`}
-        >
-            <Icon size={10} className={active && color === 'yellow' ? 'fill-slate-900' : ''}/>
-            {label}
-            {active && <Check size={8} strokeWidth={4}/>}
+        <button onClick={onClick} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} hover:border-slate-300`}>
+            <Icon size={10} className={active && color === 'yellow' ? 'fill-slate-900' : ''}/> {label} {active && <Check size={8} strokeWidth={4}/>}
         </button>
     );
 };
