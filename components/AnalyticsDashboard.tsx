@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     Wallet, UserCheck, Truck, TrendingUp, History, Activity, 
     ArrowUpRight, ArrowDownLeft, ArrowRight, Building2,
-    CalendarDays, DollarSign, Calculator, Receipt, BarChart3
+    CalendarDays, BarChart3
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { CashRegister, Client, Provider, DailyExpense, Purchase, ViewState } from '../types';
