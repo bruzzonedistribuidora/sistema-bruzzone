@@ -1,13 +1,13 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+// Added 'List' to lucide-react imports to fix 'Cannot find name List' error
 import { 
     Globe, Search, Star, Percent,
-    Eye, EyeOff, Package, Camera, Upload, X, Image as ImageIcon,
-    LayoutGrid, List, CheckCircle2, TrendingUp, Sparkles, Filter,
+    Eye, Package, Camera, Upload, X, Image as ImageIcon,
+    CheckCircle2, TrendingUp, Sparkles, Filter,
     RefreshCw, Tag, ChevronUp, ChevronDown, FolderOpen, 
     ArrowRight, ShoppingBag, Plus, Trash2, Layers, Check,
-    // Fix: Added missing DollarSign import from lucide-react
-    DollarSign
+    DollarSign, Smartphone, ShoppingCart, Globe2, 
+    CheckSquare, Square, Zap, Power, List
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -18,8 +18,10 @@ const EcommerceAdmin: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [activeFolder, setActiveFolder] = useState<EcommerceFolder>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+    const [isApplying, setIsApplying] = useState(false);
 
     const loadProducts = async () => {
         const all = await productDB.getAll();
@@ -76,8 +78,23 @@ const EcommerceAdmin: React.FC = () => {
             return 0;
         });
 
-        return items.slice(0, 150); // Límite para rendimiento
+        return items.slice(0, 150); // Límite para rendimiento de renderizado
     }, [products, searchTerm, activeFolder, sortConfig]);
+
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredAndSorted.length && filteredAndSorted.length > 0) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredAndSorted.map(p => p.id)));
+        }
+    };
+
+    const toggleSelectOne = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
 
     const handleUpdateProduct = async (id: string, updates: any) => {
         const product = products.find(p => p.id === id);
@@ -88,9 +105,37 @@ const EcommerceAdmin: React.FC = () => {
             ecommerce: { ...(product.ecommerce || {}), ...updates } 
         };
         
+        // Si activamos cualquier plataforma, marcamos como publicado general
+        if (updates.mercadoLibre || updates.tiendaNube || updates.webPropia) {
+            updated.ecommerce.isPublished = true;
+        }
+
         await productDB.save(updated);
-        // Actualizar estado local inmediatamente para respuesta visual rápida
         setProducts(prev => prev.map(p => p.id === id ? updated : p));
+    };
+
+    const handleBulkPlatformUpdate = async (platform: 'mercadoLibre' | 'tiendaNube' | 'webPropia' | 'ALL', value: boolean) => {
+        if (selectedIds.size === 0) return;
+        setIsApplying(true);
+        
+        const updatedProducts = products.filter(p => selectedIds.has(p.id)).map(p => {
+            const ecom = { ...(p.ecommerce || {}) };
+            if (platform === 'ALL') {
+                ecom.mercadoLibre = value;
+                ecom.tiendaNube = value;
+                ecom.webPropia = value;
+                ecom.isPublished = value;
+            } else {
+                ecom[platform] = value;
+                if (value) ecom.isPublished = true;
+            }
+            return { ...p, ecommerce: ecom };
+        });
+
+        await productDB.saveBulk(updatedProducts);
+        await loadProducts();
+        setIsApplying(false);
+        alert("Actualización de plataformas completada.");
     };
 
     const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,7 +151,7 @@ const EcommerceAdmin: React.FC = () => {
     };
 
     return (
-        <div className="flex h-full bg-slate-100 font-sans overflow-hidden animate-fade-in">
+        <div className="flex h-full bg-slate-100 font-sans overflow-hidden animate-fade-in relative">
             
             {/* SIDEBAR DE CARPETAS */}
             <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
@@ -118,11 +163,11 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
 
                 <div className="p-4 space-y-2 flex-1 overflow-y-auto custom-scrollbar">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-4">Carpetas Inteligentes</p>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-4">Filtrar por Carpeta</p>
                     
                     <FolderBtn 
                         active={activeFolder === 'ALL'} 
-                        onClick={() => setActiveFolder('ALL')} 
+                        onClick={() => {setActiveFolder('ALL'); setSelectedIds(new Set());}} 
                         icon={List} 
                         label="Todo el Catálogo" 
                         count={stats.total} 
@@ -130,7 +175,7 @@ const EcommerceAdmin: React.FC = () => {
                     />
                     <FolderBtn 
                         active={activeFolder === 'PUBLISHED'} 
-                        onClick={() => setActiveFolder('PUBLISHED')} 
+                        onClick={() => {setActiveFolder('PUBLISHED'); setSelectedIds(new Set());}} 
                         icon={Globe} 
                         label="Escaparate Web" 
                         count={stats.published} 
@@ -138,7 +183,7 @@ const EcommerceAdmin: React.FC = () => {
                     />
                     <FolderBtn 
                         active={activeFolder === 'OFFERS'} 
-                        onClick={() => setActiveFolder('OFFERS')} 
+                        onClick={() => {setActiveFolder('OFFERS'); setSelectedIds(new Set());}} 
                         icon={Percent} 
                         label="Carpeta de Ofertas" 
                         count={stats.offers} 
@@ -146,25 +191,16 @@ const EcommerceAdmin: React.FC = () => {
                     />
                     <FolderBtn 
                         active={activeFolder === 'FEATURED'} 
-                        onClick={() => setActiveFolder('FEATURED')} 
+                        onClick={() => {setActiveFolder('FEATURED'); setSelectedIds(new Set());}} 
                         icon={Star} 
                         label="Carpeta Destacados" 
                         count={stats.featured} 
                         color="text-yellow-500"
                     />
-
-                    <div className="pt-8 mt-8 border-t border-slate-100">
-                        <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100">
-                            <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Sparkles size={14}/> Sincronización
-                            </h4>
-                            <p className="text-[11px] text-indigo-700 leading-relaxed font-medium">Todos los cambios realizados aquí impactan automáticamente en la **Tienda Online** y el **Portal de Clientes**.</p>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="p-4 bg-slate-50 border-t border-slate-200">
-                    <button className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all">
+                    <button onClick={loadProducts} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all">
                         <RefreshCw size={14}/> Sincronizar Nube
                     </button>
                 </div>
@@ -177,144 +213,159 @@ const EcommerceAdmin: React.FC = () => {
                         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20}/>
                         <input 
                             type="text" 
-                            placeholder="Buscar artículo en esta carpeta..." 
+                            placeholder="Buscar artículos para publicar..." 
                             className="w-full pl-12 pr-6 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 shadow-inner transition-all uppercase"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <button className="p-3.5 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><Filter size={20}/></button>
-                        <button className="p-3.5 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><RefreshCw size={20}/></button>
-                    </div>
                 </div>
 
-                <div className="flex-1 overflow-hidden p-6">
+                <div className="flex-1 overflow-hidden p-6 pb-24">
                     <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest sticky top-0 z-10">
                                     <tr>
-                                        <th className="px-8 py-5">Visual / Imagen</th>
-                                        <th className="px-4 py-5">Identificación / Nombre</th>
+                                        <th className="px-6 py-5 w-10 text-center">
+                                            <button onClick={toggleSelectAll}>
+                                                {selectedIds.size === filteredAndSorted.length && filteredAndSorted.length > 0 ? <CheckSquare size={18} className="text-indigo-400"/> : <Square size={18} className="text-slate-500"/>}
+                                            </button>
+                                        </th>
+                                        <th className="px-4 py-5">Visual</th>
+                                        <th className="px-4 py-5">Nombre / SKU</th>
                                         <th className="px-4 py-5 text-right">Precio Actual</th>
-                                        <th className="px-4 py-5 text-center">Carpeta Web</th>
-                                        <th className="px-8 py-5 text-center">Acciones</th>
+                                        <th className="px-4 py-5 text-center">Plataformas</th>
+                                        <th className="px-8 py-5 text-center">Modo</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {filteredAndSorted.map(p => (
-                                        <tr key={p.id} className={`hover:bg-slate-50 transition-colors group ${p.ecommerce?.isPublished ? 'bg-indigo-50/5' : ''}`}>
-                                            <td className="px-8 py-4">
-                                                <input 
-                                                    type="file" 
-                                                    ref={el => { fileInputRefs.current[p.id] = el; }}
-                                                    className="hidden" 
-                                                    accept="image/*"
-                                                    onChange={(e) => handleImageUpload(p.id, e)}
-                                                />
+                                        <tr key={p.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.has(p.id) ? 'bg-indigo-50/50' : ''}`}>
+                                            <td className="px-6 py-4 text-center">
+                                                <button onClick={() => toggleSelectOne(p.id)}>
+                                                    {selectedIds.has(p.id) ? <CheckSquare size={18} className="text-indigo-600"/> : <Square size={18} className="text-slate-200"/>}
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <input type="file" ref={el => { fileInputRefs.current[p.id] = el; }} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(p.id, e)} />
                                                 <div 
                                                     onClick={() => fileInputRefs.current[p.id]?.click()}
-                                                    className={`w-20 h-20 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all overflow-hidden ${p.ecommerce?.imageUrl ? 'border-white bg-white shadow-md' : 'border-slate-200 bg-slate-50 hover:border-indigo-400'}`}
+                                                    className={`w-14 h-14 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden ${p.ecommerce?.imageUrl ? 'border-white bg-white shadow-sm' : 'border-slate-200 bg-slate-50'}`}
                                                 >
                                                     {p.ecommerce?.imageUrl ? (
                                                         <img src={p.ecommerce.imageUrl} className="w-full h-full object-cover" alt={p.name} />
                                                     ) : (
-                                                        <Camera className="text-slate-300 group-hover:scale-110 transition-transform" size={24}/>
+                                                        <Camera className="text-slate-300" size={18}/>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4">
-                                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-tight leading-tight mb-1 truncate max-w-[350px]">{p.name || 'SIN NOMBRE'}</h4>
-                                                <div className="flex gap-2 items-center">
-                                                    <p className="text-[9px] font-mono font-bold text-indigo-500 uppercase bg-indigo-50 px-1.5 py-0.5 rounded">SKU: {p.internalCodes[0]}</p>
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{p.brand}</p>
-                                                </div>
+                                                <h4 className="font-black text-slate-800 uppercase text-xs truncate max-w-[280px]">{p.name}</h4>
+                                                <p className="text-[9px] font-mono font-bold text-indigo-500 uppercase bg-indigo-50 w-fit px-1.5 py-0.5 rounded mt-1">SKU: {p.internalCodes[0]}</p>
                                             </td>
                                             <td className="px-4 py-4 text-right">
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <div className="flex items-center gap-2">
-                                                        {/* Fix: Added missing DollarSign import from lucide-react */}
-                                                        <DollarSign size={14} className="text-slate-300"/>
-                                                        <input 
-                                                            type="number" 
-                                                            className={`w-32 p-2.5 rounded-xl text-right text-xs font-black outline-none border-2 transition-all ${p.ecommerce?.isOffer ? 'bg-orange-50 border-orange-200 text-orange-600' : 'bg-slate-50 border-slate-100 text-slate-900'}`}
-                                                            value={p.ecommerce?.isOffer ? (p.ecommerce?.offerPrice || 0) : p.priceFinal}
-                                                            readOnly={!p.ecommerce?.isOffer}
-                                                            onChange={e => handleUpdateProduct(p.id, { offerPrice: parseFloat(e.target.value) || 0 })}
-                                                        />
-                                                    </div>
-                                                    {p.ecommerce?.isOffer && (
-                                                        <span className="text-[9px] text-slate-400 line-through font-black">Normal: ${p.priceFinal.toLocaleString()}</span>
-                                                    )}
-                                                </div>
+                                                <p className="text-sm font-black text-slate-900 tracking-tighter">${p.priceFinal.toLocaleString()}</p>
+                                                {p.ecommerce?.isOffer && <span className="text-[8px] text-orange-500 font-black uppercase">OFERTA ACTIVA</span>}
                                             </td>
                                             <td className="px-4 py-4">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <QuickBadge 
-                                                        active={p.ecommerce?.isPublished} 
-                                                        onClick={() => handleUpdateProduct(p.id, { isPublished: !p.ecommerce?.isPublished })} 
-                                                        label="Web" 
-                                                        icon={Globe}
-                                                        color="indigo"
-                                                    />
-                                                    <QuickBadge 
-                                                        active={p.ecommerce?.isOffer} 
-                                                        onClick={() => handleUpdateProduct(p.id, { isOffer: !p.ecommerce?.isOffer, offerPrice: !p.ecommerce?.isOffer ? Math.round(p.priceFinal * 0.85) : null })} 
-                                                        label="Oferta" 
-                                                        icon={Percent}
-                                                        color="orange"
-                                                    />
-                                                    <QuickBadge 
-                                                        active={p.ecommerce?.isFeatured} 
-                                                        onClick={() => handleUpdateProduct(p.id, { isFeatured: !p.ecommerce?.isFeatured })} 
-                                                        label="Top" 
-                                                        icon={Star}
-                                                        color="yellow"
-                                                    />
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <PlatformIcon active={p.ecommerce?.mercadoLibre} label="M" color="bg-[#FFF159] text-gray-800" />
+                                                    <PlatformIcon active={p.ecommerce?.tiendaNube} label="N" color="bg-[#00AEEF] text-white" />
+                                                    <PlatformIcon active={p.ecommerce?.webPropia} label="W" color="bg-indigo-600 text-white" />
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-4 text-center">
-                                                <button 
-                                                    onClick={() => window.open(`/shop/product/${p.id}`, '_blank')}
-                                                    className="p-3 bg-white text-slate-400 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm border border-slate-100">
-                                                    <Eye size={18}/>
-                                                </button>
+                                            <td className="px-8 py-4">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <QuickBadge active={p.ecommerce?.isOffer} onClick={() => handleUpdateProduct(p.id, { isOffer: !p.ecommerce?.isOffer })} label="Ofe" icon={Percent} color="orange" />
+                                                    <QuickBadge active={p.ecommerce?.isFeatured} onClick={() => handleUpdateProduct(p.id, { isFeatured: !p.ecommerce?.isFeatured })} label="Top" icon={Star} color="yellow" />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
-                                    {filteredAndSorted.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="py-40 text-center">
-                                                <FolderOpen size={64} className="mx-auto mb-4 text-slate-200" strokeWidth={1} />
-                                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Esta carpeta está vacía</p>
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
-                        </div>
-                        
-                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div className="flex -space-x-2">
-                                    {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded-full bg-slate-300 border-2 border-white"></div>)}
-                                </div>
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mostrando resultados parciales para optimizar carga</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Carpeta</p>
-                                <p className="text-lg font-black text-slate-800">{filteredAndSorted.length} SKUs</p>
-                            </div>
                         </div>
                     </div>
                 </div>
             </main>
+
+            {/* BARRA DE ACCIONES MASIVAS (FLOTANTE) */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[90%] max-w-5xl bg-slate-900 rounded-[2.5rem] shadow-2xl p-6 border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 animate-fade-in z-[250]">
+                    <div className="flex items-center gap-6">
+                        <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg animate-pulse">
+                            <CheckSquare size={24}/>
+                        </div>
+                        <div>
+                            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest">Acciones Masivas</p>
+                            <h4 className="text-white font-black text-lg leading-none">{selectedIds.size} Artículos Seleccionados</h4>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center gap-3">
+                        <button 
+                            onClick={() => handleBulkPlatformUpdate('ALL', true)}
+                            disabled={isApplying}
+                            className="bg-white text-slate-900 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-100 transition-all active:scale-95">
+                            <Power size={14} className="text-green-500"/> Publicar en Todo
+                        </button>
+                        
+                        <div className="h-10 w-px bg-white/10 mx-2 hidden md:block"></div>
+
+                        <BulkPlatformBtn 
+                            onClick={() => handleBulkPlatformUpdate('mercadoLibre', true)} 
+                            icon={ShoppingCart} 
+                            label="M. Libre" 
+                            color="bg-[#FFF159]" 
+                            textColor="text-gray-800"
+                        />
+                        <BulkPlatformBtn 
+                            onClick={() => handleBulkPlatformUpdate('tiendaNube', true)} 
+                            icon={Globe2} 
+                            label="T. Nube" 
+                            color="bg-[#00AEEF]" 
+                            textColor="text-white"
+                        />
+                        <BulkPlatformBtn 
+                            onClick={() => handleBulkPlatformUpdate('webPropia', true)} 
+                            icon={Globe} 
+                            label="Mi Web" 
+                            color="bg-indigo-600" 
+                            textColor="text-white"
+                        />
+
+                        <button 
+                            onClick={() => handleBulkPlatformUpdate('ALL', false)}
+                            className="bg-red-500/20 text-red-500 border border-red-500/50 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
+                            Quitar de la Web
+                        </button>
+                    </div>
+
+                    <button onClick={() => setSelectedIds(new Set())} className="p-3 text-slate-500 hover:text-white transition-colors">
+                        <X size={24}/>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
 
 // --- COMPONENTES ATÓMICOS ---
+
+const PlatformIcon: React.FC<{ active?: boolean, label: string, color: string }> = ({ active, label, color }) => (
+    <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black transition-all ${active ? color : 'bg-slate-100 text-slate-300'}`}>
+        {label}
+    </div>
+);
+
+const BulkPlatformBtn: React.FC<{ onClick: () => void, icon: any, label: string, color: string, textColor: string }> = ({ onClick, icon: Icon, label, color, textColor }) => (
+    <button 
+        onClick={onClick}
+        className={`${color} ${textColor} px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg`}>
+        <Icon size={14}/> {label}
+    </button>
+);
 
 const FolderBtn: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string, count: number, color: string }> = ({ active, onClick, icon: Icon, label, count, color }) => (
     <button 
@@ -333,17 +384,17 @@ const FolderBtn: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
     </button>
 );
 
-const QuickBadge: React.FC<{ active: boolean, onClick: () => void, label: string, icon: any, color: 'indigo' | 'orange' | 'yellow' }> = ({ active, onClick, label, icon: Icon, color }) => {
+const QuickBadge: React.FC<{ active?: boolean, onClick: () => void, label: string, icon: any, color: 'indigo' | 'orange' | 'yellow' }> = ({ active, onClick, label, icon: Icon, color }) => {
     const colors = {
-        indigo: active ? 'bg-indigo-600 text-white border-indigo-400 shadow-indigo-100' : 'text-slate-300 border-slate-100',
-        orange: active ? 'bg-orange-500 text-white border-orange-400 shadow-orange-100' : 'text-slate-300 border-slate-100',
-        yellow: active ? 'bg-yellow-400 text-slate-900 border-yellow-500 shadow-yellow-100' : 'text-slate-300 border-slate-100'
+        indigo: active ? 'bg-indigo-600 text-white border-indigo-400' : 'text-slate-300 border-slate-100',
+        orange: active ? 'bg-orange-500 text-white border-orange-400' : 'text-slate-300 border-slate-100',
+        yellow: active ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'text-slate-300 border-slate-100'
     };
 
     return (
         <button 
             onClick={onClick}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} ${active ? 'shadow-lg' : 'hover:border-slate-300'}`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} hover:border-slate-300`}
         >
             <Icon size={10} className={active && color === 'yellow' ? 'fill-slate-900' : ''}/>
             {label}
