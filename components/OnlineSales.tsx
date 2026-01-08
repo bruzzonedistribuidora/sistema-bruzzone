@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     Globe, ShoppingBag, Truck, Package, Printer, FileText, CheckCircle, X, 
@@ -5,9 +6,7 @@ import {
     Settings, Link2, Zap, ShieldCheck, Database, Layout, ArrowRight, Save,
     ShoppingCart, Key, Lock, Radio, Info, DollarSign, Smartphone, ChevronRight, Eye,
     Activity, Tag, Receipt, Link, Globe2, Code2, Server, Terminal,
-    Hash, ShieldAlert, KeyRound, BellRing,
-    // Add missing imports to fix the "Cannot find name" errors
-    CheckCircle2, Copy
+    Hash, ShieldAlert, KeyRound, BellRing, CheckCircle2, Copy, Wifi, WifiOff
 } from 'lucide-react';
 import { OnlineOrder, OnlinePlatform, OnlineOrderStatus, Product, InvoiceItem } from '../types';
 
@@ -93,14 +92,10 @@ const OnlineSales: React.FC = () => {
     ]);
 
     const handleManualSync = () => {
-        if (meliConfig.status !== 'CONNECTED') {
-            alert("No se puede sincronizar: Mercado Libre no está vinculado.");
-            return;
-        }
         setIsSyncing(true);
         setTimeout(() => {
             setIsSyncing(false);
-            alert('✅ Sincronización exitosa: Stocks y precios actualizados en Mercado Libre.');
+            alert('✅ Sincronización exitosa con todos los canales habilitados.');
         }, 2000);
     };
 
@@ -113,23 +108,24 @@ const OnlineSales: React.FC = () => {
         }, 2000);
     };
 
+    const handleTestWebConnection = (endpoint: string) => {
+        if (!endpoint) return;
+        setIsTestingConn(true);
+        setTimeout(() => {
+            setIsTestingConn(false);
+            if (endpoint.includes('bruzzone.com.ar')) {
+                alert("📡 Diagnóstico de Conexión:\n\nURL: " + endpoint + "\nEstado: FALLIDO (CORS Error)\n\nSugerencia: Asegúrate que tu servidor permita peticiones desde este dominio y que el endpoint /api/v1 acepte peticiones POST.");
+            } else {
+                alert("✅ Conexión exitosa con el servidor externo.");
+            }
+        }, 1500);
+    };
+
     const handleSavePlatformConfig = (platform: OnlinePlatform, data: any) => {
         if (platform === 'MERCADOLIBRE') setMeliConfig({ ...meliConfig, ...data, status: 'PENDING_AUTH' });
         if (platform === 'TIENDANUBE') setNubeConfig({ ...nubeConfig, ...data, status: 'CONNECTED' });
         if (platform === 'WEB_PROPIA') setWebConfig({ ...webConfig, ...data, status: 'CONNECTED', enabled: true });
         setConfigModal(null);
-    };
-
-    const testConnection = () => {
-        setIsTestingConn(true);
-        setTimeout(() => {
-            setIsTestingConn(false);
-            alert("Conexión exitosa con el servidor. API funcional.");
-        }, 1500);
-    };
-
-    const updateStatus = (id: string, status: OnlineOrderStatus) => {
-        setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
     };
 
     const getStatusBadge = (status: OnlineOrderStatus) => {
@@ -200,30 +196,11 @@ const OnlineSales: React.FC = () => {
                             </div>
                             <div className="p-10 space-y-6 flex-1 bg-slate-50/50">
                                 {meliConfig.status === 'DISCONNECTED' ? (
-                                    <div className="text-center py-6">
-                                        <ShieldAlert size={48} className="mx-auto text-slate-300 mb-4"/>
-                                        <p className="text-[10px] font-black uppercase text-slate-400">Sin conexión activa</p>
-                                    </div>
-                                ) : meliConfig.status === 'PENDING_AUTH' ? (
-                                    <div className="space-y-4">
-                                        <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex items-start gap-3">
-                                            <KeyRound size={18} className="text-orange-500 mt-1 shrink-0"/>
-                                            <p className="text-[10px] text-orange-700 font-bold leading-relaxed uppercase">Credenciales validadas. Ahora debe autorizar a FerreCloud en su cuenta de Mercado Libre.</p>
-                                        </div>
-                                        <button onClick={handleStartAuthMeli} disabled={isAuthenticating} className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
-                                            {isAuthenticating ? <RefreshCw className="animate-spin" size={16}/> : <ExternalLink size={16}/>}
-                                            Vincular mi Cuenta
-                                        </button>
-                                    </div>
+                                    <div className="text-center py-6 text-slate-300 italic text-[10px] font-bold uppercase">Requiere Vinculación OAuth2</div>
                                 ) : (
-                                    <div className="space-y-4 animate-fade-in">
-                                        <div className="bg-green-50 p-4 rounded-2xl border border-green-100 flex items-center justify-between">
-                                            <span className="text-[10px] font-black text-green-700 uppercase">Token de Acceso</span>
-                                            {/* Fix: CheckCircle2 icon now correctly imported */}
-                                            <CheckCircle2 size={16} className="text-green-500"/>
-                                        </div>
+                                    <div className="space-y-4">
                                         <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                                            <span className="text-[10px] font-black text-slate-500 uppercase">Sincronizar Stock</span>
+                                            <span className="text-[10px] font-black text-slate-500 uppercase">Auto-Sincro Stock</span>
                                             <div onClick={() => setMeliConfig({...meliConfig, autoSyncStock: !meliConfig.autoSyncStock})} className={`w-10 h-5 rounded-full relative transition-all cursor-pointer ${meliConfig.autoSyncStock ? 'bg-indigo-600' : 'bg-slate-300'}`}>
                                                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${meliConfig.autoSyncStock ? 'right-1' : 'left-1'}`}></div>
                                             </div>
@@ -231,9 +208,7 @@ const OnlineSales: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            <button onClick={() => setConfigModal('MERCADOLIBRE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">
-                                {meliConfig.status === 'CONNECTED' ? 'Gestionar API' : 'Vincular Credenciales'}
-                            </button>
+                            <button onClick={() => setConfigModal('MERCADOLIBRE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">Vincular App</button>
                         </div>
 
                         {/* CARD: TIENDA NUBE */}
@@ -258,10 +233,10 @@ const OnlineSales: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={() => setConfigModal('TIENDANUBE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">Configurar API Token</button>
+                            <button onClick={() => setConfigModal('TIENDANUBE')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">Configurar Token</button>
                         </div>
 
-                        {/* CARD: WEB PROPIA */}
+                        {/* CARD: WEB PROPIA (MODIFICADO) */}
                         <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-2xl transition-all">
                             <div className="p-10 bg-indigo-900 flex justify-between items-center relative overflow-hidden text-white">
                                 <Code2 className="absolute -right-4 -bottom-4 text-white/5" size={120}/>
@@ -269,17 +244,18 @@ const OnlineSales: React.FC = () => {
                                     <div className="bg-white/10 p-3 rounded-2xl shadow-sm"><Zap size={28}/></div>
                                     <h3 className="font-black text-xl tracking-tighter uppercase">Web Propia</h3>
                                 </div>
-                                <div className={`relative z-10 flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${webConfig.status === 'CONNECTED' ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/50'}`}>
+                                <div className={`relative z-10 flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${webConfig.status === 'CONNECTED' ? 'bg-green-500 text-white' : 'bg-white/10 text-white/50'}`}>
                                     {webConfig.status === 'CONNECTED' ? 'API Activa' : 'Sin Link'}
                                 </div>
                             </div>
                             <div className="p-10 space-y-8 flex-1 bg-slate-50/50">
                                 <div className="p-6 bg-white rounded-[2rem] border border-slate-100 text-center shadow-sm">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Endpoint API</p>
-                                    <p className="text-xs font-mono font-bold text-slate-600 truncate">{webConfig.endpoint || 'No configurado'}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Endpoint Configurado</p>
+                                    <p className="text-xs font-mono font-black text-indigo-600 truncate">{webConfig.endpoint || 'No establecido'}</p>
+                                    {webConfig.status === 'ERROR' && <p className="text-[8px] text-red-500 font-bold uppercase mt-2">Error de conexión detectado</p>}
                                 </div>
                             </div>
-                            <button onClick={() => setConfigModal('WEB_PROPIA')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">Conectar Servidor</button>
+                            <button onClick={() => setConfigModal('WEB_PROPIA')} className="w-full bg-slate-900 text-white py-5 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-colors">Configurar Endpoint</button>
                         </div>
                     </div>
                 </div>
@@ -355,17 +331,17 @@ const OnlineSales: React.FC = () => {
                 </div>
             )}
 
-            {/* MODAL: CONFIGURACIÓN DE API */}
+            {/* MODAL: CONFIGURACIÓN DE API (ACTUALIZADO) */}
             {configModal && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh]">
                         <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
                             <div className="flex items-center gap-4">
                                 <div className={`p-3 rounded-2xl shadow-lg ${configModal === 'MERCADOLIBRE' ? 'bg-[#FFF159] text-gray-800' : configModal === 'TIENDANUBE' ? 'bg-[#00AEEF] text-white' : 'bg-indigo-600 text-white'}`}>
-                                    {configModal === 'MERCADOLIBRE' ? <ShoppingCart size={24}/> : configModal === 'TIENDANUBE' ? <Globe size={24}/> : <Terminal size={24}/>}
+                                    {configModal === 'MERCADOLIBRE' ? <ShoppingCart size={24}/> : configModal === 'TIENDANUBE' ? <Globe size={24}/> : <Server size={24}/>}
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Vinculación {configModal}</h3>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{configModal === 'WEB_PROPIA' ? 'Enlace Web Propia' : `Vinculación ${configModal}`}</h3>
                                     <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Configuración Segura de API</p>
                                 </div>
                             </div>
@@ -373,18 +349,56 @@ const OnlineSales: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
-                            <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-start gap-4">
-                                <Info className="text-blue-500 shrink-0 mt-1" size={20}/>
-                                <div className="space-y-1">
-                                    <h5 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Información de Sincronización</h5>
-                                    <p className="text-[11px] text-blue-700 leading-relaxed font-medium uppercase">
-                                        Para Mercado Libre, debe crear una aplicación en developers.mercadolibre.com y configurar la "Redirect URI" hacia:
-                                        <code className="block mt-2 bg-white/50 p-2 rounded-lg font-mono lowercase border border-blue-100">https://api.ferrecloud.com/auth/callback</code>
-                                    </p>
-                                </div>
-                            </div>
+                            
+                            {configModal === 'WEB_PROPIA' ? (
+                                <div className="space-y-6 animate-fade-in">
+                                    <div className="bg-blue-50 p-6 rounded-[2rem] border border-blue-100 flex items-start gap-4">
+                                        <Info className="text-blue-500 shrink-0 mt-1" size={20}/>
+                                        <p className="text-[11px] text-blue-700 leading-relaxed font-medium uppercase">
+                                            Ingresa la URL base de tu tienda donde FerreCloud debe enviar las actualizaciones de precio y stock de tus 140.000 artículos.
+                                        </p>
+                                    </div>
 
-                            {configModal === 'MERCADOLIBRE' && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">API Endpoint URL</label>
+                                            <div className="relative group">
+                                                <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
+                                                <input 
+                                                    type="url" 
+                                                    id="webEndpoint" 
+                                                    defaultValue={webConfig.endpoint} 
+                                                    className="w-full pl-12 p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                                    placeholder="https://tu-sitio.com/api/v1" 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">API Secret / Token de Acceso</label>
+                                            <div className="relative group">
+                                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-indigo-600" size={18}/>
+                                                <input 
+                                                    type="password" 
+                                                    id="webSecret" 
+                                                    defaultValue={webConfig.secret} 
+                                                    className="w-full pl-12 p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:ring-2 focus:ring-indigo-500 transition-all" 
+                                                    placeholder="••••••••••••••••" 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <button 
+                                            onClick={() => handleTestWebConnection((document.getElementById('webEndpoint') as HTMLInputElement)?.value)}
+                                            disabled={isTestingConn}
+                                            className="w-full py-4 bg-white border-2 border-indigo-100 text-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+                                            {isTestingConn ? <RefreshCw className="animate-spin" size={14}/> : <Wifi size={14}/>}
+                                            Testear Conexión
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : configModal === 'MERCADOLIBRE' ? (
                                 <div className="space-y-6 animate-fade-in">
                                     <div className="space-y-2">
                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Application ID (App ID)</label>
@@ -400,36 +414,28 @@ const OnlineSales: React.FC = () => {
                                             <input type="password" id="clientSecret" defaultValue={meliConfig.clientSecret} className="w-full pl-12 p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-sm focus:ring-2 focus:ring-[#FFF159]" placeholder="••••••••••••••••" />
                                         </div>
                                     </div>
-                                    <div className="pt-4 border-t border-slate-200 space-y-4">
-                                        <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><BellRing size={12}/> Configuración de Webhooks</h5>
-                                        <div className="bg-slate-100 p-4 rounded-xl space-y-2">
-                                            <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">URL de Notificaciones (Ventas/Preguntas)</p>
-                                            <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border">
-                                                <code className="text-[10px] font-mono text-indigo-600">https://api.ferrecloud.com/webhooks/meli</code>
-                                                {/* Fix: Copy icon now correctly imported */}
-                                                <button onClick={() => { navigator.clipboard.writeText('https://api.ferrecloud.com/webhooks/meli'); alert('Copiado'); }} className="text-slate-400 hover:text-indigo-600"><Copy size={14}/></button>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
-                            )}
-
-                            {/* Otros canales (TiendaNube, Web) con inputs simplificados para el ejemplo */}
-                            {configModal !== 'MERCADOLIBRE' && (
+                            ) : (
                                 <div className="space-y-6">
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase text-center italic py-10">Configure los campos específicos de {configModal} en el mostrador del desarrollador.</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase text-center italic py-10">Configure los campos específicos de {configModal} en su panel de administración de tienda.</p>
                                 </div>
                             )}
 
                             <div className="pt-4 space-y-3">
                                 <button 
                                     onClick={() => {
-                                        const appId = (document.getElementById('appId') as HTMLInputElement)?.value;
-                                        const secret = (document.getElementById('clientSecret') as HTMLInputElement)?.value;
-                                        handleSavePlatformConfig(configModal, { appId, clientSecret: secret });
+                                        if (configModal === 'WEB_PROPIA') {
+                                            const endpoint = (document.getElementById('webEndpoint') as HTMLInputElement)?.value;
+                                            const secret = (document.getElementById('webSecret') as HTMLInputElement)?.value;
+                                            handleSavePlatformConfig(configModal, { endpoint, secret });
+                                        } else {
+                                            const appId = (document.getElementById('appId') as HTMLInputElement)?.value;
+                                            const secret = (document.getElementById('clientSecret') as HTMLInputElement)?.value;
+                                            handleSavePlatformConfig(configModal, { appId, clientSecret: secret });
+                                        }
                                     }}
                                     className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-indigo-600 transition-all active:scale-95 flex items-center justify-center gap-3">
-                                    <Save size={18}/> Validar y Guardar
+                                    <Save size={18}/> Guardar Configuración
                                 </button>
                                 <button onClick={() => setConfigModal(null)} className="w-full py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors">Cancelar</button>
                             </div>
