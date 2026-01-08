@@ -4,9 +4,9 @@ import {
     Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
     Calculator, Layers, ClipboardList, Bot, X, Plus,
     FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
-    ShoppingBag, Laptop, PackagePlus, Globe
+    ShoppingBag, Laptop, PackagePlus, Globe, Key
 } from 'lucide-react';
-import { ViewState } from '../types';
+import { ViewState, SystemLicense } from '../types';
 
 interface DashboardProps {
     onNavigate: (view: ViewState) => void;
@@ -37,6 +37,7 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.PRESUPUESTOS, label: "Presupuestos", category: "Ventas", icon: FileSpreadsheet, color: "bg-teal-500" },
     { id: ViewState.AI_ASSISTANT, label: "FerreBot IA", category: "Inteligencia", icon: Bot, color: "bg-indigo-900" },
     { id: ViewState.CLOUD_HUB, label: "Nube Central", category: "Sistema", icon: Globe, color: "bg-indigo-800" },
+    { id: ViewState.LICENSE_MANAGER, label: "Licencias (ROOT)", category: "Administración", icon: Key, color: "bg-slate-900" },
 ];
 
 const DEFAULT_SHORTCUTS = [
@@ -46,18 +47,32 @@ const DEFAULT_SHORTCUTS = [
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [isEditMode, setIsEditMode] = useState(false);
+  const [license, setLicense] = useState<SystemLicense | null>(null);
   const [userShortcuts, setUserShortcuts] = useState<ViewState[]>(() => {
       const saved = localStorage.getItem('ferrecloud_user_shortcuts');
       return saved ? JSON.parse(saved) : DEFAULT_SHORTCUTS;
   });
 
+  const loadLicense = () => {
+    const saved = localStorage.getItem('ferrecloud_license');
+    if (saved) setLicense(JSON.parse(saved));
+  };
+
   useEffect(() => {
       localStorage.setItem('ferrecloud_user_shortcuts', JSON.stringify(userShortcuts));
+      loadLicense();
+      window.addEventListener('license_updated', loadLicense);
+      return () => window.removeEventListener('license_updated', loadLicense);
   }, [userShortcuts]);
 
+  const isModuleEnabled = (id: ViewState) => {
+    if (!license) return true;
+    return license.enabledModules[id] !== false;
+  };
+
   const visibleShortcuts = useMemo(() => 
-    ALL_MODULES.filter(m => userShortcuts.includes(m.id)),
-  [userShortcuts]);
+    ALL_MODULES.filter(m => userShortcuts.includes(m.id) && isModuleEnabled(m.id)),
+  [userShortcuts, license]);
 
   const toggleShortcut = (id: ViewState) => {
       setUserShortcuts(prev => 
@@ -130,7 +145,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   
                   <div className="flex-1 overflow-y-auto p-12 bg-slate-50/50 custom-scrollbar">
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                          {ALL_MODULES.map(module => {
+                          {ALL_MODULES.filter(m => isModuleEnabled(m.id)).map(module => {
                               const isSelected = userShortcuts.includes(module.id);
                               const Icon = module.icon;
                               return (
