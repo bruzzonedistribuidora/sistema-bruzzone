@@ -8,9 +8,8 @@ import {
     ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CompanyConfig } from '../types';
-import { productDB } from '../services/storageService';
+import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
-// Fix: Added missing required properties to DEFAULT_CLIENT to match Client interface
 const DEFAULT_CLIENT: Client = {
     id: 'cf-default', 
     name: 'Consumidor Final', 
@@ -75,7 +74,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             p.name.toLowerCase().includes(term) || 
             p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
             (p.barcodes && p.barcodes.some(c => c.toLowerCase().includes(term)))
-        ).slice(0, 12);
+        ).slice(0, 50);
     }, [productSearch, products]);
 
     const totals = useMemo(() => {
@@ -103,6 +102,13 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         });
         setProductSearch('');
         setShowProductResults(false);
+    };
+
+    const handlePedir = (e: React.MouseEvent, p: Product) => {
+        e.stopPropagation();
+        if (addToReplenishmentQueue(p)) {
+            alert(`Articulo ${p.name} enviado a reposición.`);
+        }
     };
 
     const handleCheckout = (isFiscal: boolean = false) => {
@@ -141,7 +147,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <Zap size={20} className="text-indigo-400 animate-pulse ml-2"/>
                                 </div>
                                 {showProductResults && productSearch.length > 2 && (
-                                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 z-[100] overflow-hidden animate-fade-in">
+                                    <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 z-[100] overflow-hidden animate-fade-in max-h-96 overflow-y-auto custom-scrollbar">
                                         {filteredProducts.map(p => (
                                             <div key={p.id} onClick={() => addToCart(p)} className="p-5 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer transition-colors group">
                                                 <div>
@@ -151,7 +157,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                         <span className="text-indigo-500">Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
-                                                <p className="font-black text-indigo-600 text-lg tracking-tighter">${p.priceFinal.toLocaleString('es-AR')}</p>
+                                                <div className="flex items-center gap-4">
+                                                    <button onClick={(e) => handlePedir(e, p)} className="p-3 bg-slate-100 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Pedir Reposición"><Truck size={16}/></button>
+                                                    <p className="font-black text-indigo-600 text-lg tracking-tighter">${p.priceFinal.toLocaleString('es-AR')}</p>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -196,13 +205,18 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                 </td>
                                             </tr>
                                         ))}
+                                        {cart.length === 0 && (
+                                            <tr>
+                                                <td colSpan={4} className="py-24 text-center text-slate-300 uppercase font-black tracking-widest">Carrito vacío</td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
-                    <div className="w-[450px] flex flex-col gap-6">
+                    <div className="w-[400px] flex flex-col gap-6">
                         <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl flex flex-col relative overflow-hidden shrink-0">
                             <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><ShoppingCart size={180}/></div>
                             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-8 border-b border-white/10 pb-4">Consola de Pago</h3>
@@ -221,7 +235,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 </div>
                                 <div className="pt-6 border-t border-white/10">
                                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3">Total a Percibir</p>
-                                    <p className="text-7xl font-black tracking-tighter text-white leading-none">${totals.total.toLocaleString('es-AR')}</p>
+                                    <p className="text-6xl font-black tracking-tighter text-white leading-none">${totals.total.toLocaleString('es-AR')}</p>
                                 </div>
                             </div>
                         </div>
@@ -245,7 +259,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <th className="px-8 py-5">Ref. Operación</th>
                                     <th className="px-8 py-5">Fecha / Hora</th>
                                     <th className="px-8 py-5">Cliente</th>
-                                    <th className="px-8 py-5 text-right">Importe Porcentaje</th>
+                                    <th className="px-8 py-5 text-right">Importe Total</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -257,6 +271,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         <td className="px-8 py-5 text-right font-black text-slate-900 text-lg tracking-tighter">${sale.total.toLocaleString('es-AR')}</td>
                                     </tr>
                                 ))}
+                                {salesHistory.length === 0 && (
+                                    <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Sin ventas registradas</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
