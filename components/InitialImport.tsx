@@ -36,7 +36,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'coeficienteBonificacionCosto', label: 'Coef. Bonif. Directo', required: false },
         { key: 'profitMargin', label: 'Margen Ganancia %', required: false },
         { key: 'vatRate', label: 'Alícuota IVA %', required: false },
-        { key: 'stock', label: 'Stock Actual', required: false },
+        { key: 'stockPrincipal', label: 'Stock en Mostrador (Principal)', required: false },
+        { key: 'stockDeposito', label: 'Stock en Depósito', required: false },
+        { key: 'stockSucursal', label: 'Stock en Sucursal', required: false },
         { key: 'stockMaximo', label: 'Stock Deseado (Máximo)', required: false },
         { key: 'reorderPoint', label: 'Punto de Pedido', required: false },
         { key: 'brand', label: 'Marca', required: false },
@@ -94,7 +96,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                            (field.key === 'vatRate' && (header === 'iva' || header === 'tasa iva' || header === 'alicuota')) ||
                            (field.key === 'disc1' && (header.includes('bonif 1') || header.includes('desc 1'))) ||
                            (field.key === 'disc2' && (header.includes('bonif 2') || header.includes('desc 2'))) ||
-                           (field.key === 'disc3' && (header.includes('bonif 3') || header.includes('desc 3')))
+                           (field.key === 'disc3' && (header.includes('bonif 3') || header.includes('desc 3'))) ||
+                           (field.key === 'stockPrincipal' && (header.includes('stock p') || header.includes('stock most'))) ||
+                           (field.key === 'stockDeposito' && (header.includes('stock d') || header.includes('stock dep'))) ||
+                           (field.key === 'stockSucursal' && (header.includes('stock s') || header.includes('stock suc')))
                 });
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -177,6 +182,11 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const costAfterDiscounts = unitListCost * coefBonif;
                 const priceNeto = costAfterDiscounts * (1 + rawMargin / 100);
 
+                // Stocks desglosados
+                const sP = mapping.stockPrincipal !== undefined ? parseNumber(row[mapping.stockPrincipal], 0) : (existingProduct?.stockPrincipal || 0);
+                const sD = mapping.stockDeposito !== undefined ? parseNumber(row[mapping.stockDeposito], 0) : (existingProduct?.stockDeposito || 0);
+                const sS = mapping.stockSucursal !== undefined ? parseNumber(row[mapping.stockSucursal], 0) : (existingProduct?.stockSucursal || 0);
+
                 const productData: Product = {
                     id: existingProduct?.id || `prod-${Date.now()}-${i}`,
                     internalCodes: mapping.internalCodes !== undefined ? [row[mapping.internalCodes] || 'S/C'] : (existingProduct?.internalCodes || ['S/C']),
@@ -198,7 +208,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     profitMargin: rawMargin,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
                     priceFinal: parseFloat((priceNeto * (1 + vatRate/100)).toFixed(2)),
-                    stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
+                    stockPrincipal: sP,
+                    stockDeposito: sD,
+                    stockSucursal: sS,
+                    stock: sP + sD + sS,
                     stockMaximo: mapping.stockMaximo !== undefined ? parseNumber(row[mapping.stockMaximo], 0) : (existingProduct?.stockMaximo || 0),
                     reorderPoint: mapping.reorderPoint !== undefined ? parseNumber(row[mapping.reorderPoint], 0) : (existingProduct?.reorderPoint || 0),
                     stockDetails: existingProduct?.stockDetails || [],
