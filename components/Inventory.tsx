@@ -7,7 +7,7 @@ import {
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
     PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet,
-    PackagePlus
+    PackagePlus, Link2
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -128,7 +128,7 @@ const Inventory: React.FC = () => {
 
           const headers = [
               "CODIGO PROPIO (SKU)", "NOMBRE ARTICULO", "MARCA", "RUBRO", "PROVEEDOR", 
-              "COSTO LISTA", "COEFICIENTE", "MARGEN %", "IVA %", "PRECIO NETO", "PRECIO FINAL", "STOCK ACTUAL"
+              "COSTO LISTA", "DESC 1", "DESC 2", "DESC 3", "MARGEN %", "IVA %", "PRECIO NETO", "PRECIO FINAL", "STOCK ACTUAL"
           ];
 
           const csvRows = all.map(p => [
@@ -138,7 +138,9 @@ const Inventory: React.FC = () => {
               p.category,
               p.provider,
               p.listCost,
-              p.coeficienteBonificacionCosto || 1,
+              p.discounts[0] || 0,
+              p.discounts[1] || 0,
+              p.discounts[2] || 0,
               p.profitMargin,
               p.vatRate,
               p.priceNeto,
@@ -168,10 +170,17 @@ const Inventory: React.FC = () => {
       }
   };
 
+  // --- LÓGICA DE CÁLCULO DE PRECIOS CON 3 DESCUENTOS ---
   useEffect(() => {
     const listCost = Number(formData.listCost) || 0;
-    const coefBonif = Number(formData.coeficienteBonificacionCosto) || 1;
+    const d1 = Number(formData.discounts?.[0]) || 0;
+    const d2 = Number(formData.discounts?.[1]) || 0;
+    const d3 = Number(formData.discounts?.[2]) || 0;
+    
+    // Coeficiente en cascada: (1 - d1/100) * (1 - d2/100) * (1 - d3/100)
+    const coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100);
     const costAfterDiscounts = listCost * coefBonif;
+    
     const margin = Number(formData.profitMargin) || 0;
     const priceNeto = costAfterDiscounts * (1 + margin / 100);
     const vatRate = Number(formData.vatRate) || 0;
@@ -179,11 +188,12 @@ const Inventory: React.FC = () => {
 
     setFormData(prev => ({
         ...prev,
+        coeficienteBonificacionCosto: parseFloat(coefBonif.toFixed(5)),
         costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)),
         priceNeto: parseFloat(priceNeto.toFixed(2)),
         priceFinal: parseFloat(priceFinal.toFixed(2))
     }));
-  }, [formData.listCost, formData.coeficienteBonificacionCosto, formData.profitMargin, formData.vatRate]);
+  }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate]);
 
   const handleOpenModal = (p?: Product) => {
     if (p) {
@@ -197,7 +207,8 @@ const Inventory: React.FC = () => {
             otrosCodigos3: p.otrosCodigos3 || '',
             otrosCodigos4: p.otrosCodigos4 || '',
             purchasePackageQuantity: p.purchasePackageQuantity || 1,
-            vatRate: p.vatRate !== undefined ? p.vatRate : 21
+            vatRate: p.vatRate !== undefined ? p.vatRate : 21,
+            discounts: p.discounts || [0, 0, 0, 0]
         });
         setBulkCost((p.listCost || 0) * (p.purchasePackageQuantity || 1));
     } else {
@@ -209,7 +220,8 @@ const Inventory: React.FC = () => {
             otrosCodigos1: '', otrosCodigos2: '', otrosCodigos3: '', otrosCodigos4: '',
             purchasePackageQuantity: 1,
             name: '', brand: '', provider: '', category: '',
-            listCost: 0, coeficienteBonificacionCosto: 1, 
+            listCost: 0, 
+            coeficienteBonificacionCosto: 1, 
             profitMargin: 30,
             vatRate: 21, stock: 0,
             tasa: 0, alicuotaImpuestoInterno: 0,
@@ -217,7 +229,7 @@ const Inventory: React.FC = () => {
             ecommerce: { isPublished: false },
             isCombo: false, comboItems: [],
             purchaseCurrency: 'ARS', saleCurrency: 'ARS',
-            discounts: []
+            discounts: [0, 0, 0, 0]
         });
         setBulkCost(0);
     }
@@ -231,6 +243,12 @@ const Inventory: React.FC = () => {
           const unitCost = cost / qty;
           setFormData(prev => ({...prev, listCost: unitCost, purchasePackageQuantity: qty}));
       }
+  };
+
+  const updateDiscount = (idx: number, val: number) => {
+      const current = [...(formData.discounts || [0, 0, 0, 0])];
+      current[idx] = val;
+      setFormData({...formData, discounts: current});
   };
 
   const handleSaveEntity = () => {
@@ -440,7 +458,7 @@ const Inventory: React.FC = () => {
                   <div className="flex bg-slate-100 p-1.5 gap-1 border-b border-slate-200 shrink-0">
                       {[
                         { id: 'GENERAL', label: 'Identificación', icon: Tag },
-                        { id: 'PRICING', label: 'Costos y Fraccionamiento', icon: DollarSign },
+                        { id: 'PRICING', label: 'Costos y Bonificaciones', icon: DollarSign },
                         { id: 'TECHNICAL', label: 'Ferretería / Fiscal', icon: Settings2 },
                         { id: 'STOCK', label: 'Logística', icon: Boxes }
                       ].map(tab => (
@@ -546,27 +564,7 @@ const Inventory: React.FC = () => {
                               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                                   <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
                                       <div className="space-y-6">
-                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">{"Fraccionamiento Bulto -> Unidad"}</label>
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100">
-                                              <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Bulto Entero</label>
-                                                  <div className="relative group">
-                                                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
-                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={bulkCost} onChange={e => handleBulkCalc(parseFloat(e.target.value) || 0, formData.purchasePackageQuantity || 1)} />
-                                                  </div>
-                                              </div>
-                                              <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Unidades por Bulto</label>
-                                                  <div className="relative group">
-                                                      <Scaling className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
-                                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-indigo-200 rounded-xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={(e) => handleBulkCalc(bulkCost, parseFloat(e.target.value) || 1)} />
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      </div>
-
-                                      <div className="space-y-4">
-                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Análisis de Costo Unitario</label>
+                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Análisis de Costo Bruto</label>
                                           <div className="grid grid-cols-2 gap-6">
                                               <div>
                                                   <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Costo Lista Unitario</label>
@@ -576,17 +574,49 @@ const Inventory: React.FC = () => {
                                                   </div>
                                               </div>
                                               <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Coef. Bonif. Costo</label>
-                                                  <input type="number" step="0.001" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-black text-2xl text-indigo-600" value={formData.coeficienteBonificacionCosto} onChange={e => setFormData({...formData, coeficienteBonificacionCosto: parseFloat(e.target.value) || 1})} />
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Unidades por Bulto</label>
+                                                  <div className="relative group">
+                                                      <Scaling className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300" size={18}/>
+                                                      <input type="number" className="w-full pl-10 p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" value={formData.purchasePackageQuantity} onChange={(e) => setFormData({...formData, purchasePackageQuantity: parseFloat(e.target.value) || 1})} />
+                                                  </div>
                                               </div>
                                           </div>
                                       </div>
 
+                                      {/* NUEVA SECCIÓN: DESCUENTOS EN CASCADA */}
+                                      <div className="space-y-6 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100">
+                                          <div className="flex items-center justify-between mb-2">
+                                              <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                                                  <Percent size={14}/> Cadena de Bonificaciones
+                                              </label>
+                                              <div className="text-[8px] font-black bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-400 uppercase">Impacto en Cascada</div>
+                                          </div>
+                                          <div className="grid grid-cols-3 gap-4">
+                                              {[0, 1, 2].map(idx => (
+                                                  <div key={idx}>
+                                                      <label className="text-[8px] font-black text-slate-400 uppercase block mb-1.5 ml-1">Desc. {idx + 1} (%)</label>
+                                                      <input 
+                                                          type="number" 
+                                                          className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-black text-xl text-indigo-600 text-center focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                                          value={formData.discounts?.[idx] || 0} 
+                                                          onChange={e => updateDiscount(idx, parseFloat(e.target.value) || 0)} 
+                                                      />
+                                                  </div>
+                                              ))}
+                                          </div>
+                                          <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
+                                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                   <Link2 size={12}/> Coeficiente Total:
+                                               </span>
+                                               <span className="font-mono font-black text-slate-800 text-lg">{formData.coeficienteBonificacionCosto}</span>
+                                          </div>
+                                      </div>
+
                                       <div className="space-y-4 pt-6 border-t border-slate-100">
-                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Márgenes de Ganancia</label>
+                                          <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block ml-2">Rentabilidad de Venta</label>
                                           <div className="grid grid-cols-2 gap-4">
                                               <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Margen Base (%)</label>
+                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Margen Ganancia (%)</label>
                                                   <input type="number" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-2xl text-indigo-600" value={formData.profitMargin} onChange={e => setFormData({...formData, profitMargin: parseFloat(e.target.value) || 0})} />
                                               </div>
                                               <div className="flex flex-col justify-end pb-1 text-right">
