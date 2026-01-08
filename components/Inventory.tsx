@@ -377,58 +377,59 @@ const Inventory: React.FC = () => {
                 <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse table-fixed">
-                            <thead className="bg-slate-900 sticky top-0 z-20 text-[11px] uppercase font-black text-slate-300 tracking-wider">
+                            <thead className="bg-slate-900 sticky top-0 z-20 text-xs uppercase font-black text-slate-300 tracking-wider">
                                 <tr>
-                                    <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
-                                        <div className="flex items-center gap-2">ID / Códigos {getSortIcon('code')}</div>
+                                    <th className="w-[12%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
+                                        <div className="flex items-center gap-2">SKU {getSortIcon('code')}</div>
                                     </th>
-                                    <th className="w-[35%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('name')}>
+                                    <th className="w-[45%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('name')}>
                                         <div className="flex items-center gap-2">Descripción Comercial {getSortIcon('name')}</div>
                                     </th>
-                                    <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
-                                        <div className="flex items-center justify-center gap-2">Rubro / Marca {getSortIcon('category')}</div>
+                                    <th className="w-[13%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
+                                        <div className="flex items-center justify-center gap-2">Rubro {getSortIcon('category')}</div>
                                     </th>
-                                    <th className="w-[20%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('stock')}>
-                                        <div className="flex items-center justify-center gap-2">Existencias {getSortIcon('stock')}</div>
+                                    <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('stock')}>
+                                        <div className="flex items-center justify-center gap-2">Stock Total {getSortIcon('stock')}</div>
                                     </th>
                                     <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-700 transition-colors text-right bg-slate-800" onClick={() => requestSort('price')}>
-                                        <div className="flex items-center justify-end gap-2">PVP IVA {getSortIcon('price')}</div>
+                                        <div className="flex items-center justify-end gap-2">PVP Final {getSortIcon('price')}</div>
                                     </th>
-                                    <th className="w-[80px] px-4 py-5 text-center"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 text-sm">
+                            <tbody className="divide-y divide-slate-100">
                                 {sortedProducts.map(p => (
                                     <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
-                                        <td className="px-6 py-5">
-                                            <p className="font-mono font-black text-indigo-600 truncate">{p.internalCodes?.[0] || 'S/C'}</p>
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 truncate">EAN: {p.barcodes?.[0] || '-'}</p>
+                                        <td className="px-6 py-6">
+                                            <p className="font-mono font-black text-indigo-600 truncate text-xs">{p.internalCodes?.[0] || 'S/C'}</p>
                                         </td>
-                                        <td className="px-6 py-5">
-                                            <p className="font-black text-slate-800 uppercase leading-tight mb-1.5 truncate" title={p.name}>{p.name}</p>
-                                            <p className="text-[11px] text-slate-400 font-bold uppercase truncate max-w-full">{p.provider}</p>
+                                        <td className="px-6 py-6">
+                                            <p className="font-black text-slate-800 uppercase text-base leading-tight mb-1 truncate" title={p.name}>{p.name}</p>
+                                            <div className="flex gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                <span className="text-indigo-400">{p.brand}</span>
+                                                <span className="w-1 h-1 bg-slate-200 rounded-full mt-1"></span>
+                                                <span>{p.provider}</span>
+                                            </div>
                                         </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-lg border text-[10px] font-black uppercase mb-1.5 inline-block truncate max-w-full">{p.category}</span>
-                                            <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest block truncate">{p.brand}</span>
+                                        <td className="px-6 py-6 text-center">
+                                            <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase inline-block truncate max-w-full">{p.category}</span>
                                         </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <div className="flex flex-col items-center gap-1.5">
-                                                <span className="text-base font-black text-slate-900 tracking-tighter">TOTAL: {p.stock?.toLocaleString()}</span>
-                                                <div className="flex gap-1.5 text-[9px] font-black uppercase tracking-tighter">
-                                                    <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100" title="Stock Salón">P:{p.stockPrincipal || 0}</span>
-                                                    <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded border border-emerald-100" title="Stock Depósito">D:{p.stockDeposito || 0}</span>
-                                                    <span className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded border border-orange-100" title="Stock Sucursal">S:{p.stockSucursal || 0}</span>
+                                        <td className="px-6 py-6 text-center">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span className={`text-lg font-black tracking-tighter ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600 animate-pulse' : 'text-slate-900'}`}>{p.stock?.toLocaleString()}</span>
+                                                <div className="flex gap-1.5 text-[8px] font-black uppercase tracking-tighter">
+                                                    <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100" title="Salón">P:{p.stockPrincipal || 0}</span>
+                                                    <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100" title="Depósito">D:{p.stockDeposito || 0}</span>
+                                                    <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100" title="Sucursal">S:{p.stockSucursal || 0}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-5 text-right font-black text-slate-900 bg-indigo-50/10">
-                                            <p className="text-xl tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
-                                        </td>
-                                        <td className="px-4 py-5 text-center">
-                                            <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handlePedir(p)} className="p-2 bg-white text-emerald-600 rounded-xl shadow-sm border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all" title="Pedir Reposición"><Truck size={14}/></button>
-                                                <button onClick={() => handleOpenModal(p)} className="p-2 bg-white text-indigo-600 rounded-xl shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14} /></button>
+                                        <td className="px-6 py-6 text-right font-black text-slate-900 bg-indigo-50/10">
+                                            <div className="flex flex-col items-end gap-1">
+                                                <p className="text-2xl tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => handlePedir(p)} className="p-2 bg-white text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all"><Truck size={12}/></button>
+                                                    <button onClick={() => handleOpenModal(p)} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={12}/></button>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
