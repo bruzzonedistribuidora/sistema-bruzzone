@@ -255,6 +255,27 @@ const Inventory: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const applyProviderDiscounts = () => {
+    if (!formData.provider) {
+        alert("Primero seleccione un proveedor en la pestaña de Identificación.");
+        return;
+    }
+    const providerObj = providers.find(p => p.name === formData.provider);
+    if (providerObj && providerObj.defaultDiscounts) {
+        setFormData(prev => ({
+            ...prev,
+            discounts: [
+                providerObj.defaultDiscounts[0] || 0,
+                providerObj.defaultDiscounts[1] || 0,
+                providerObj.defaultDiscounts[2] || 0,
+                0
+            ]
+        }));
+    } else {
+        alert("El proveedor seleccionado no tiene descuentos predeterminados configurados.");
+    }
+  };
+
   const handleBulkCalc = (cost: number, qty: number) => {
       setBulkCost(cost);
       if (qty > 0) {
@@ -614,7 +635,12 @@ const Inventory: React.FC = () => {
                                               <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
                                                   <Percent size={14}/> Cadena de Bonificaciones
                                               </label>
-                                              <div className="text-[8px] font-black bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-400 uppercase">Impacto en Cascada</div>
+                                              <button 
+                                                onClick={applyProviderDiscounts}
+                                                className="flex items-center gap-2 bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest shadow-md hover:bg-indigo-700 transition-all active:scale-95"
+                                              >
+                                                <Zap size={10} fill="currentColor"/> Sincronizar Proveedor
+                                              </button>
                                           </div>
                                           <div className="grid grid-cols-3 gap-4">
                                               {[0, 1, 2].map(idx => (
