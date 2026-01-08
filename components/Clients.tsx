@@ -4,11 +4,10 @@ import {
     User, Plus, Search, FileText, Globe, X, Copy, MessageCircle, Key, 
     ExternalLink, History, Eye, ChevronRight, ShoppingBag, Receipt, 
     Printer, Mail, DollarSign, ArrowDownLeft, CheckCircle, Wallet, 
-    CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserPlus, Loader2, Zap, Save,
-    ShieldCheck, Link, Share2, Edit, Trash2, FileSpreadsheet, LayoutTemplate, ChevronLeft, MapPin, Users, Send, Download, AlertTriangle, Building,
-    Calendar, Shield, Star, Gift, Sparkles, RefreshCw, Pencil, ArrowLeft,
-    UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp, Columns, Table as TableIcon, Hash, Tag, Notebook, Percent, Settings2,
-    ToggleLeft, ToggleRight, List
+    CreditCard, Package, Info, CheckSquare, Square, ArrowRight, Scroll, Smartphone, Landmark, UserCheck, Phone, QrCode, Banknote, FileCheck, FileUp, Columns, Table as TableIcon, Hash, Tag, Notebook, Percent, Settings2,
+    ToggleLeft, ToggleRight, List,
+    // Add missing imports
+    Zap, RefreshCw, Save, Trash2, Pencil, MapPin, Users
 } from 'lucide-react';
 import { Client, CurrentAccountMovement, CompanyConfig, TaxCondition, AuthorizedContact, PriceList } from '../types';
 import { fetchCompanyByCuit } from '../services/geminiService';
@@ -25,6 +24,8 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'CLIENT' | 'CONTACTS' | 'MOVEMENTS'>('GENERAL');
+  // Add aiSources state for grounding
+  const [aiSources, setAiSources] = useState<{title: string, uri: string}[]>([]);
   
   // Filtro de movimientos
   const [movDateStart, setMovDateStart] = useState('');
@@ -65,6 +66,8 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
       if (cleanCuit.length < 10) return;
 
       setIsSearchingCuit(true);
+      // Reset sources before search
+      setAiSources([]);
       try {
           const formattedCuitForSearch = cleanCuit.length === 11 
             ? `${cleanCuit.slice(0,2)}-${cleanCuit.slice(2,10)}-${cleanCuit.slice(10)}`
@@ -80,6 +83,8 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                   taxCondition: (data.condicionIva as TaxCondition) || prev.taxCondition,
                   cuit: formattedCuitForSearch 
               }));
+              // Save grounding sources
+              setAiSources(data.sources || []);
           }
       } catch (err) { console.error(err); } finally { setIsSearchingCuit(false); }
   };
@@ -141,7 +146,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                 </div>
             </div>
             <div className="flex gap-3">
-                <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setClientForm({name: '', firstName: '', lastName: '', fantasyName: '', cuit: '', phone: '', email: '', address: '', balance: 0, limit: 100000, points: 0, isCurrentAccountActive: true, isLimitEnabled: false, taxCondition: 'Consumidor Final', authorizedContacts: []}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
+                <button onClick={() => { setModalTab('GENERAL'); setIsEditing(false); setAiSources([]); setClientForm({name: '', firstName: '', lastName: '', fantasyName: '', cuit: '', phone: '', email: '', address: '', balance: 0, limit: 100000, points: 0, isCurrentAccountActive: true, isLimitEnabled: false, taxCondition: 'Consumidor Final', authorizedContacts: []}); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest active:scale-95">
                     <Plus size={20} /> Nuevo Cliente
                 </button>
             </div>
@@ -181,7 +186,7 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                 </td>
                                 <td className="px-8 py-5 text-center">
                                     <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setModalTab('GENERAL'); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90"><Pencil size={18}/></button>
+                                        <button onClick={() => { setIsEditing(true); setClientForm(client); setModalTab('GENERAL'); setAiSources([]); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all active:scale-90"><Pencil size={18}/></button>
                                         <button onClick={() => onOpenPortal?.(client)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all active:scale-90"><Globe size={18}/></button>
                                         <button onClick={() => setClients(prev => prev.filter(c => c.id !== client.id))} className="p-3 bg-red-50 text-red-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all active:scale-90"><Trash2 size={18}/></button>
                                     </div>
@@ -242,6 +247,21 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                                                     {isSearchingCuit ? <RefreshCw className="animate-spin" size={20}/> : <Zap size={20}/>}
                                                 </button>
                                             </div>
+                                            {/* Display AI grounding sources if available */}
+                                            {aiSources.length > 0 && (
+                                                <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 animate-fade-in">
+                                                    <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                        <Info size={10}/> Fuentes de información IA:
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {aiSources.map((s, idx) => (
+                                                            <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[9px] font-bold text-blue-600 hover:underline">
+                                                                <ExternalLink size={10}/> {s.title}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -394,7 +414,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal }) => {
                         )}
 
                         {/* TAB MOVIMIENTOS */}
-                        {/* Fix: Changed check from 'MOVIMIENTOS' to 'MOVEMENTS' to correctly match the defined state type. */}
                         {modalTab === 'MOVEMENTS' && (
                             <div className="space-y-6 animate-fade-in flex flex-col h-full overflow-hidden">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm">
