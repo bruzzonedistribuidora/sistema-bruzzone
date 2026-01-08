@@ -5,12 +5,14 @@ import {
     Receipt, Truck, Wallet, Bot, Settings, FileUp, Layers, Zap, 
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
-    ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3
+    ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
+    Settings2
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import Inventory from './components/Inventory';
+import StockAdjustment from './components/StockAdjustment';
 import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
@@ -54,6 +56,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
     [ViewState.ANALYTICS]: { icon: BarChart3, label: "Dashboard", color: "bg-indigo-600" },
     [ViewState.INVENTORY]: { icon: Database, label: "Inventario Maestro", color: "bg-indigo-500" },
+    [ViewState.STOCK_ADJUSTMENT]: { icon: Settings2, label: "Ajuste Stock", color: "bg-slate-800" },
     [ViewState.POS]: { icon: Receipt, label: "Punto de Venta", color: "bg-emerald-500" },
     [ViewState.PURCHASES]: { icon: Truck, label: "Compras / Gastos", color: "bg-blue-500" },
     [ViewState.TREASURY]: { icon: Wallet, label: "Tesorería", color: "bg-orange-500" },
@@ -134,6 +137,7 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment />;
       case ViewState.PROVIDERS: return <Providers />;
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
