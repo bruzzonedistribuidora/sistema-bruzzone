@@ -469,9 +469,11 @@ const UsersComponent: React.FC = () => {
                   {roles.map(role => (
                     <div 
                       key={role.id}
-                      onClick={() => setUserFormData({...userFormData, roleId: role.id})}
+                      /* Fix: cast role.id as literal union to match User.roleId */
+                      onClick={() => setUserFormData({...userFormData, roleId: role.id as User['roleId']})}
                       className={`border-2 rounded-2xl p-4 cursor-pointer transition-all flex items-center justify-between group ${
-                        userFormData.roleId === role.id 
+                        /* Fix: cast role.id for type-safe comparison */
+                        userFormData.roleId === (role.id as User['roleId'])
                         ? 'border-ferre-orange bg-orange-50 shadow-md ring-4 ring-orange-50' 
                         : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                       }`}
