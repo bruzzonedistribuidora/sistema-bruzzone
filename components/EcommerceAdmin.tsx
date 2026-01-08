@@ -8,7 +8,7 @@ import {
     ArrowRight, ShoppingBag, Plus, Trash2, Layers, Check,
     DollarSign, Smartphone, ShoppingCart, Globe2, 
     CheckSquare, Square, Zap, Power, List, CloudUpload,
-    CloudDownload
+    CloudDownload, ShieldAlert
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -119,6 +119,18 @@ const EcommerceAdmin: React.FC = () => {
 
     const handleBulkPlatformUpdate = async (platform: 'mercadoLibre' | 'tiendaNube' | 'webPropia' | 'ALL', value: boolean) => {
         if (selectedIds.size === 0) return;
+
+        // Validación de canal conectado (Simulada)
+        if (value) {
+            const meliConfig = JSON.parse(localStorage.getItem('sync_meli') || '{}');
+            if (platform === 'mercadoLibre' || platform === 'ALL') {
+                if (meliConfig.status !== 'CONNECTED') {
+                    alert("❌ Error de Sincronización: Mercado Libre no está autenticado. Vincule su cuenta en 'Configuración API' para publicar.");
+                    return;
+                }
+            }
+        }
+
         setIsApplying(true);
         
         const updatedProducts = products.filter(p => selectedIds.has(p.id)).map(p => {
@@ -139,7 +151,7 @@ const EcommerceAdmin: React.FC = () => {
         await loadProducts();
         setIsApplying(false);
         if (value) {
-            alert(`✅ Sincronización exitosa: ${selectedIds.size} artículos publicados.`);
+            alert(`✅ Sincronización exitosa: ${selectedIds.size} artículos publicados en la nube.`);
         } else {
             alert(`✅ Se han removido ${selectedIds.size} artículos del catálogo web.`);
         }
