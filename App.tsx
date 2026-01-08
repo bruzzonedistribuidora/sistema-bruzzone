@@ -6,7 +6,7 @@ import {
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Settings2, DollarSign
+    Settings2, DollarSign, Key, ShieldAlert
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -48,11 +48,12 @@ import CreditNotes from './components/CreditNotes';
 import MassProductUpdate from './components/MassProductUpdate';
 import StockTransfers from './components/StockTransfers';
 import CloudHub from './components/CloudHub';
+import LicenseManager from './components/LicenseManager';
 import Login from './components/Login';
 import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
-import { ViewState, User, Client, InvoiceItem } from './types';
+import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
@@ -86,6 +87,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
     [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Monitor Faltantes", color: "bg-orange-600" },
     [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Armado Pedido", color: "bg-emerald-600" },
+    [ViewState.LICENSE_MANAGER]: { icon: Key, label: "Gestión Licencias", color: "bg-slate-900" },
 };
 
 const App: React.FC = () => {
@@ -98,17 +100,29 @@ const App: React.FC = () => {
   });
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
+  const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
+
+  const loadLicense = () => {
+    const saved = localStorage.getItem('ferrecloud_license');
+    if (saved) setSystemLicense(JSON.parse(saved));
+  };
 
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
+
+    loadLicense();
+    window.addEventListener('license_updated', loadLicense);
 
     const checkMobile = () => {
         setIsMobile(window.innerWidth < 1024);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => {
+        window.removeEventListener('resize', checkMobile);
+        window.removeEventListener('license_updated', loadLicense);
+    };
   }, []);
 
   const handleNavigate = (view: ViewState) => {
@@ -136,6 +150,24 @@ const App: React.FC = () => {
   };
 
   const renderViewContent = (view: ViewState) => {
+    // Si el sistema está bloqueado y no es el creador, mostramos pantalla de bloqueo
+    if (systemLicense?.status === 'LOCKED' && loggedInUser?.roleId !== 'creator') {
+        return (
+            <div className="h-full flex items-center justify-center bg-slate-100 p-10">
+                <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-red-100 text-center max-w-md space-y-6 animate-fade-in">
+                    <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
+                        <ShieldAlert size={64}/>
+                    </div>
+                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">SISTEMA BLOQUEADO</h3>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed italic">Su licencia ha sido suspendida por el proveedor. Por favor, regularice su situación administrativa para restablecer el servicio.</p>
+                    <div className="pt-6 border-t">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Soporte Técnico Cloud</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard onNavigate={handleNavigate} />;
@@ -178,6 +210,7 @@ const App: React.FC = () => {
       case ViewState.CLOUD_HUB: return <CloudHub />;
       case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { setItemsToBill(null); handleNavigate(ViewState.REPLENISHMENT); }} />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
+      case ViewState.LICENSE_MANAGER: return <LicenseManager />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
