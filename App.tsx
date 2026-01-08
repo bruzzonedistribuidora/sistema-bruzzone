@@ -52,7 +52,7 @@ import Login from './components/Login';
 import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
-import LicenseManager from './components/LicenseManager';
+import LicenseConsole from './components/LicenseConsole';
 import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -212,7 +212,7 @@ const App: React.FC = () => {
       case ViewState.CLOUD_HUB: return <CloudHub />;
       case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { setItemsToBill(null); handleNavigate(ViewState.REPLENISHMENT); }} />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
-      case ViewState.LICENSE_MANAGER: return <LicenseManager />;
+      case ViewState.LICENSE_MANAGER: return <LicenseConsole />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
@@ -251,7 +251,7 @@ const App: React.FC = () => {
                         }`}
                     >
                         <Icon size={14} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
-                        <span className="text-[10px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                        <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
                             {config.label}
                         </span>
                         {view !== ViewState.DASHBOARD && (
