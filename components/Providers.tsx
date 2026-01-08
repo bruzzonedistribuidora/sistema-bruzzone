@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Users, Plus, Search, Truck, X, Save, Phone, Mail, 
@@ -393,6 +394,21 @@ const Providers: React.FC = () => {
                                                 {isSearchingCuit ? <RefreshCw className="animate-spin" size={20}/> : <Zap size={20}/>}
                                             </button>
                                         </div>
+                                        {/* Display AI grounding sources if available */}
+                                        {aiSources.length > 0 && (
+                                            <div className="mt-4 p-4 bg-blue-50 rounded-2xl border border-blue-100 animate-fade-in">
+                                                <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                    <Info size={10}/> Fuentes de información IA:
+                                                </p>
+                                                <div className="space-y-1">
+                                                    {aiSources.map((s, idx) => (
+                                                        <a key={idx} href={s.uri} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[9px] font-bold text-blue-600 hover:underline">
+                                                            <ExternalLink size={10}/> {s.title}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Razón Social</label>
