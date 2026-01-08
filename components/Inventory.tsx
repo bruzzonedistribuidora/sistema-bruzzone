@@ -6,10 +6,11 @@ import {
     Percent, Activity, Database, Boxes, RefreshCw, 
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
-    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet
+    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet,
+    PackagePlus
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
-import { productDB } from '../services/storageService';
+import { productDB, addToReplenishmentQueue } from '../services/storageService';
 import Providers from './Providers';
 
 const Inventory: React.FC = () => {
@@ -106,6 +107,14 @@ const Inventory: React.FC = () => {
   const getSortIcon = (key: string) => {
     if (sortConfig.key !== key) return <div className="w-4 h-4 opacity-20"><ChevronUp size={14}/></div>;
     return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-indigo-400"/> : <ChevronDown size={14} className="text-indigo-400"/>;
+  };
+
+  const handlePedir = (p: Product) => {
+      if (addToReplenishmentQueue(p)) {
+          alert(`Articulo ${p.name} agregado a la cola de reposición.`);
+      } else {
+          alert(`El articulo ya se encuentra en la cola de reposición.`);
+      }
   };
 
   const handleExportCatalog = async () => {
@@ -357,6 +366,7 @@ const Inventory: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-5 text-center">
                                             <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handlePedir(p)} className="p-3 bg-white text-emerald-600 rounded-xl shadow-sm border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all" title="Pedir Reposición"><Truck size={14}/></button>
                                                 <button onClick={() => handleOpenModal(p)} className="p-3 bg-white text-indigo-600 rounded-xl shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={14} /></button>
                                                 <button onClick={async () => { if(confirm('¿Eliminar artículo?')) await productDB.delete(p.id); }} className="p-3 bg-white text-red-400 rounded-xl shadow-sm border border-red-100 hover:bg-red-50 hover:text-white transition-all"><Trash2 size={14} /></button>
                                             </div>
