@@ -1,6 +1,5 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-// Added ArrowDownLeft to imports to fix the error on line 200
 import { 
     Calculator, FileText, BookOpen, PieChart, Landmark, Plus, 
     Search, Download, TrendingUp, Target, Activity, DollarSign, 
@@ -62,17 +61,34 @@ const Accounting: React.FC = () => {
   });
 
   // --- DATOS DE OTROS MÓDULOS ---
-  const products: Product[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'), []);
-  const expenses: DailyExpense[] = useMemo(() => JSON.parse(localStorage.getItem('daily_movements') || '[]'), []);
-  const sales: any[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'), []);
+  const products: Product[] = useMemo(() => {
+    try {
+        const saved = localStorage.getItem('ferrecloud_products');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  }, []);
+
+  const expenses: DailyExpense[] = useMemo(() => {
+    try {
+        const saved = localStorage.getItem('daily_movements');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  }, []);
+
+  const sales: any[] = useMemo(() => {
+    try {
+        const saved = localStorage.getItem('ferrecloud_sales_history');
+        return saved ? JSON.parse(saved) : [];
+    } catch (e) { return []; }
+  }, []);
 
   // --- CÁLCULOS FINANCIEROS AVANZADOS ---
   const financials = useMemo(() => {
-    const totalSales = sales.reduce((acc, s) => acc + s.total, 0);
-    const fixedExp = expenses.filter(e => e.category === 'FIXED' && e.type === 'EXPENSE').reduce((acc, e) => acc + e.amount, 0);
-    const varExp = expenses.filter(e => e.category === 'VARIABLE' && e.type === 'EXPENSE').reduce((acc, e) => acc + e.amount, 0);
+    const totalSales = sales.reduce((acc, s) => acc + (s.total || 0), 0);
+    const fixedExp = expenses.filter(e => e.category === 'FIXED' && e.type === 'EXPENSE').reduce((acc, e) => acc + (e.amount || 0), 0);
+    const varExp = expenses.filter(e => e.category === 'VARIABLE' && e.type === 'EXPENSE').reduce((acc, e) => acc + (e.amount || 0), 0);
     
-    // Margen promedio real del inventario
+    // Margen promedio real del inventario (por defecto 30%)
     const avgMargin = products.length > 0 
         ? products.reduce((acc, p) => acc + (p.profitMargin || 30), 0) / products.length 
         : 30;
@@ -121,7 +137,7 @@ const Accounting: React.FC = () => {
             <div>
                 <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">Contabilidad Central</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-                    Análisis de Supervivencia y Liquidez
+                    <Activity size={14} className="text-green-500 animate-pulse"/> Análisis de Supervivencia y Liquidez
                 </p>
             </div>
         </div>
@@ -268,7 +284,6 @@ const Accounting: React.FC = () => {
               </div>
           )}
 
-          {/* OTRAS SECCIONES (DIARIO, RESULTADOS, FISCAL) SE MANTIENEN IGUAL QUE ANTES PERO DENTRO DEL NUEVO LAYOUT */}
           {activeSection === 'DIARIO' && (
               <div className="flex flex-col h-full space-y-4 animate-fade-in overflow-hidden">
                   <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm shrink-0">
@@ -287,7 +302,23 @@ const Accounting: React.FC = () => {
                                   <tr><th className="px-8 py-5">Fecha</th><th className="px-4 py-5">Cuenta</th><th className="px-4 py-5">Concepto</th><th className="px-8 py-5 text-right">Debe</th><th className="px-8 py-5 text-right">Haber</th></tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                  <tr><td colSpan={5} className="py-40 text-center text-slate-300 font-black uppercase tracking-widest"><History size={48} className="mx-auto mb-4 opacity-10"/>Sin movimientos recientes</td></tr>
+                                  {entries.length === 0 ? (
+                                     <tr><td colSpan={5} className="py-40 text-center text-slate-300 font-black uppercase tracking-widest"><History size={48} className="mx-auto mb-4 opacity-10"/>Sin movimientos recientes</td></tr>
+                                  ) : (
+                                    entries.map(entry => (
+                                        <React.Fragment key={entry.id}>
+                                            {entry.items.map((item, idx) => (
+                                                <tr key={`${entry.id}-${idx}`} className="hover:bg-slate-50">
+                                                    <td className="px-8 py-4 text-xs font-bold text-slate-400">{idx === 0 ? entry.date : ''}</td>
+                                                    <td className="px-4 py-4 font-bold text-indigo-600">{item.accountName}</td>
+                                                    <td className="px-4 py-4 text-xs uppercase font-medium">{idx === 0 ? entry.description : ''}</td>
+                                                    <td className="px-8 py-4 text-right font-black">{item.debit > 0 ? `$${item.debit.toLocaleString()}` : '-'}</td>
+                                                    <td className="px-8 py-4 text-right font-black">{item.credit > 0 ? `$${item.credit.toLocaleString()}` : '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </React.Fragment>
+                                    ))
+                                  )}
                               </tbody>
                            </table>
                       </div>
@@ -301,7 +332,7 @@ const Accounting: React.FC = () => {
                         <h3 className="text-xl font-black uppercase tracking-tight mb-8">Estado de Resultados P&L</h3>
                         <div className="h-80">
                              <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={[{name: 'Ingresos', v: financials.totalSales}, {name: 'Gastos', v: financials.fixedExp + financials.varExp}]}>
+                                <BarChart data={[{name: 'Ingresos', v: financials.totalSales}, {name: 'Gastos Totales', v: financials.fixedExp + financials.varExp}]}>
                                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'black'}} />
                                     <Tooltip />
                                     <Bar dataKey="v" fill="#4f46e5" radius={[10, 10, 0, 0]} barSize={50} />
