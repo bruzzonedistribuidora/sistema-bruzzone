@@ -1,5 +1,5 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-// Added 'List' to lucide-react imports to fix 'Cannot find name List' error
 import { 
     Globe, Search, Star, Percent,
     Eye, Package, Camera, Upload, X, Image as ImageIcon,
@@ -7,7 +7,8 @@ import {
     RefreshCw, Tag, ChevronUp, ChevronDown, FolderOpen, 
     ArrowRight, ShoppingBag, Plus, Trash2, Layers, Check,
     DollarSign, Smartphone, ShoppingCart, Globe2, 
-    CheckSquare, Square, Zap, Power, List
+    CheckSquare, Square, Zap, Power, List, CloudUpload,
+    CloudDownload
 } from 'lucide-react';
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
@@ -24,8 +25,10 @@ const EcommerceAdmin: React.FC = () => {
     const [isApplying, setIsApplying] = useState(false);
 
     const loadProducts = async () => {
+        setIsApplying(true);
         const all = await productDB.getAll();
         setProducts(all);
+        setTimeout(() => setIsApplying(false), 500);
     };
 
     useEffect(() => {
@@ -78,7 +81,7 @@ const EcommerceAdmin: React.FC = () => {
             return 0;
         });
 
-        return items.slice(0, 150); // Límite para rendimiento de renderizado
+        return items.slice(0, 150); 
     }, [products, searchTerm, activeFolder, sortConfig]);
 
     const toggleSelectAll = () => {
@@ -135,7 +138,12 @@ const EcommerceAdmin: React.FC = () => {
         await productDB.saveBulk(updatedProducts);
         await loadProducts();
         setIsApplying(false);
-        alert("Actualización de plataformas completada.");
+        if (value) {
+            alert(`✅ Sincronización exitosa: ${selectedIds.size} artículos publicados.`);
+        } else {
+            alert(`✅ Se han removido ${selectedIds.size} artículos del catálogo web.`);
+        }
+        setSelectedIds(new Set());
     };
 
     const handleImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,8 +208,9 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
 
                 <div className="p-4 bg-slate-50 border-t border-slate-200">
-                    <button onClick={loadProducts} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all">
-                        <RefreshCw size={14}/> Sincronizar Nube
+                    <button onClick={loadProducts} disabled={isApplying} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all disabled:opacity-50">
+                        {isApplying ? <RefreshCw className="animate-spin" size={14}/> : <CloudDownload size={14}/>} 
+                        {isApplying ? 'Sincronizando...' : 'Recargar Base Local'}
                     </button>
                 </div>
             </aside>
@@ -213,12 +222,17 @@ const EcommerceAdmin: React.FC = () => {
                         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={20}/>
                         <input 
                             type="text" 
-                            placeholder="Buscar artículos para publicar..." 
+                            placeholder="Buscar artículos por nombre o SKU..." 
                             className="w-full pl-12 pr-6 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-indigo-100 shadow-inner transition-all uppercase"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    {isApplying && (
+                        <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest animate-pulse">
+                            <RefreshCw size={14} className="animate-spin"/> Procesando cambios masivos...
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-hidden p-6 pb-24">
@@ -235,8 +249,8 @@ const EcommerceAdmin: React.FC = () => {
                                         <th className="px-4 py-5">Visual</th>
                                         <th className="px-4 py-5">Nombre / SKU</th>
                                         <th className="px-4 py-5 text-right">Precio Actual</th>
-                                        <th className="px-4 py-5 text-center">Plataformas</th>
-                                        <th className="px-8 py-5 text-center">Modo</th>
+                                        <th className="px-4 py-5 text-center">Publicar en Canal</th>
+                                        <th className="px-8 py-5 text-center">Destacar</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -269,10 +283,25 @@ const EcommerceAdmin: React.FC = () => {
                                                 {p.ecommerce?.isOffer && <span className="text-[8px] text-orange-500 font-black uppercase">OFERTA ACTIVA</span>}
                                             </td>
                                             <td className="px-4 py-4">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <PlatformIcon active={p.ecommerce?.mercadoLibre} label="M" color="bg-[#FFF159] text-gray-800" />
-                                                    <PlatformIcon active={p.ecommerce?.tiendaNube} label="N" color="bg-[#00AEEF] text-white" />
-                                                    <PlatformIcon active={p.ecommerce?.webPropia} label="W" color="bg-indigo-600 text-white" />
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <PlatformBtn 
+                                                        active={p.ecommerce?.mercadoLibre} 
+                                                        label="M" 
+                                                        color="bg-[#FFF159] text-gray-800"
+                                                        onClick={() => handleUpdateProduct(p.id, { mercadoLibre: !p.ecommerce?.mercadoLibre })}
+                                                    />
+                                                    <PlatformBtn 
+                                                        active={p.ecommerce?.tiendaNube} 
+                                                        label="N" 
+                                                        color="bg-[#00AEEF] text-white"
+                                                        onClick={() => handleUpdateProduct(p.id, { tiendaNube: !p.ecommerce?.tiendaNube })}
+                                                    />
+                                                    <PlatformBtn 
+                                                        active={p.ecommerce?.webPropia} 
+                                                        label="W" 
+                                                        color="bg-indigo-600 text-white"
+                                                        onClick={() => handleUpdateProduct(p.id, { webPropia: !p.ecommerce?.webPropia })}
+                                                    />
                                                 </div>
                                             </td>
                                             <td className="px-8 py-4">
@@ -298,8 +327,8 @@ const EcommerceAdmin: React.FC = () => {
                             <CheckSquare size={24}/>
                         </div>
                         <div>
-                            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest">Acciones Masivas</p>
-                            <h4 className="text-white font-black text-lg leading-none">{selectedIds.size} Artículos Seleccionados</h4>
+                            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-widest">Sincronización Masiva</p>
+                            <h4 className="text-white font-black text-lg leading-none">{selectedIds.size} ítems listos</h4>
                         </div>
                     </div>
 
@@ -307,8 +336,9 @@ const EcommerceAdmin: React.FC = () => {
                         <button 
                             onClick={() => handleBulkPlatformUpdate('ALL', true)}
                             disabled={isApplying}
-                            className="bg-white text-slate-900 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-100 transition-all active:scale-95">
-                            <Power size={14} className="text-green-500"/> Publicar en Todo
+                            className="bg-indigo-500 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all active:scale-95 shadow-xl shadow-indigo-500/20">
+                            {isApplying ? <RefreshCw className="animate-spin" size={16}/> : <CloudUpload size={16}/>}
+                            Sincronizar y Publicar
                         </button>
                         
                         <div className="h-10 w-px bg-white/10 mx-2 hidden md:block"></div>
@@ -338,7 +368,7 @@ const EcommerceAdmin: React.FC = () => {
                         <button 
                             onClick={() => handleBulkPlatformUpdate('ALL', false)}
                             className="bg-red-500/20 text-red-500 border border-red-500/50 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">
-                            Quitar de la Web
+                            Despublicar Todo
                         </button>
                     </div>
 
@@ -353,10 +383,12 @@ const EcommerceAdmin: React.FC = () => {
 
 // --- COMPONENTES ATÓMICOS ---
 
-const PlatformIcon: React.FC<{ active?: boolean, label: string, color: string }> = ({ active, label, color }) => (
-    <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black transition-all ${active ? color : 'bg-slate-100 text-slate-300'}`}>
+const PlatformBtn: React.FC<{ active?: boolean, label: string, color: string, onClick: () => void }> = ({ active, label, color, onClick }) => (
+    <button 
+        onClick={onClick}
+        className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all border-2 ${active ? `${color} border-white shadow-md scale-110` : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}>
         {label}
-    </div>
+    </button>
 );
 
 const BulkPlatformBtn: React.FC<{ onClick: () => void, icon: any, label: string, color: string, textColor: string }> = ({ onClick, icon: Icon, label, color, textColor }) => (
