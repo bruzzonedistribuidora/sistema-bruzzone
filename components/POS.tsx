@@ -7,10 +7,9 @@ import {
     CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
     ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap,
     ArrowLeftRight, Banknote, Smartphone as ECheqIcon,
-    // Added History to fix JSX component error
-    History
+    History, PackageCheck, Wallet
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, TreasuryMovement, CashRegister } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 const DEFAULT_CLIENT: Client = {
@@ -52,7 +51,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
     const [paymentMethod, setPaymentMethod] = useState<string>('EFECTIVO');
     
-    // Estados para Tarjeta Avanzada
     const [selectedSystemId, setSelectedSystemId] = useState<string>('');
     const [cardMode, setCardMode] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
@@ -115,17 +113,111 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         setShowProductResults(false);
     };
 
-    const handleCheckout = (isFiscal: boolean = false) => {
+    const handleCheckout = async (isFiscal: boolean = false) => {
         if (cart.length === 0) return;
+
+        // Validar Cajas para Tesorería
+        const savedRegisters: CashRegister[] = JSON.parse(localStorage.getItem('ferrecloud_registers') || '[]');
+        const activeRegister = savedRegisters.find(r => r.isOpen);
+        
+        if (!activeRegister && paymentMethod !== 'CTACTE') {
+            alert("⚠️ No hay ninguna CAJA ABIERTA. Debe abrir una caja en el módulo de Tesorería para registrar el ingreso de dinero.");
+            return;
+        }
+
         isFiscal ? setIsFiscalInvoicing(true) : setIsProcessing(true);
-        setTimeout(() => {
-            const sale = { id: `VEN-${Date.now().toString().slice(-6)}`, isFiscal, date: new Date().toLocaleString(), client: selectedClient.name, total: totals.total, method: paymentMethod, items: [...cart] };
-            const newHistory = [sale, ...salesHistory];
-            setSalesHistory(newHistory);
-            localStorage.setItem('ferrecloud_sales_history', JSON.stringify(newHistory));
-            setLastSale(sale);
-            setIsFiscalInvoicing(false); setIsProcessing(false); setShowSuccessModal(true); setCart([]);
-        }, isFiscal ? 2000 : 800);
+
+        // Simulamos un delay de proceso
+        await new Promise(resolve => setTimeout(resolve, isFiscal ? 1500 : 600));
+
+        const saleId = `VEN-${Date.now().toString().slice(-6)}`;
+        const timestamp = new Date().toLocaleString();
+
+        // 1. REGISTRAR VENTA EN HISTORIAL
+        const sale = { 
+            id: saleId, 
+            isFiscal, 
+            date: timestamp, 
+            client: selectedClient.name, 
+            total: totals.total, 
+            method: paymentMethod, 
+            items: cart.map(i => ({ 
+                sku: i.product.internalCodes[0], 
+                name: i.product.name, 
+                qty: i.quantity, 
+                price: i.appliedPrice 
+            })) 
+        };
+        
+        const newHistory = [sale, ...salesHistory];
+        setSalesHistory(newHistory);
+        localStorage.setItem('ferrecloud_sales_history', JSON.stringify(newHistory));
+
+        // 2. DESCONTAR STOCK REAL (IndexedDB)
+        const productsToUpdate: Product[] = [];
+        for (const item of cart) {
+            const prod = products.find(p => p.id === item.product.id);
+            if (prod) {
+                const updatedProd = {
+                    ...prod,
+                    stockPrincipal: Math.max(0, (prod.stockPrincipal || 0) - item.quantity),
+                    stock: Math.max(0, (prod.stock || 0) - item.quantity)
+                };
+                productsToUpdate.push(updatedProd);
+            }
+        }
+        await productDB.saveBulk(productsToUpdate);
+
+        // 3. REGISTRAR EN TESORERÍA (Si no es Cuenta Corriente)
+        if (paymentMethod !== 'CTACTE' && activeRegister) {
+            const movement: TreasuryMovement = {
+                id: `MV-${Date.now()}`,
+                date: timestamp,
+                type: 'INCOME',
+                subtype: 'VENTA',
+                paymentMethod: paymentMethod as any,
+                amount: totals.total,
+                description: `VENTA ${isFiscal ? 'FISCAL' : 'INTERNA'} #${saleId} - ${selectedClient.name}`,
+                cashRegisterId: activeRegister.id
+            };
+
+            const updatedRegisters = savedRegisters.map(r => 
+                r.id === activeRegister.id ? { ...r, balance: r.balance + totals.total } : r
+            );
+            localStorage.setItem('ferrecloud_registers', JSON.stringify(updatedRegisters));
+
+            const savedMovements: TreasuryMovement[] = JSON.parse(localStorage.getItem('ferrecloud_treasury_movements') || '[]');
+            localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify([movement, ...savedMovements]));
+        }
+
+        // 4. SI ES CTACTE -> ACTUALIZAR SALDO CLIENTE
+        if (paymentMethod === 'CTACTE') {
+            const savedClients: Client[] = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
+            const updatedClients = savedClients.map(c => 
+                c.id === selectedClient.id ? { ...c, balance: (c.balance || 0) + totals.total } : c
+            );
+            localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
+            
+            const movements = JSON.parse(localStorage.getItem('ferrecloud_movements') || '[]');
+            movements.push({
+                id: `MOV-${Date.now()}`,
+                clientId: selectedClient.id,
+                date: timestamp,
+                voucherType: `VENTA POS #${saleId}`,
+                description: `Compra financiada en Cuenta Corriente`,
+                debit: totals.total,
+                credit: 0,
+                balance: (selectedClient.balance || 0) + totals.total
+            });
+            localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
+        }
+
+        setLastSale(sale);
+        setIsFiscalInvoicing(false);
+        setIsProcessing(false);
+        setShowSuccessModal(true);
+        setCart([]);
+        setSelectedClient(DEFAULT_CLIENT);
     };
 
     const currentSystem = companyConfig.paymentSystems?.find(s => s.id === selectedSystemId);
@@ -163,7 +255,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                     <p className="font-black text-slate-800 uppercase text-sm leading-none mb-1.5">{p.name}</p>
                                                     <div className="flex gap-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                                                         <span>SKU: {p.internalCodes[0]}</span>
-                                                        <span className="text-indigo-500 font-black">Stock: {p.stock}</span>
+                                                        <span className={`${p.stock > 0 ? 'text-indigo-500' : 'text-red-500'} font-black`}>Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
                                                 <p className="font-black text-indigo-600 text-lg tracking-tighter">${p.priceFinal.toLocaleString('es-AR')}</p>
@@ -219,7 +311,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             </div>
                         </div>
 
-                        {/* ACCIONES DE CONVERSIÓN */}
                         <div className="grid grid-cols-2 gap-4 shrink-0">
                             <button 
                                 onClick={() => onTransformToRemito?.(cart)} 
@@ -276,7 +367,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     </div>
                                 </div>
 
-                                {/* CONFIGURACIÓN DE TARJETA DINÁMICA */}
                                 {paymentMethod === 'TARJETA' && (
                                     <div className="bg-white/5 p-5 rounded-2xl border border-white/10 space-y-5 animate-fade-in">
                                         <div className="space-y-2">
@@ -328,7 +418,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 {isFiscalInvoicing ? <RefreshCw className="animate-spin"/> : <><ShieldCheck size={24}/> FACTURAR (ARCA)</>}
                             </button>
                             <button onClick={() => handleCheckout(false)} disabled={cart.length === 0 || isProcessing} className="w-full py-6 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] shadow-lg bg-white border-2 border-slate-200 text-slate-900 flex items-center justify-center gap-4 transition-all active:scale-95 disabled:opacity-30">
-                                {isProcessing ? <RefreshCw className="animate-spin"/> : <><CheckCircle size={24}/> COBRO INTERNO</>}
+                                {isProcessing ? <RefreshCw className="animate-spin"/> : <><CheckCircle size={24}/> INGRESO DE VENTA</>}
                             </button>
                         </div>
                     </div>
@@ -358,6 +448,45 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL DE ÉXITO TRANSACCIONAL */}
+            {showSuccessModal && lastSale && (
+                <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                        <div className="p-10 text-center space-y-6">
+                            <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto shadow-inner border border-green-100">
+                                <CheckCircle size={64}/>
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">Venta Exitosa</h3>
+                                <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Comprobante {lastSale.id}</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2 flex items-center justify-center gap-2">
+                                        <PackageCheck size={14} className="text-indigo-500"/> Stock
+                                    </p>
+                                    <p className="text-sm font-black text-slate-700 uppercase">{lastSale.items.length} Items Descontados</p>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-2 flex items-center justify-center gap-2">
+                                        <Wallet size={14} className="text-green-500"/> Tesorería
+                                    </p>
+                                    <p className="text-sm font-black text-slate-700 uppercase">Caja Actualizada</p>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 space-y-3">
+                                <button onClick={() => window.print()} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+                                    <Printer size={20}/> Imprimir Ticket
+                                </button>
+                                <button onClick={() => setShowSuccessModal(false)} className="w-full py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600 transition-colors">Nueva Venta</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
