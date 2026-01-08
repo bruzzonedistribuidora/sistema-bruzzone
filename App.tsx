@@ -1,182 +1,230 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-    Wallet, UserCheck, Truck, TrendingUp, History, Activity, 
-    ArrowUpRight, ArrowDownLeft, ArrowRight, Building2,
-    CalendarDays, DollarSign, Calculator, Receipt, BarChart3
+    X, Smartphone, ShoppingBag, Plus, LayoutDashboard, Database, 
+    Receipt, Truck, Wallet, Bot, Settings, FileUp, Layers, Zap, 
+    Search as SearchIcon, ChevronRight, Package, ListOrdered,
+    RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
+    Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
+    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud, Laptop,
+    ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { CashRegister, Client, Provider, DailyExpense, Purchase, ViewState } from '../types';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
+import Inventory from './components/Inventory';
+import POS from './components/POS';
+import Purchases from './components/Purchases';
+import Clients from './components/Clients';
+import Providers from './components/Providers';
+import Treasury from './components/Treasury';
+import Accounting from './components/Accounting';
+import Statistics from './components/Statistics';
+import Reports from './components/Reports';
+import Backup from './components/Backup';
+import Branches from './components/Branches';
+import UsersComponent from './components/Users';
+import PriceUpdates from './components/PriceUpdates';
+import Assistant from './components/Assistant';
+import CompanySettings from './components/CompanySettings';
+import AfipConfig from './components/AfipConfig';
+import DailyMovements from './components/DailyMovements';
+import Employees from './components/Employees';
+import ConfigPanel from './components/ConfigPanel';
+import Marketing from './components/Marketing';
+import PriceAudit from './components/PriceAudit';
+import OnlineSales from './components/OnlineSales';
+import EcommerceAdmin from './components/EcommerceAdmin';
+import PublicPortal from './components/PublicPortal';
+import Shop from './components/Shop';
+import InitialImport from './components/InitialImport';
+import CustomerPortal from './components/CustomerPortal';
+import Remitos from './components/Remitos';
+import Presupuestos from './components/Presupuestos';
+import SalesOrders from './components/SalesOrders';
+import CreditNotes from './components/CreditNotes';
+import MassProductUpdate from './components/MassProductUpdate';
+import StockTransfers from './components/StockTransfers';
+import CloudHub from './components/CloudHub';
+import Login from './components/Login';
+import Replenishment from './components/Replenishment';
+import Shortages from './components/Shortages';
+import { ViewState, User, Client, InvoiceItem } from './types';
 
-interface AnalyticsDashboardProps {
-    onNavigate: (view: ViewState) => void;
-}
+const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
+    [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
+    [ViewState.ANALYTICS]: { icon: BarChart3, label: "Dashboard", color: "bg-indigo-600" },
+    [ViewState.INVENTORY]: { icon: Database, label: "Inventario Maestro", color: "bg-indigo-500" },
+    [ViewState.POS]: { icon: Receipt, label: "Punto de Venta", color: "bg-emerald-500" },
+    [ViewState.PURCHASES]: { icon: Truck, label: "Compras / Gastos", color: "bg-blue-500" },
+    [ViewState.TREASURY]: { icon: Wallet, label: "Tesorería", color: "bg-orange-500" },
+    [ViewState.ACCOUNTING]: { icon: Calculator, label: "Contabilidad", color: "bg-violet-600" },
+    [ViewState.AI_ASSISTANT]: { icon: Bot, label: "Asistente IA", color: "bg-pink-500" },
+    [ViewState.CONFIG_PANEL]: { icon: Settings, label: "Configuración", color: "bg-slate-700" },
+    [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador Excel", color: "bg-indigo-600" },
+    [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Precios & Listas", color: "bg-violet-500" },
+    [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Cambios Masivos", color: "bg-amber-500" },
+    [ViewState.ONLINE_SALES]: { icon: OrderIcon, label: "Hub de Ventas Online", color: "bg-indigo-600" },
+    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Gestión Catálogo Web", color: "bg-pink-600" },
+    [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda Online", color: "bg-pink-600" },
+    [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
+    [ViewState.MARKETING]: { icon: Heart, label: "Marketing & Puntos", color: "bg-red-500" },
+    [ViewState.CLIENTS]: { icon: Users, label: "Fichero Clientes", color: "bg-sky-500" },
+    [ViewState.REMITOS]: { icon: ListOrdered, label: "Remitos", color: "bg-blue-600" },
+    [ViewState.PRESUPUESTOS]: { icon: FileSpreadsheet, label: "Presupuestos", color: "bg-teal-500" },
+    [ViewState.SALES_ORDERS]: { icon: Package, label: "Pedidos", color: "bg-green-600" },
+    [ViewState.CREDIT_NOTES]: { icon: RotateCcw, label: "Notas de Crédito", color: "bg-red-500" },
+    [ViewState.PROVIDERS]: { icon: Truck, label: "Proveedores", color: "bg-slate-800" },
+    [ViewState.STATISTICS]: { icon: TrendingUp, label: "Estadísticas", color: "bg-cyan-500" },
+    [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
+    [ViewState.BACKUP]: { icon: HardDrive, label: "Respaldo Datos", color: "bg-slate-600" },
+    [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
+    [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Monitor Faltantes", color: "bg-orange-600" },
+    [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Armado Pedido", color: "bg-emerald-600" },
+};
 
-const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ onNavigate }) => {
-  const [data, setData] = useState({
-      available: 0,
-      toCollect: 0,
-      toPay: 0,
-      recentActivity: [] as any[]
+const App: React.FC = () => {
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
+  const [activeView, setActiveView] = useState<ViewState>(() => {
+    if (window.location.pathname.includes('/shop')) return ViewState.SHOP;
+    return ViewState.DASHBOARD;
   });
+  const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
+  const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
 
   useEffect(() => {
-    const registers: CashRegister[] = JSON.parse(localStorage.getItem('ferrecloud_registers') || '[]');
-    const clients: Client[] = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
-    const providers: Provider[] = JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]');
-    const sales: any[] = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
-    const expenses: DailyExpense[] = JSON.parse(localStorage.getItem('daily_movements') || '[]');
-    const purchases: Purchase[] = JSON.parse(localStorage.getItem('ferrecloud_purchases') || '[]');
-
-    const available = registers.reduce((acc, r) => acc + (r.balance || 0), 0);
-    const toCollect = clients.reduce((acc, c) => acc + (c.balance || 0), 0);
-    const toPay = providers.reduce((acc, p) => acc + (p.balance || 0), 0);
-
-    const activities = [
-        ...sales.map(s => ({ type: 'SALE', label: `Venta: ${s.client}`, amount: s.total, date: s.date, icon: ArrowUpRight, color: 'text-green-500' })),
-        ...expenses.map(e => ({ type: 'EXPENSE', label: e.description, amount: e.amount, date: e.date, icon: ArrowDownLeft, color: 'text-red-500' })),
-        ...purchases.map(p => ({ type: 'PURCHASE', label: `Compra: ${p.providerName}`, amount: p.total, date: p.date, icon: Truck, color: 'text-blue-500' }))
-    ].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 8);
-
-    setData({ available, toCollect, toPay, recentActivity: activities });
+    const savedSession = localStorage.getItem('ferrecloud_session');
+    if (savedSession) setLoggedInUser(JSON.parse(savedSession));
   }, []);
 
+  const handleNavigate = (view: ViewState) => {
+    if (!openViews.includes(view)) {
+        setOpenViews(prev => [...prev, view]);
+    }
+    setActiveView(view);
+  };
+
+  const closeView = (view: ViewState, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (view === ViewState.DASHBOARD) return; 
+    
+    const newViews = openViews.filter(v => v !== view);
+    setOpenViews(newViews);
+    
+    if (activeView === view) {
+        setActiveView(newViews[newViews.length - 1]);
+    }
+  };
+
+  const renderViewContent = (view: ViewState) => {
+    switch (view) {
+      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
+      case ViewState.ANALYTICS: return <AnalyticsDashboard onNavigate={handleNavigate} />;
+      case ViewState.INVENTORY: return <Inventory />;
+      case ViewState.PROVIDERS: return <Providers />;
+      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
+      case ViewState.TREASURY: return <Treasury />;
+      case ViewState.CLIENTS: return <Clients onOpenPortal={(c) => { setPortalPreviewClient(c); handleNavigate(ViewState.CUSTOMER_PORTAL); }} />;
+      case ViewState.ONLINE_SALES: return <OnlineSales />;
+      case ViewState.ACCOUNTING: return <Accounting />;
+      case ViewState.STATISTICS: return <Statistics />;
+      case ViewState.REPORTS: return <Reports />;
+      case ViewState.BACKUP: return <Backup />;
+      case ViewState.BRANCHES: return <Branches />;
+      case ViewState.USERS: return <UsersComponent />;
+      case ViewState.PRICE_UPDATES: return <PriceUpdates />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
+      case ViewState.COMPANY_SETTINGS: return <CompanySettings />;
+      case ViewState.AFIP_CONFIG: return <AfipConfig />;
+      case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
+      case ViewState.EMPLOYEES: return <Employees />;
+      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
+      case ViewState.MARKETING: return <Marketing />;
+      case ViewState.PRICE_AUDIT: return <PriceAudit />;
+      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin />;
+      case ViewState.PUBLIC_PORTAL: return <PublicPortal />;
+      case ViewState.SHOP: return <Shop />;
+      case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
+      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.PURCHASES: return <Purchases />;
+      case ViewState.REMITOS: return <Remitos onBillRemitos={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos onConvertToSale={(items) => { setItemsToBill(items); handleNavigate(ViewState.POS); }} />;
+      case ViewState.SALES_ORDERS: return <SalesOrders />;
+      case ViewState.CREDIT_NOTES: return <CreditNotes />;
+      case ViewState.CUSTOMER_PORTAL: return portalPreviewClient ? <CustomerPortal client={portalPreviewClient} onLogout={() => closeView(ViewState.CUSTOMER_PORTAL)} /> : null;
+      case ViewState.CLOUD_HUB: return <CloudHub />;
+      case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { setItemsToBill(null); handleNavigate(ViewState.REPLENISHMENT); }} />;
+      case ViewState.REPLENISHMENT: return <Replenishment />;
+      default: return <Dashboard onNavigate={handleNavigate} />;
+    }
+  };
+
+  const isPublicView = activeView === ViewState.SHOP || activeView === ViewState.PUBLIC_PORTAL;
+
+  if (isPublicView) {
+      return <div className="h-screen w-full bg-white overflow-hidden">{renderViewContent(activeView)}</div>;
+  }
+
+  if (!loggedInUser) {
+    return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
+  }
+
   return (
-    <div className="h-full bg-slate-50 flex flex-col overflow-y-auto custom-scrollbar p-8 md:p-12 space-y-10 font-sans pb-24">
-        
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tighter leading-none">Dashboard de Parámetros</h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
-                    <Activity size={14} className="text-green-500 animate-pulse"/> Analítica financiera consolidada
-                </p>
-            </div>
-            <div className="flex items-center gap-4">
-                 <div className="bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
-                    <CalendarDays size={18} className="text-indigo-500"/>
-                    <span className="text-xs font-black text-slate-600 uppercase tracking-widest">{new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</span>
-                </div>
-            </div>
-        </div>
-
-        {/* CABECERA FINANCIERA: LOS 3 PARÁMETROS SOLICITADOS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group border border-slate-800">
-                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform"><Wallet size={120}/></div>
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-4">Dinero Disponible (Cajas)</p>
-                <h3 className="text-5xl font-black tracking-tighter leading-none">${data.available.toLocaleString('es-AR')}</h3>
-                <div className="mt-10 flex items-center gap-2">
-                    <button onClick={() => onNavigate(ViewState.TREASURY)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all">
-                        Ir a Tesorería <ArrowRight size={12}/>
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><UserCheck size={120}/></div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Cuentas por Cobrar (Clientes)</p>
-                <h3 className="text-5xl font-black text-slate-800 tracking-tighter leading-none">${data.toCollect.toLocaleString('es-AR')}</h3>
-                <div className="mt-10 flex items-center gap-2">
-                    <button onClick={() => onNavigate(ViewState.CLIENTS)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all">
-                        Ver Cobranzas <ArrowRight size={12}/>
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-[3rem] p-10 border border-slate-200 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><Truck size={120}/></div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Cuentas por Pagar (Prov.)</p>
-                <h3 className="text-5xl font-black text-red-500 tracking-tighter leading-none">${data.toPay.toLocaleString('es-AR')}</h3>
-                <div className="mt-10 flex items-center gap-2">
-                    <button onClick={() => onNavigate(ViewState.PURCHASES)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 transition-all">
-                        Administrar Pagos <ArrowRight size={12}/>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        {/* SECCIÓN INTERMEDIA: GRÁFICO Y ACTIVIDAD */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white rounded-[3.5rem] p-12 border border-slate-200 shadow-sm flex flex-col min-h-[400px]">
-                <div className="flex justify-between items-center mb-10">
-                    <div>
-                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-3">
-                            <TrendingUp size={24} className="text-indigo-600"/> Rendimiento Comercial
-                        </h3>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Comparativa de flujo de ingresos semanal</p>
-                    </div>
-                </div>
-                <div className="flex-1">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={[
-                            { name: 'Lun', in: 45000 }, { name: 'Mar', in: 52000 }, { name: 'Mie', in: 48000 },
-                            { name: 'Jue', in: 61000 }, { name: 'Vie', in: 55000 }, { name: 'Sab', in: 85000 }, { name: 'Dom', in: 20000 },
-                        ]}>
-                            <defs>
-                                <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'black', fill: '#94a3b8'}} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'black', fill: '#94a3b8'}} />
-                            <Tooltip contentStyle={{borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}} />
-                            <Area type="monotone" dataKey="in" stroke="#4f46e5" strokeWidth={5} fillOpacity={1} fill="url(#colorIn)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            <div className="bg-white rounded-[3.5rem] p-12 border border-slate-200 shadow-sm flex flex-col">
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-10 flex items-center gap-3">
-                    <History size={24} className="text-slate-400"/> Libro de Actividad
-                </h3>
-                <div className="space-y-6 flex-1">
-                    {data.recentActivity.map((act, idx) => (
-                        <div key={idx} className="flex items-center justify-between group animate-fade-in">
-                            <div className="flex items-center gap-4">
-                                <div className={`p-3 rounded-2xl bg-slate-50 ${act.color} group-hover:scale-110 transition-transform`}>
-                                    <act.icon size={18}/>
-                                </div>
-                                <div>
-                                    <p className="text-[11px] font-black text-slate-800 uppercase leading-none mb-1.5 truncate max-w-[120px]">{act.label}</p>
-                                    <p className="text-[9px] text-gray-400 font-bold uppercase">{act.date}</p>
-                                </div>
+    <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
+      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} />
+      
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
+            {openViews.map((view) => {
+                const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
+                const Icon = config.icon;
+                return (
+                    <button 
+                        key={view} 
+                        onClick={() => setActiveView(view)} 
+                        className={`flex items-center gap-3 px-4 h-10 rounded-t-xl transition-all border-x border-t relative group min-w-[140px] max-w-[200px] ${
+                            activeView === view 
+                            ? 'bg-slate-50 text-indigo-600 border-slate-200 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] font-black' 
+                            : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
+                        }`}
+                    >
+                        <Icon size={14} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
+                        <span className="text-[10px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                            {config.label}
+                        </span>
+                        {view !== ViewState.DASHBOARD && (
+                            <div 
+                                onClick={(e) => closeView(view, e)}
+                                className={`p-1 rounded-md transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
+                            >
+                                <X size={12} />
                             </div>
-                            <p className={`font-black text-sm tracking-tighter ${act.type === 'SALE' ? 'text-green-600' : 'text-slate-800'}`}>
-                                {act.type === 'SALE' ? '+' : '-'}${act.amount.toLocaleString('es-AR')}
-                            </p>
-                        </div>
-                    ))}
-                    {data.recentActivity.length === 0 && (
-                        <div className="text-center py-10 opacity-30">
-                            <Activity size={40} className="mx-auto mb-2" />
-                            <p className="text-[10px] font-black uppercase">Sin actividad hoy</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+                        )}
+                        {activeView === view && (
+                            <div className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-indigo-600"></div>
+                        )}
+                    </button>
+                );
+            })}
+        </header>
 
-        <div className="bg-indigo-900 rounded-[3.5rem] p-12 text-white flex flex-col md:flex-row justify-between items-center shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 p-12 opacity-5 pointer-events-none rotate-12"><Building2 size={240}/></div>
-            <div className="relative z-10 space-y-4">
-                <h4 className="text-3xl font-black uppercase tracking-tighter">Reporte Mensual Detallado</h4>
-                <p className="text-indigo-200 text-sm max-w-md font-medium leading-relaxed">Acceda al análisis completo de rentabilidad por rubro, impuestos y proyección de punto de equilibrio.</p>
+        <main className="flex-1 relative bg-slate-50 overflow-hidden">
+          {openViews.map((view) => (
+            <div 
+              key={view} 
+              className={`absolute inset-0 transition-opacity duration-200 ${
+                activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+              }`}
+            >
+              {renderViewContent(view)}
             </div>
-            <button 
-                onClick={() => onNavigate(ViewState.REPORTS)}
-                className="relative z-10 bg-white text-indigo-900 px-12 py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-50 active:scale-95 transition-all flex items-center gap-3">
-                {/* Fixed error: Added missing BarChart3 import from lucide-react */}
-                <BarChart3 size={20}/> Generar Reporte Full
-            </button>
-        </div>
-
-        <footer className="fixed bottom-0 left-64 right-0 pointer-events-none pb-4 text-center opacity-10">
-            <p className="text-[7px] font-black uppercase tracking-[1.5em]">Bruzzone Cloud Finance Engine v5.0 • Buenos Aires, ARG</p>
-        </footer>
+          ))}
+        </main>
+      </div>
     </div>
   );
 };
 
-export default AnalyticsDashboard;
+export default App;
