@@ -8,7 +8,7 @@ import {
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Scale, Activity
+    Scale, Activity, Settings2
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
@@ -164,6 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
                     <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />
+                    <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajuste de Existencias" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />
                     <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} active={activeView === ViewState.SHORTAGES} onClick={() => handleNav(ViewState.SHORTAGES)} />
                     <DropdownItem view={ViewState.REPLENISHMENT} label="Armar Pedido" icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />
                     <DropdownItem view={ViewState.INITIAL_IMPORT} label="Carga Masiva" icon={FileUp} active={activeView === ViewState.INITIAL_IMPORT} onClick={() => handleNav(ViewState.INITIAL_IMPORT)} />
@@ -173,7 +174,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
                 
-                {/* NUEVA SECCIÓN DE FINANZAS AGRUPADA */}
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
                     <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />
                     <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
