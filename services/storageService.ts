@@ -1,9 +1,8 @@
-
 import { Product, ReplenishmentItem } from '../types';
 
 const DB_NAME = 'FerreCloudDB';
 const STORE_NAME = 'products';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incrementado para actualizar índices
 
 class ProductDB {
     private db: IDBDatabase | null = null;
@@ -20,6 +19,12 @@ class ProductDB {
                     const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                     store.createIndex('name', 'name', { unique: false });
                     store.createIndex('brand', 'brand', { unique: false });
+                    store.createIndex('webPropia', 'ecommerce.webPropia', { unique: false });
+                } else {
+                    const store = (event.target as IDBOpenDBRequest).transaction?.objectStore(STORE_NAME);
+                    if (store && !store.indexNames.contains('webPropia')) {
+                        store.createIndex('webPropia', 'ecommerce.webPropia', { unique: false });
+                    }
                 }
             };
 
@@ -38,6 +43,21 @@ class ProductDB {
             const transaction = db.transaction(STORE_NAME, 'readonly');
             const store = transaction.objectStore(STORE_NAME);
             const request = limit ? store.getAll(null, limit) : store.getAll();
+            request.onsuccess = () => resolve(request.result || []);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // Nuevo método para obtener solo productos publicados de forma eficiente
+    async getPublished(): Promise<Product[]> {
+        const db = await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(STORE_NAME, 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const index = store.index('webPropia');
+            // Fix: Cast 'true' to any as boolean might not be included in the IDBValidKey type definition in some TypeScript environments
+            const request = index.getAll(true as any); // Busca donde ecommerce.webPropia === true
+            
             request.onsuccess = () => resolve(request.result || []);
             request.onerror = () => reject(request.error);
         });
