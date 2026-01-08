@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, CheckSquare, Square, FileText, 
@@ -5,9 +6,16 @@ import {
     Minus, Package, Trash2, History, CheckCircle, 
     ChevronRight, DollarSign, UserSearch, Filter,
     TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download,
-    PackagePlus, Save
+    PackagePlus, Save, Truck
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem } from '../types';
+import { addToReplenishmentQueue } from '../services/storageService';
+
+interface RemitosProps {
+    initialItems?: InvoiceItem[];
+    onItemsConsumed?: () => void;
+    onBillRemitos?: (items: InvoiceItem[]) => void;
+}
 
 const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBillRemitos }) => {
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');
@@ -50,7 +58,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
         p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
         p.barcodes.some(c => c.toLowerCase().includes(term))
-    ).slice(0, 10);
+    ).slice(0, 50);
   }, [searchTerm, products]);
 
   useEffect(() => {
@@ -67,6 +75,13 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     });
     setSearchTerm('');
     setShowSearchResults(false);
+  };
+
+  const handlePedir = (e: React.MouseEvent, p: Product) => {
+    e.stopPropagation();
+    if (addToReplenishmentQueue(p)) {
+        alert(`Articulo ${p.name} enviado a reposición.`);
+    }
   };
 
   const handleAddManualItem = () => {
@@ -200,6 +215,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
   const toggleSelectAllVisible = () => {
       if (selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0) {
+          // Fix: Corrected typo from setSelectedIds to setSelectedRemitoIds (defined on line 34)
           setSelectedRemitoIds([]);
       } else {
           setSelectedRemitoIds(filteredRemitos.map(r => r.id));
@@ -221,21 +237,22 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
       </div>
 
       {activeTab === 'NEW' && (
-        <div className="flex-1 flex flex-col gap-3 min-0 print:hidden">
+        <div className="flex-1 flex overflow-hidden gap-6 p-2">
+          <div className="flex-[3] flex flex-col gap-6 overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 shrink-0">
-                <div className="md:col-span-3 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
+                <div className="md:col-span-4 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-1.5">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Cliente Destino</label>
-                    <select className="w-full p-1.5 bg-slate-50 border rounded-lg font-bold text-xs" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
+                    <select className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)}>
                         <option value="">-- SELECCIONE --</option>
                         {allClients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
                 </div>
-                <div className="md:col-span-6 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-1.5 relative">
+                <div className="md:col-span-8 bg-white p-3 rounded-2xl border border-gray-200 shadow-sm flex flex-col gap-1.5 relative">
                     <label className="text-[9px] font-black text-gray-400 uppercase">Añadir Artículos (SKU/Prov/EAN)</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                            <input type="text" placeholder="Buscar por código o nombre..." className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-gray-100 rounded-lg font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
+                            <input type="text" placeholder="Buscar por código o nombre..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-100 rounded-xl font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
                         </div>
                         <button 
                             onClick={() => setIsManualModalOpen(true)}
@@ -245,9 +262,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                         </button>
                     </div>
                     {showSearchResults && searchTerm.trim().length > 0 && (
-                        <div className="absolute top-full left-0 w-full bg-white border rounded-xl shadow-2xl mt-1 max-h-60 overflow-y-auto z-50 p-1">
+                        <div className="absolute top-full left-0 w-full bg-white border rounded-2xl shadow-2xl mt-1 max-h-80 overflow-y-auto z-50 p-1 custom-scrollbar">
                             {filteredProducts.map(p => (
-                                <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-2 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50 group">
+                                <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-3 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50 group">
                                     <div>
                                         <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
                                         <div className="flex gap-2 text-[7px] font-bold text-gray-400 uppercase">
@@ -255,57 +272,84 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                                             <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
                                         </div>
                                     </div>
-                                    <div className="text-right"><p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p></div>
+                                    <div className="flex items-center gap-3">
+                                        <div onClick={(e) => handlePedir(e, p)} className="p-2 bg-slate-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><Truck size={14}/></div>
+                                        <p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p>
+                                    </div>
                                 </button>
                             ))}
                         </div>
                     )}
                 </div>
-                <div className="md:col-span-3 flex items-end gap-2">
-                    {editingRemitoId && (
-                        <button onClick={cancelEdit} className="px-4 py-2.5 bg-slate-200 text-slate-600 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-slate-300">
-                           Cancelar
-                        </button>
-                    )}
-                    <button onClick={handleCreateRemito} className="flex-1 py-2.5 bg-slate-900 text-white rounded-lg font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-opacity-90 transition-all">
-                        {editingRemitoId ? 'Guardar Cambios' : 'Generar Remito'}
-                    </button>
-                </div>
             </div>
             
-            <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 bg-white rounded-[2.5rem] border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase sticky top-0 z-10">
+                        <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] sticky top-0 z-10">
                             <tr>
-                                <th className="px-4 py-2.5">Artículo</th>
-                                <th className="px-4 py-2.5 text-center">Cant.</th>
-                                <th className="px-4 py-2.5 text-right">P. Unitario</th>
-                                <th className="px-4 py-2.5 text-center"></th>
+                                <th className="px-6 py-4">Descripción del Artículo</th>
+                                <th className="px-6 py-4 text-center">Cant.</th>
+                                <th className="px-6 py-4 text-right">P. Unitario</th>
+                                <th className="px-6 py-4 text-center"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {cart.map((item, i) => (
                                 <tr key={i} className="border-b last:border-0 text-[11px] hover:bg-slate-50">
-                                    <td className="px-4 py-2">
+                                    <td className="px-6 py-4">
                                         <p className="font-black uppercase text-slate-800 leading-none mb-1">{item.product.name}</p>
-                                        {item.product.id.startsWith('manual-rem') && (
-                                            <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">No Listado</span>
-                                        )}
+                                        <div className="flex gap-2">
+                                            <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">{item.product.internalCodes[0]}</p>
+                                            {item.product.id.startsWith('manual-rem') && (
+                                                <span className="text-[7px] font-black bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">No Listado</span>
+                                            )}
+                                        </div>
                                     </td>
-                                    <td className="px-4 py-2 text-center font-bold">{item.quantity}</td>
-                                    <td className="px-4 py-2 text-right font-bold text-slate-400">${item.historicalPrice.toLocaleString()}</td>
-                                    <td className="px-4 py-2 text-center"><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} className="p-1 text-gray-300 hover:text-red-500"><Trash2 size={14}/></button></td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center justify-center gap-3 bg-slate-50 border rounded-xl p-1 w-fit mx-auto">
+                                            <button onClick={() => setCart(cart.map((it, idx) => i === idx ? {...it, quantity: Math.max(1, it.quantity - 1)} : it))}><Minus size={14}/></button>
+                                            <span className="font-black w-6 text-center">{item.quantity}</span>
+                                            <button onClick={() => setCart(cart.map((it, idx) => i === idx ? {...it, quantity: it.quantity + 1} : it))}><Plus size={14}/></button>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-black text-slate-900">${item.historicalPrice.toLocaleString()}</td>
+                                    <td className="px-6 py-4 text-center"><button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16}/></button></td>
                                 </tr>
                             ))}
+                            {cart.length === 0 && (
+                                <tr><td colSpan={4} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">Remito vacío</td></tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
-                <div className="p-4 bg-slate-50 border-t border-gray-100 flex justify-between items-center">
-                    <p className="text-[10px] font-black text-gray-400 uppercase">Subtotal del Envío</p>
-                    <p className="text-xl font-black text-slate-900">${cart.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString('es-AR')}</p>
-                </div>
             </div>
+          </div>
+
+          <div className="w-[350px] flex flex-col gap-4">
+              <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden flex-1 flex flex-col">
+                  <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none"><ClipboardList size={140}/></div>
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-8 border-b border-white/10 pb-4">Resumen Despacho</h3>
+                  <div className="space-y-6 flex-1">
+                      <div className="flex justify-between items-end border-b border-white/5 pb-4">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Items totales</p>
+                          <p className="text-xl font-black">{cart.length}</p>
+                      </div>
+                      <div className="mt-auto">
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3">Valor Estimado</p>
+                        <p className="text-5xl font-black tracking-tighter text-white leading-none">${cart.reduce((a,c) => a + (c.historicalPrice * c.quantity), 0).toLocaleString('es-AR')}</p>
+                      </div>
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <button onClick={handleCreateRemito} disabled={!selectedClient || cart.length === 0} className="w-full py-5 rounded-[1.8rem] font-black uppercase text-xs tracking-widest shadow-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all">
+                      <Save size={18}/> {editingRemitoId ? 'Confirmar Cambios' : 'Generar Remito'}
+                  </button>
+                  {editingRemitoId && (
+                      <button onClick={cancelEdit} className="w-full py-3 text-[10px] font-black uppercase text-slate-400 hover:text-red-500">Cancelar Edición</button>
+                  )}
+              </div>
+          </div>
         </div>
       )}
 
@@ -325,7 +369,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     <input 
                         type="text" 
                         placeholder="Buscar por cliente o remito..." 
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 uppercase transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-50 uppercase transition-all"
                         value={historySearch}
                         onChange={e => setHistorySearch(e.target.value)}
                     />
@@ -528,11 +572,5 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     </div>
   );
 };
-
-interface RemitosProps {
-    initialItems?: InvoiceItem[];
-    onItemsConsumed?: () => void;
-    onBillRemitos?: (items: InvoiceItem[]) => void;
-}
 
 export default Remitos;
