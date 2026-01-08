@@ -1,31 +1,25 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, DollarSign, History, Filter, 
     Download, AlertCircle, TrendingUp, Users, CheckCircle, 
     ChevronRight, Phone, ArrowUpRight, LayoutList, 
     Truck, Building2, UserSearch, Mail, MessageCircle,
     X, ArrowLeft, Printer, Landmark, Receipt, Calendar,
-    CreditCard, Save
+    CreditCard, Save, Trash2
 } from 'lucide-react';
 import { Provider, CurrentAccountMovement } from '../types';
 
-interface ProviderBalancesProps {
-    onNavigateToHistory?: (provider: Provider) => void;
-}
-
-const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory }) => {
+const ProviderBalances: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     
-    // Carga de proveedores desde localStorage
     const [providers, setProviders] = useState<Provider[]>(() => {
         const saved = localStorage.getItem('ferrecloud_providers');
         return saved ? JSON.parse(saved) : [];
     });
 
-    // Carga de movimientos generales (Compras y Pagos)
     const [allMovements, setAllMovements] = useState<CurrentAccountMovement[]>(() => {
         const saved = localStorage.getItem('ferrecloud_movements');
         return saved ? JSON.parse(saved) : [];
@@ -33,7 +27,14 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
 
     const [filterType, setFilterType] = useState<'ALL_DEBT' | 'HIGH_DEBT'>('ALL_DEBT');
 
-    // Filtrar proveedores que tienen deuda (balance > 0)
+    useEffect(() => {
+        localStorage.setItem('ferrecloud_providers', JSON.stringify(providers));
+    }, [providers]);
+
+    useEffect(() => {
+        localStorage.setItem('ferrecloud_movements', JSON.stringify(allMovements));
+    }, [allMovements]);
+
     const providersWithDebt = useMemo(() => providers.filter(p => p.balance > 0), [providers]);
     
     const filteredProviders = useMemo(() => {
@@ -46,7 +47,6 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
 
     const totalDebt = useMemo(() => providersWithDebt.reduce((acc, curr) => acc + curr.balance, 0), [providersWithDebt]);
 
-    // Filtrar movimientos específicos del proveedor seleccionado
     const providerMovements = useMemo(() => {
         if (!selectedProvider) return [];
         return allMovements
@@ -69,15 +69,9 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
             balance: newBalance
         };
 
-        const updatedMovements = [newMovement, ...allMovements];
-        const updatedProviders = providers.map(p => p.id === selectedProvider.id ? { ...p, balance: newBalance } : p);
-
-        setAllMovements(updatedMovements);
-        setProviders(updatedProviders);
-        setSelectedProvider({ ...selectedProvider, balance: newBalance });
-        
-        localStorage.setItem('ferrecloud_movements', JSON.stringify(updatedMovements));
-        localStorage.setItem('ferrecloud_providers', JSON.stringify(updatedProviders));
+        setAllMovements(prev => [newMovement, ...prev]);
+        setProviders(prev => prev.map(p => p.id === selectedProvider.id ? { ...p, balance: newBalance } : p));
+        setSelectedProvider(prev => prev ? { ...prev, balance: newBalance } : null);
         
         setIsPaymentModalOpen(false);
         alert("Pago registrado y saldo actualizado correctamente.");
@@ -112,12 +106,12 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
                             <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Último Pago</p>
                                 <h4 className="text-xl font-black text-slate-700 tracking-tight">
-                                    {providerMovements.find(m => m.credit > 0)?.date || 'N/A'}
+                                    {providerMovements.find(m => m.credit > 0)?.date || 'Sin pagos'}
                                 </h4>
                             </div>
                             <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl">
                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Días Promedio Pago</p>
-                                <h4 className="text-2xl font-black tracking-tight">15 Días</h4>
+                                <h4 className="text-2xl font-black tracking-tight">-- Días</h4>
                             </div>
                         </div>
 
@@ -127,34 +121,36 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
                                     <Receipt size={16} className="text-indigo-600"/> Libro Mayor del Proveedor
                                 </h3>
                             </div>
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em]">
-                                    <tr>
-                                        <th className="px-8 py-4">Fecha</th>
-                                        <th className="px-8 py-4">Comprobante / Detalle</th>
-                                        <th className="px-8 py-4 text-right">Debe (+)</th>
-                                        <th className="px-8 py-4 text-right">Haber (-)</th>
-                                        <th className="px-8 py-4 text-right">Saldo</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 text-[11px]">
-                                    {providerMovements.map(m => (
-                                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-8 py-4 font-bold text-slate-400">{m.date}</td>
-                                            <td className="px-8 py-4">
-                                                <p className="font-black text-slate-800 uppercase leading-none mb-1">{m.voucherType}</p>
-                                                <p className="text-[9px] text-slate-400 font-medium uppercase truncate max-w-[200px]">{m.description}</p>
-                                            </td>
-                                            <td className="px-8 py-4 text-right font-black text-red-600">{m.debit > 0 ? `$${m.debit.toLocaleString('es-AR')}` : '-'}</td>
-                                            <td className="px-8 py-4 text-right font-black text-green-600">{m.credit > 0 ? `$${m.credit.toLocaleString('es-AR')}` : '-'}</td>
-                                            <td className="px-8 py-4 text-right font-black text-slate-900">${m.balance.toLocaleString('es-AR')}</td>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em]">
+                                        <tr>
+                                            <th className="px-8 py-4">Fecha</th>
+                                            <th className="px-8 py-4">Comprobante / Detalle</th>
+                                            <th className="px-8 py-4 text-right">Debe (+)</th>
+                                            <th className="px-8 py-4 text-right">Haber (-)</th>
+                                            <th className="px-8 py-4 text-right">Saldo</th>
                                         </tr>
-                                    ))}
-                                    {providerMovements.length === 0 && (
-                                        <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Sin movimientos registrados</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-[11px]">
+                                        {providerMovements.map(m => (
+                                            <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-8 py-4 font-bold text-slate-400">{m.date}</td>
+                                                <td className="px-8 py-4">
+                                                    <p className="font-black text-slate-800 uppercase leading-none mb-1">{m.voucherType}</p>
+                                                    <p className="text-[9px] text-slate-400 font-medium uppercase truncate max-w-[200px]">{m.description}</p>
+                                                </td>
+                                                <td className="px-8 py-4 text-right font-black text-red-600">{m.debit > 0 ? `$${m.debit.toLocaleString('es-AR')}` : '-'}</td>
+                                                <td className="px-8 py-4 text-right font-black text-green-600">{m.credit > 0 ? `$${m.credit.toLocaleString('es-AR')}` : '-'}</td>
+                                                <td className="px-8 py-4 text-right font-black text-slate-900">${m.balance.toLocaleString('es-AR')}</td>
+                                            </tr>
+                                        ))}
+                                        {providerMovements.length === 0 && (
+                                            <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Sin movimientos registrados</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -258,7 +254,7 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
                                                 {prov.name.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-black text-slate-800 text-sm uppercase tracking-tight leading-none mb-1">{prov.name}</p>
+                                                <p className="font-black text-slate-800 text-sm uppercase tracking-tight leading-none mb-1.5">{prov.name}</p>
                                                 <p className="text-[10px] text-slate-400 font-mono font-bold tracking-tighter">{prov.cuit}</p>
                                             </div>
                                         </div>
@@ -305,9 +301,11 @@ const ProviderBalances: React.FC<ProviderBalancesProps> = ({ onNavigateToHistory
     );
 };
 
-// Modal de Pago Local para el componente
 const PaymentModal: React.FC<{ onClose: () => void, onConfirm: (a: number, m: string, n: string) => void, providerName: string }> = ({ onClose, onConfirm, providerName }) => {
-    const [form, setForm] = useState({ amount: '', method: 'TRANSFERENCIA', notes: '' });
+    const [amount, setAmount] = useState('');
+    const [method, setMethod] = useState('TRANSFERENCIA');
+    const [notes, setNotes] = useState('');
+
     return (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
             <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
@@ -318,24 +316,40 @@ const PaymentModal: React.FC<{ onClose: () => void, onConfirm: (a: number, m: st
                 <div className="p-10 space-y-6">
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Importe a Pagar ($)</label>
-                        <input type="number" className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-green-600 outline-none font-black text-4xl text-slate-800 text-center" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} autoFocus />
+                        <input 
+                            type="number" 
+                            className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-[2rem] focus:bg-white focus:border-green-600 outline-none font-black text-4xl text-slate-800 text-center" 
+                            value={amount} 
+                            onChange={e => setAmount(e.target.value)} 
+                            autoFocus 
+                        />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Medio de Pago</label>
-                        <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl outline-none font-black text-xs uppercase" value={form.method} onChange={e => setForm({...form, method: e.target.value})}>
+                        <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl outline-none font-black text-xs uppercase" value={method} onChange={e => setMethod(e.target.value)}>
                             <option value="TRANSFERENCIA">Transferencia</option>
                             <option value="CHEQUE">Cheque de Terceros</option>
                             <option value="E-CHEQ">E-Cheq Propio</option>
                             <option value="EFECTIVO">Efectivo Caja</option>
                         </select>
                     </div>
-                    <button onClick={() => onConfirm(parseFloat(form.amount) || 0, form.method, form.notes)} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Observaciones</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-4 bg-slate-50 border border-gray-200 rounded-xl outline-none font-bold text-xs uppercase" 
+                            placeholder="Ej: Pago total factura #992..." 
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                        />
+                    </div>
+                    <button onClick={() => onConfirm(parseFloat(amount) || 0, method, notes)} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-xl flex items-center justify-center gap-3">
                         <Save size={20}/> Confirmar Pago
                     </button>
                 </div>
             </div>
         </div>
     );
-}
+};
 
 export default ProviderBalances;
