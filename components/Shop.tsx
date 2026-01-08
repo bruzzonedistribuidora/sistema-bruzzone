@@ -7,22 +7,23 @@ import {
     Zap, Tag, Globe, Sparkles, Instagram, Facebook, 
     Clock, MapPin, CheckCircle, Package, ArrowLeft,
     CreditCard, ExternalLink, Calculator, Trash2,
-    Heart, Menu, User
+    Heart, Menu, User, RefreshCw
 } from 'lucide-react';
 import { Product, SalesOrder, CompanyConfig, Category } from '../types';
+import { productDB } from '../services/storageService';
 
 const Shop: React.FC = () => {
     const [view, setView] = useState<'HOME' | 'CATALOG' | 'CART' | 'CHECKOUT' | 'SUCCESS'>('HOME');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('TODOS');
+    const [isLoading, setIsLoading] = useState(false);
+    
     const [cart, setCart] = useState<{product: Product, quantity: number}[]>(() => {
         const saved = localStorage.getItem('ferreshop_cart');
         return saved ? JSON.parse(saved) : [];
     });
     
-    const [products, setProducts] = useState<Product[]>(() => 
-        JSON.parse(localStorage.getItem('ferrecloud_products') || '[]')
-    );
+    const [products, setProducts] = useState<Product[]>([]);
     const [categories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
     
     const companyConfig: CompanyConfig = useMemo(() => {
@@ -34,30 +35,44 @@ const Shop: React.FC = () => {
         };
     }, []);
 
+    // Carga de productos desde IndexedDB (Soporta los 140k artículos)
+    const loadProducts = async () => {
+        setIsLoading(true);
+        // Cargamos una muestra inicial de productos publicados para la web propia
+        const all = await productDB.getAll();
+        // Filtramos solo los que pertenecen a la Web Propia
+        const shopItems = all.filter(p => p.ecommerce?.webPropia === true);
+        setProducts(shopItems);
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
+        loadProducts();
+        // Escuchar actualizaciones desde el panel administrativo
+        window.addEventListener('ferrecloud_products_updated', loadProducts);
+        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+    }, []);
+
     useEffect(() => {
         localStorage.setItem('ferreshop_cart', JSON.stringify(cart));
     }, [cart]);
 
-    const publishedProducts = useMemo(() => 
-        products.filter(p => p.ecommerce?.isPublished),
+    const featuredProducts = useMemo(() => 
+        products.filter(p => p.ecommerce?.isFeatured).slice(0, 8),
     [products]);
 
-    const featuredProducts = useMemo(() => 
-        publishedProducts.filter(p => p.ecommerce?.isFeatured).slice(0, 8),
-    [publishedProducts]);
-
     const offerProducts = useMemo(() => 
-        publishedProducts.filter(p => p.ecommerce?.isOffer).slice(0, 8),
-    [publishedProducts]);
+        products.filter(p => p.ecommerce?.isOffer).slice(0, 8),
+    [products]);
 
     const filteredCatalog = useMemo(() => {
-        return publishedProducts.filter(p => {
+        return products.filter(p => {
             const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                p.internalCodes.some(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
             const matchCat = selectedCategory === 'TODOS' || p.category === selectedCategory;
             return matchSearch && matchCat;
         });
-    }, [publishedProducts, searchTerm, selectedCategory]);
+    }, [products, searchTerm, selectedCategory]);
 
     const addToCart = (product: Product, qty: number = 1) => {
         setCart(prev => {
@@ -145,13 +160,13 @@ const Shop: React.FC = () => {
                             <div className="max-w-4xl space-y-8 relative z-10">
                                 <div className="inline-flex items-center gap-2 bg-white px-4 py-1.5 rounded-full shadow-lg border border-slate-100">
                                     <Sparkles size={14} className="text-amber-400 fill-amber-400"/>
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Catálogo de 140.000 artículos</span>
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Catálogo Profesional Sincronizado</span>
                                 </div>
                                 <h2 className="text-5xl md:text-8xl font-black text-slate-900 tracking-tighter uppercase leading-[0.9]">
                                     Herramientas de<br/><span className="text-indigo-600">Nivel Experto</span>
                                     </h2>
                                 <p className="text-slate-500 text-lg md:text-xl font-medium max-w-2xl mx-auto">
-                                    Todo lo que tu obra necesita con stock real y envío inmediato a todo el país.
+                                    Todo lo que tu obra necesita con stock real de mostrador y envío inmediato.
                                 </p>
                                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
                                     <button onClick={() => setView('CATALOG')} className="w-full sm:w-auto bg-slate-900 text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all active:scale-95 flex items-center justify-center gap-3">
@@ -162,7 +177,12 @@ const Shop: React.FC = () => {
                         </section>
 
                         {/* PRODUCTOS DESTACADOS */}
-                        {featuredProducts.length > 0 && (
+                        {isLoading ? (
+                            <div className="py-20 text-center flex flex-col items-center gap-4">
+                                <RefreshCw className="animate-spin text-indigo-600" size={40}/>
+                                <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Cargando Catálogo...</p>
+                            </div>
+                        ) : featuredProducts.length > 0 && (
                             <section className="max-w-7xl mx-auto px-6 md:px-12 py-24 space-y-12">
                                 <div className="flex justify-between items-end border-b border-slate-100 pb-8">
                                     <div>
@@ -236,14 +256,21 @@ const Shop: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8 pb-20">
-                                {filteredCatalog.length === 0 ? (
+                                {isLoading ? (
+                                    <div className="col-span-full py-40 text-center flex flex-col items-center gap-4">
+                                        <RefreshCw className="animate-spin text-indigo-600" size={40}/>
+                                        <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Buscando en Base Maestro...</p>
+                                    </div>
+                                ) : filteredCatalog.length === 0 ? (
                                     <div className="col-span-full py-40 text-center opacity-30">
                                         <Package size={80} className="mx-auto mb-4" strokeWidth={1}/>
                                         <p className="font-black uppercase tracking-widest">Sin resultados en esta categoría</p>
                                     </div>
-                                ) : filteredCatalog.map(p => (
-                                    <ShopProductCard key={p.id} product={p} onAdd={addToCart} />
-                                ))}
+                                ) : (
+                                    filteredCatalog.map(p => (
+                                        <ShopProductCard key={p.id} product={p} onAdd={addToCart} />
+                                    ))
+                                )}
                             </div>
                         </div>
                     </div>
