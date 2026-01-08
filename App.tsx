@@ -47,6 +47,7 @@ import CloudHub from './components/CloudHub';
 import Login from './components/Login';
 import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
+import MobileApp from './components/MobileApp';
 import { ViewState, User, Client, InvoiceItem } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -82,6 +83,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(() => {
     if (window.location.pathname.includes('/shop')) return ViewState.SHOP;
@@ -93,6 +95,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedSession = localStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
+
+    // Detección simple de móvil
+    const checkMobile = () => {
+        setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const handleNavigate = (view: ViewState) => {
@@ -112,6 +122,11 @@ const App: React.FC = () => {
     if (activeView === view) {
         setActiveView(newViews[newViews.length - 1]);
     }
+  };
+
+  const handleLogout = () => {
+    setLoggedInUser(null);
+    localStorage.removeItem('ferrecloud_session');
   };
 
   const renderViewContent = (view: ViewState) => {
@@ -166,6 +181,11 @@ const App: React.FC = () => {
 
   if (!loggedInUser) {
     return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
+  }
+
+  // Si es móvil, cargamos la aplicación móvil dedicada
+  if (isMobile) {
+      return <MobileApp user={loggedInUser} onLogout={handleLogout} />;
   }
 
   return (
