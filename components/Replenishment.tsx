@@ -1,48 +1,63 @@
+
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, ShoppingCart, Truck, Send, Trash2, Mail, FileText, ChevronDown, Check, Package, X, Printer, Download, Building2, Calendar, DollarSign, MessageCircle } from 'lucide-react';
+import { Search, Plus, ShoppingCart, Truck, Send, Trash2, Mail, FileText, ChevronDown, Check, Package, X, Printer, Download, Building2, Calendar, DollarSign, MessageCircle, RefreshCw } from 'lucide-react';
 import { Product, Provider, ReplenishmentItem, ReplenishmentOrder } from '../types';
+import { productDB } from '../services/storageService';
 
 interface ReplenishmentProps {
     initialItems?: ReplenishmentItem[];
     onItemsConsumed?: () => void;
 }
 
-const createMockProduct = (id: string, internalCode: string, name: string, providerName: string, providerCode: string, stock: number, cost: number): Product => ({
-  id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [providerCode], 
-  name, brand: 'Generico', provider: providerName, category: 'General', description: '',
-  measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
-  vatRate: 21, listCost: cost, discounts: [0,0,0,0], costAfterDiscounts: cost, profitMargin: 40,
-  priceNeto: cost * 1.4, priceFinal: cost * 1.4 * 1.21, stock, stockDetails: [], 
-  stockMinimo: 10, stockMaximo: 50, reorderPoint: 20,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
-  isCombo: false,
-  comboItems: []
-});
-
 const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsConsumed }) => {
   const [activeTab, setActiveTab] = useState<'NEW_ORDER' | 'PENDING_ORDERS'>('NEW_ORDER');
   const [searchTerm, setSearchTerm] = useState('');
   const [showPrintModal, setShowPrintModal] = useState<ReplenishmentOrder | null>(null);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   
   const [providers] = useState<Provider[]>(() => {
       const saved = localStorage.getItem('ferrecloud_providers');
-      return saved ? JSON.parse(saved) : [
-        { id: 'P1', name: 'Herramientas Global SA', cuit: '30-11223344-5', contact: 'Roberto', balance: 0, defaultDiscounts: [0,0,0] },
-        { id: 'P2', name: 'Pinturas del Centro', cuit: '30-55667788-9', contact: 'Maria', balance: 0, defaultDiscounts: [0,0,0] },
-        { id: 'P3', name: 'Bulonera Industrial', cuit: '30-99887766-1', contact: 'Carlos', balance: 0, defaultDiscounts: [0,0,0] },
-      ];
+      return saved ? JSON.parse(saved) : [];
   });
 
-  const [products] = useState<Product[]>([
-    createMockProduct('1', 'TOR-001', 'Tornillo Autoperforante 2"', 'Herramientas Global SA', 'HG-5502', 5, 120),
-    createMockProduct('2', 'MAR-055', 'Martillo Galponero', 'Herramientas Global SA', 'HG-9900', 3, 4500),
-    createMockProduct('3', 'PINT-20L', 'Látex Interior 20L', 'Pinturas del Centro', 'SW-2000', 2, 35000),
-    createMockProduct('4', 'BUL-HEX', 'Bulon Hexagonal 10mm', 'Bulonera Industrial', 'BU-1010', 500, 85),
-    createMockProduct('5', 'LIJ-180', 'Lija al agua 180', 'Pinturas del Centro', 'LIJ-AA', 20, 210),
-  ]);
-
+  const [products, setProducts] = useState<Product[]>([]);
   const [cartItems, setCartItems] = useState<ReplenishmentItem[]>([]);
   const [orders, setOrders] = useState<ReplenishmentOrder[]>([]);
+
+  const loadProducts = async () => {
+    setIsLoadingProducts(true);
+    const all = await productDB.getAll();
+    setProducts(all);
+    setIsLoadingProducts(false);
+  };
+
+  const loadFromQueue = () => {
+    const savedQueue = localStorage.getItem('ferrecloud_replenishment_queue');
+    if (savedQueue) {
+        const queue: ReplenishmentItem[] = JSON.parse(savedQueue);
+        setCartItems(prev => {
+            const next = [...prev];
+            queue.forEach(item => {
+                if (!next.some(i => i.product.id === item.product.id)) {
+                    next.push(item);
+                }
+            });
+            return next;
+        });
+        localStorage.removeItem('ferrecloud_replenishment_queue');
+    }
+  };
+
+  useEffect(() => {
+    loadProducts();
+    loadFromQueue();
+    window.addEventListener('replenishment_queue_updated', loadFromQueue);
+    window.addEventListener('ferrecloud_products_updated', loadProducts);
+    return () => {
+        window.removeEventListener('replenishment_queue_updated', loadFromQueue);
+        window.removeEventListener('ferrecloud_products_updated', loadProducts);
+    };
+  }, []);
 
   useEffect(() => {
       if (initialItems && initialItems.length > 0) {
@@ -201,7 +216,7 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
       <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Armado de Pedidos</h2>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Truck className="text-indigo-600"/> Armado de Pedidos</h2>
             <p className="text-gray-500 text-sm">Generación y envío de órdenes de compra valorizadas.</p>
           </div>
           
@@ -228,39 +243,41 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                             <input 
                                 type="text" 
                                 placeholder="Buscar producto por nombre o código..." 
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 outline-none"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-50 outline-none uppercase font-bold text-sm"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <table className="w-full text-left">
                             <thead className="bg-white sticky top-0 z-10 text-xs text-gray-500 uppercase border-b border-gray-200">
                                 <tr>
                                     <th className="px-4 py-3">Producto</th>
-                                    <th className="px-4 py-3">Stock / Ideal</th>
+                                    <th className="px-4 py-3 text-center">Stock Actual</th>
                                     <th className="px-4 py-3 text-right">Costo Lista</th>
-                                    <th className="px-4 py-3 text-center">Acción</th>
+                                    <th className="px-4 py-3 text-center"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredProducts.map(p => (
-                                    <tr key={p.id} className="hover:bg-gray-50">
+                                {isLoadingProducts ? (
+                                    <tr><td colSpan={4} className="py-20 text-center"><RefreshCw className="animate-spin mx-auto text-indigo-400"/></td></tr>
+                                ) : filteredProducts.map(p => (
+                                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3">
-                                            <div className="font-bold text-gray-800 text-sm">{p.name}</div>
-                                            <div className="text-xs text-gray-500 font-mono">{p.internalCodes[0]}</div>
+                                            <div className="font-bold text-gray-800 text-sm uppercase">{p.name}</div>
+                                            <div className="text-[10px] text-gray-500 font-mono uppercase tracking-widest">{p.internalCodes[0]}</div>
                                         </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            <span className={`font-bold ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600' : 'text-gray-700'}`}>{p.stock}</span> 
+                                        <td className="px-4 py-3 text-sm text-center">
+                                            <span className={`font-bold ${p.stock <= (p.reorderPoint || 0) ? 'text-red-600' : 'text-gray-700'}`}>{p.stock}</span> 
                                             <span className="text-gray-400"> / {p.stockMaximo}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm text-right font-bold text-gray-800">${p.listCost.toLocaleString('es-AR')}</td>
+                                        <td className="px-4 py-3 text-sm text-right font-black text-slate-900">${p.listCost.toLocaleString('es-AR')}</td>
                                         <td className="px-4 py-3 text-center">
                                             <button 
                                               onClick={() => addToCart(p)}
                                               disabled={cartItems.some(i => i.product.id === p.id)}
-                                              className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 disabled:opacity-50 transition-colors">
+                                              className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white disabled:opacity-50 transition-all">
                                                 <Plus size={16}/>
                                             </button>
                                         </td>
@@ -275,35 +292,35 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                     <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           <ShoppingCart size={20} className="text-ferre-orange"/>
-                          <h3 className="font-bold">Carrito de Reposición</h3>
+                          <h3 className="font-bold uppercase text-xs tracking-widest">Carrito de Reposición</h3>
                         </div>
-                        <span className="text-xs bg-ferre-orange px-2 py-0.5 rounded-full font-black">{cartItems.length} ITEMS</span>
+                        <span className="text-[10px] bg-ferre-orange px-2 py-0.5 rounded-full font-black uppercase tracking-widest">{cartItems.length} ITEMS</span>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 custom-scrollbar">
                         {cartItems.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-gray-400">
                                 <Package size={48} className="mb-2 opacity-50"/>
-                                <p className="text-sm">Agrega productos de la lista izquierda.</p>
+                                <p className="text-[10px] uppercase font-black tracking-widest">Cola de pedidos vacía</p>
                             </div>
                         ) : (
                             cartItems.map(item => (
                                 <div key={item.product.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative group animate-fade-in">
                                     <button onClick={() => removeFromCart(item.product.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
-                                    <h4 className="font-bold text-gray-800 text-sm pr-6">{item.product.name}</h4>
-                                    <div className="flex justify-between items-center mb-3">
-                                        <p className="text-[10px] text-gray-400 font-mono uppercase">Costo: ${item.product.listCost.toLocaleString('es-AR')}</p>
-                                        <p className="text-[10px] font-bold text-indigo-600 uppercase">Sub: ${(item.product.listCost * item.quantity).toLocaleString('es-AR')}</p>
+                                    <h4 className="font-black text-slate-800 text-xs uppercase pr-6 leading-tight mb-2">{item.product.name}</h4>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <p className="text-[9px] text-gray-400 font-mono uppercase">Unidad: ${item.product.listCost.toLocaleString('es-AR')}</p>
+                                        <p className="text-[9px] font-black text-indigo-600 uppercase">Total: ${(item.product.listCost * item.quantity).toLocaleString('es-AR')}</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Proveedor</label>
-                                            <select className="w-full text-xs border border-gray-200 rounded-lg p-2 bg-gray-50" value={item.selectedProviderId} onChange={(e) => updateCartItem(item.product.id, { selectedProviderId: e.target.value })}>
+                                            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Proveedor</label>
+                                            <select className="w-full text-[10px] border border-gray-200 rounded-lg p-2 bg-slate-50 font-bold uppercase" value={item.selectedProviderId} onChange={(e) => updateCartItem(item.product.id, { selectedProviderId: e.target.value })}>
                                                 {providers.map(prov => <option key={prov.id} value={prov.id}>{prov.name}</option>)}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cantidad</label>
-                                            <input type="number" className="w-full text-xs border border-gray-200 rounded-lg p-2 text-center font-bold" value={item.quantity} onChange={(e) => updateCartItem(item.product.id, { quantity: parseFloat(e.target.value) || 0 })} />
+                                            <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Cant. Pedida</label>
+                                            <input type="number" className="w-full text-xs border border-gray-200 rounded-lg p-2 text-center font-black text-slate-900" value={item.quantity} onChange={(e) => updateCartItem(item.product.id, { quantity: parseFloat(e.target.value) || 0 })} />
                                         </div>
                                     </div>
                                 </div>
@@ -312,14 +329,14 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
                     </div>
                     <div className="p-5 border-t border-gray-200 bg-white">
                         <div className="flex justify-between items-center mb-4">
-                            <span className="text-gray-500 font-bold text-sm uppercase">Total Pedido</span>
-                            <span className="text-2xl font-black text-gray-900">${calculateOrderCost(cartItems).toLocaleString('es-AR')}</span>
+                            <span className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Inversión Estimada</span>
+                            <span className="text-2xl font-black text-slate-900 tracking-tighter">${calculateOrderCost(cartItems).toLocaleString('es-AR')}</span>
                         </div>
                         <button 
                           onClick={generateOrders}
                           disabled={cartItems.length === 0}
-                          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-all active:scale-95">
-                            Generar Órdenes por Proveedor <ChevronDown size={18}/>
+                          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-[1.5rem] shadow-xl disabled:opacity-30 flex items-center justify-center gap-2 transition-all active:scale-95 uppercase text-xs tracking-widest">
+                            Consolidar Órdenes de Compra
                         </button>
                     </div>
                 </div>
@@ -328,11 +345,11 @@ const Replenishment: React.FC<ReplenishmentProps> = ({ initialItems, onItemsCons
   
         {activeTab === 'PENDING_ORDERS' && (
             <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col animate-fade-in">
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 custom-scrollbar">
                     {orders.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
                             <Truck size={48} className="mb-4 opacity-20"/>
-                            <p>No hay pedidos en la bandeja de salida.</p>
+                            <p className="text-[10px] uppercase font-black tracking-widest">No hay pedidos generados</p>
                         </div>
                     ) : (
                         orders.map(order => (
