@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     Globe, ShoppingBag, Truck, Package, Printer, FileText, CheckCircle, X, 
@@ -28,12 +29,18 @@ interface PlatformSyncConfig {
 }
 
 const createMockItem = (desc: string, qty: number, price: number): InvoiceItem => ({
+    // Added missing stock properties and corrected minStock/desiredStock to match Product interface
     product: { 
         id: '1', internalCodes: ['SKU-001'], barcodes: ['SKU-001'], providerCodes: [], name: desc,
         brand: 'Generico', provider: 'Proveedor Demo', category: 'General', description: '',
         measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
         vatRate: 21, listCost: price * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: price * 0.6, profitMargin: 40,
-        priceNeto: price / 1.21, priceFinal: price, stock: 10, stockDetails: [], minStock: 10, desiredStock: 20, reorderPoint: 5,
+        priceNeto: price / 1.21, priceFinal: price, 
+        stock: 10, 
+        stockPrincipal: 10,
+        stockDeposito: 0,
+        stockSucursal: 0,
+        stockDetails: [], stockMinimo: 10, stockMaximo: 20, reorderPoint: 5,
         location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
         isCombo: false,
         comboItems: []
@@ -505,7 +512,7 @@ const OnlineSales: React.FC = () => {
                               </div>
                           </div>
                       </div>
-                      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                           <table className="w-full text-left">
                               <thead className="bg-slate-50/50 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b">
                                   <tr>
