@@ -7,7 +7,7 @@ import {
     Layers, Zap, Shield, ShoppingCart, Globe, Tag, 
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
-    LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus
+    LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
@@ -152,6 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
 
             <nav className="flex-1 p-4 space-y-1">
                 <NavItem view={ViewState.DASHBOARD} label="Escritorio" icon={LayoutDashboard} active={activeView === ViewState.DASHBOARD} onClick={() => handleNav(ViewState.DASHBOARD)} />
+                <NavItem view={ViewState.ANALYTICS} label="Dashboard" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
                     <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />
