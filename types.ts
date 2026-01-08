@@ -127,6 +127,9 @@ export interface Product {
   usaPorcentaje?: boolean;
   listaCodigo?: string;
   stock: number;
+  stockPrincipal: number;
+  stockDeposito: number;
+  stockSucursal: number;
   stockMinimo?: number;
   stockMaximo?: number;
   reorderPoint: number;
