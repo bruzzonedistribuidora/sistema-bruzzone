@@ -5,9 +5,12 @@ import {
     Plus, Minus, X, RefreshCw, Landmark,
     PlusCircle, Receipt, Truck, FileSpreadsheet,
     CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
-    ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap
+    ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap,
+    ArrowLeftRight, Banknote, Smartphone as ECheqIcon,
+    // Added History to fix JSX component error
+    History
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CompanyConfig } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 const DEFAULT_CLIENT: Client = {
@@ -48,7 +51,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
     const [paymentMethod, setPaymentMethod] = useState<string>('EFECTIVO');
+    
+    // Estados para Tarjeta Avanzada
     const [selectedSystemId, setSelectedSystemId] = useState<string>('');
+    const [cardMode, setCardMode] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
 
     const loadProducts = async () => {
@@ -80,15 +86,20 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const totals = useMemo(() => {
         const gross = cart.reduce((acc, item) => acc + item.subtotal, 0);
         let interest = 0;
+        
         if (paymentMethod === 'TARJETA' && selectedSystemId) {
             const sys = (companyConfig.paymentSystems || []).find(s => s.id === selectedSystemId);
             if (sys) {
-                const plan = sys.creditInstallments.find(p => p.id === selectedCuotaId);
-                interest = gross * ((plan ? plan.surcharge : sys.debitSurcharge) / 100);
+                if (cardMode === 'DEBIT') {
+                    interest = gross * (sys.debitSurcharge / 100);
+                } else {
+                    const plan = sys.creditInstallments.find(p => p.id === selectedCuotaId);
+                    interest = gross * ((plan ? plan.surcharge : 0) / 100);
+                }
             }
         }
         return { gross, interest, total: gross + interest };
-    }, [cart, paymentMethod, selectedSystemId, selectedCuotaId, companyConfig]);
+    }, [cart, paymentMethod, selectedSystemId, cardMode, selectedCuotaId, companyConfig]);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -104,18 +115,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         setShowProductResults(false);
     };
 
-    const handlePedir = (e: React.MouseEvent, p: Product) => {
-        e.stopPropagation();
-        if (addToReplenishmentQueue(p)) {
-            alert(`Articulo ${p.name} enviado a reposición.`);
-        }
-    };
-
     const handleCheckout = (isFiscal: boolean = false) => {
         if (cart.length === 0) return;
         isFiscal ? setIsFiscalInvoicing(true) : setIsProcessing(true);
         setTimeout(() => {
-            const sale = { id: `VEN-${Date.now().toString().slice(-6)}`, isFiscal, date: new Date().toLocaleString(), client: selectedClient.name, total: totals.total, items: [...cart] };
+            const sale = { id: `VEN-${Date.now().toString().slice(-6)}`, isFiscal, date: new Date().toLocaleString(), client: selectedClient.name, total: totals.total, method: paymentMethod, items: [...cart] };
             const newHistory = [sale, ...salesHistory];
             setSalesHistory(newHistory);
             localStorage.setItem('ferrecloud_sales_history', JSON.stringify(newHistory));
@@ -124,15 +128,20 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         }, isFiscal ? 2000 : 800);
     };
 
+    const currentSystem = companyConfig.paymentSystems?.find(s => s.id === selectedSystemId);
+
     return (
         <div className="flex h-full bg-slate-100 overflow-hidden flex-1 flex-col font-sans animate-fade-in">
             <div className="bg-white border-b border-slate-200 px-6 h-14 flex justify-between items-center shrink-0">
                 <div className="flex gap-8 h-full">
                     {['SALES', 'HISTORY'].map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab as any)} className={`h-full px-2 font-black text-[10px] uppercase tracking-[0.2em] border-b-4 transition-all ${activeTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>
-                            {tab === 'SALES' ? 'Facturación Directa' : 'Últimos Tickets'}
+                            {tab === 'SALES' ? 'Venta de Mostrador' : 'Últimos Tickets'}
                         </button>
                     ))}
+                </div>
+                <div className="flex items-center gap-4">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado Terminal: <span className="text-green-500">Online</span></span>
                 </div>
             </div>
 
@@ -154,13 +163,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                     <p className="font-black text-slate-800 uppercase text-sm leading-none mb-1.5">{p.name}</p>
                                                     <div className="flex gap-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                                                         <span>SKU: {p.internalCodes[0]}</span>
-                                                        <span className="text-indigo-500">Stock: {p.stock}</span>
+                                                        <span className="text-indigo-500 font-black">Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <button onClick={(e) => handlePedir(e, p)} className="p-3 bg-slate-100 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Pedir Reposición"><Truck size={16}/></button>
-                                                    <p className="font-black text-indigo-600 text-lg tracking-tighter">${p.priceFinal.toLocaleString('es-AR')}</p>
-                                                </div>
+                                                <p className="font-black text-indigo-600 text-lg tracking-tighter">${p.priceFinal.toLocaleString('es-AR')}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -179,7 +185,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-900 text-white sticky top-0 z-10 text-[9px] font-black uppercase tracking-[0.2em]">
                                         <tr>
-                                            <th className="px-8 py-5">Descripción del Artículo</th>
+                                            <th className="px-8 py-5">Descripción</th>
                                             <th className="px-8 py-5 text-center">Cantidad</th>
                                             <th className="px-8 py-5 text-right">Subtotal</th>
                                             <th className="px-8 py-5 text-center"></th>
@@ -194,47 +200,124 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex items-center justify-center gap-4 bg-slate-100 rounded-2xl p-1.5 w-fit mx-auto border border-slate-200">
-                                                        <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: Math.max(1, i.quantity - 1), subtotal: Math.max(1, i.quantity - 1) * i.appliedPrice} : i))} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"><Minus size={18}/></button>
+                                                        <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: Math.max(1, i.quantity - 1), subtotal: Math.max(1, i.quantity - 1) * i.appliedPrice} : i))} className="p-1.5 text-slate-400 hover:text-indigo-600"><Minus size={18}/></button>
                                                         <span className="font-black text-lg w-8 text-center">{item.quantity}</span>
-                                                        <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.appliedPrice} : i))} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"><Plus size={18}/></button>
+                                                        <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.appliedPrice} : i))} className="p-1.5 text-slate-400 hover:text-indigo-600"><Plus size={18}/></button>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-5 text-right font-black text-slate-900 text-xl tracking-tighter">${item.subtotal.toLocaleString('es-AR')}</td>
                                                 <td className="px-8 py-5 text-center">
-                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"><Trash2 size={20}/></button>
+                                                    <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="p-3 text-slate-200 hover:text-red-500 transition-all"><Trash2 size={20}/></button>
                                                 </td>
                                             </tr>
                                         ))}
                                         {cart.length === 0 && (
-                                            <tr>
-                                                <td colSpan={4} className="py-24 text-center text-slate-300 uppercase font-black tracking-widest">Carrito vacío</td>
-                                            </tr>
+                                            <tr><td colSpan={4} className="py-24 text-center text-slate-300 uppercase font-black tracking-widest">Carrito vacío</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
+                        {/* ACCIONES DE CONVERSIÓN */}
+                        <div className="grid grid-cols-2 gap-4 shrink-0">
+                            <button 
+                                onClick={() => onTransformToRemito?.(cart)} 
+                                disabled={cart.length === 0}
+                                className="bg-white border-2 border-slate-200 p-5 rounded-[2rem] flex items-center justify-center gap-4 group hover:border-indigo-600 transition-all disabled:opacity-30">
+                                <div className="p-3 bg-slate-100 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><Truck size={24}/></div>
+                                <div className="text-left">
+                                    <p className="font-black text-xs uppercase tracking-tight text-slate-800">Convertir a Remito</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Para entrega o cuenta corriente</p>
+                                </div>
+                            </button>
+                            <button 
+                                onClick={() => onTransformToBudget?.(cart)} 
+                                disabled={cart.length === 0}
+                                className="bg-white border-2 border-slate-200 p-5 rounded-[2rem] flex items-center justify-center gap-4 group hover:border-teal-600 transition-all disabled:opacity-30">
+                                <div className="p-3 bg-slate-100 rounded-2xl group-hover:bg-teal-600 group-hover:text-white transition-colors"><FileSpreadsheet size={24}/></div>
+                                <div className="text-left">
+                                    <p className="font-black text-xs uppercase tracking-tight text-slate-800">Generar Presupuesto</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Cotización válida por 15 días</p>
+                                </div>
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="w-[400px] flex flex-col gap-6">
-                        <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl flex flex-col relative overflow-hidden shrink-0">
-                            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><ShoppingCart size={180}/></div>
+                    <div className="w-[450px] flex flex-col gap-6">
+                        <div className="bg-slate-900 rounded-[3rem] p-8 text-white shadow-2xl flex flex-col relative overflow-hidden shrink-0">
+                            <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none"><Receipt size={180}/></div>
                             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-8 border-b border-white/10 pb-4">Consola de Pago</h3>
-                            <div className="space-y-8">
-                                <div className="flex justify-between items-baseline">
-                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Gravado</span>
+                            
+                            <div className="space-y-6">
+                                <div className="flex justify-between items-baseline border-b border-white/5 pb-4">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Subtotal Gravado</span>
                                     <span className="text-2xl font-black">${totals.gross.toLocaleString('es-AR')}</span>
                                 </div>
+
                                 <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Modalidad</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'].map(m => (
-                                            <button key={m} onClick={() => setPaymentMethod(m)} className={`py-4 rounded-2xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${paymentMethod === m ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg' : 'border-white/5 bg-white/5 text-slate-400 hover:bg-white/10'}`}>{m}</button>
+                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Medio de Pago</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { id: 'EFECTIVO', icon: Banknote },
+                                            { id: 'TARJETA', icon: CardIcon },
+                                            { id: 'CHEQUE', icon: FileText },
+                                            { id: 'E-CHEQ', icon: ECheqIcon },
+                                            { id: 'TRANSFERENCIA', icon: Landmark },
+                                            { id: 'CTACTE', icon: History }
+                                        ].map(m => (
+                                            <button 
+                                                key={m.id} 
+                                                onClick={() => setPaymentMethod(m.id)} 
+                                                className={`py-3 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 flex items-center gap-3 transition-all ${paymentMethod === m.id ? 'border-indigo-500 bg-indigo-600 text-white shadow-lg' : 'border-white/5 bg-white/5 text-slate-400 hover:bg-white/10'}`}>
+                                                <m.icon size={14}/> {m.id}
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* CONFIGURACIÓN DE TARJETA DINÁMICA */}
+                                {paymentMethod === 'TARJETA' && (
+                                    <div className="bg-white/5 p-5 rounded-2xl border border-white/10 space-y-5 animate-fade-in">
+                                        <div className="space-y-2">
+                                            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Plataforma / Sistema</label>
+                                            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                                                {(companyConfig.paymentSystems || []).map(sys => (
+                                                    <button key={sys.id} onClick={() => setSelectedSystemId(sys.id)} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${selectedSystemId === sys.id ? 'bg-indigo-500 text-white' : 'bg-white/10 text-slate-400'}`}>{sys.name}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {selectedSystemId && (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button onClick={() => setCardMode('DEBIT')} className={`py-2 rounded-lg text-[9px] font-black uppercase border-2 transition-all ${cardMode === 'DEBIT' ? 'border-indigo-400 text-indigo-400' : 'border-white/5 text-slate-500'}`}>Débito</button>
+                                                    <button onClick={() => setCardMode('CREDIT')} className={`py-2 rounded-lg text-[9px] font-black uppercase border-2 transition-all ${cardMode === 'CREDIT' ? 'border-indigo-400 text-indigo-400' : 'border-white/5 text-slate-500'}`}>Crédito</button>
+                                                </div>
+
+                                                {cardMode === 'CREDIT' && (
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {currentSystem?.creditInstallments.map(plan => (
+                                                            <button 
+                                                                key={plan.id} 
+                                                                onClick={() => setSelectedCuotaId(plan.id)}
+                                                                className={`p-2 rounded-lg border flex flex-col items-center transition-all ${selectedCuotaId === plan.id ? 'bg-indigo-600 border-indigo-400' : 'bg-white/5 border-white/10'}`}>
+                                                                <span className="text-[11px] font-black">{plan.installments}x</span>
+                                                                <span className="text-[7px] font-bold text-slate-400">+{plan.surcharge}%</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="pt-6 border-t border-white/10">
-                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3">Total a Percibir</p>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">Total a Percibir</p>
+                                        {totals.interest > 0 && <span className="text-[9px] font-bold text-orange-400 uppercase">+${totals.interest.toLocaleString()} INTERÉS</span>}
+                                    </div>
                                     <p className="text-6xl font-black tracking-tighter text-white leading-none">${totals.total.toLocaleString('es-AR')}</p>
                                 </div>
                             </div>
@@ -259,6 +342,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <th className="px-8 py-5">Ref. Operación</th>
                                     <th className="px-8 py-5">Fecha / Hora</th>
                                     <th className="px-8 py-5">Cliente</th>
+                                    <th className="px-8 py-5">Medio</th>
                                     <th className="px-8 py-5 text-right">Importe Total</th>
                                 </tr>
                             </thead>
@@ -268,12 +352,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         <td className="px-8 py-5 font-black text-indigo-600">{sale.id} {sale.isFiscal && <span className="ml-2 bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-[7px] uppercase border">Fiscal</span>}</td>
                                         <td className="px-8 py-5 font-bold text-slate-400">{sale.date}</td>
                                         <td className="px-8 py-5 font-black text-slate-700 uppercase">{sale.client}</td>
+                                        <td className="px-8 py-5 font-bold text-slate-500 uppercase">{sale.method}</td>
                                         <td className="px-8 py-5 text-right font-black text-slate-900 text-lg tracking-tighter">${sale.total.toLocaleString('es-AR')}</td>
                                     </tr>
                                 ))}
-                                {salesHistory.length === 0 && (
-                                    <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Sin ventas registradas</td></tr>
-                                )}
                             </tbody>
                         </table>
                     </div>
