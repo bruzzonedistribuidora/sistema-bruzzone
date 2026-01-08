@@ -90,11 +90,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
         };
     }, []);
 
-    // Función para validar si un módulo está habilitado por la licencia
+    const isCreator = user?.roleId === 'creator';
+
     const isModuleEnabled = (view: ViewState) => {
-        if (!license) return true; // Si no hay licencia cargada, permitimos todo por defecto
-        if (license.status === 'LOCKED' && user?.roleId !== 'creator') return false;
-        // Si el módulo está explícitamente en false en enabledModules, se oculta
+        if (isCreator) return true; // Creador ve todo
+        if (!license) return true;
+        if (license.status === 'LOCKED') return false;
         return license.enabledModules[view] !== false;
     };
 
@@ -170,27 +171,26 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
                     {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
-                    <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos Clientes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />
-                    <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />
-                    <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />
+                    {isModuleEnabled(ViewState.CLIENT_BALANCES) && <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos Clientes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />}
+                    {isModuleEnabled(ViewState.REMITOS) && <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />}
+                    {isModuleEnabled(ViewState.PRESUPUESTOS) && <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />}
                     <DropdownItem view={ViewState.CLIENTS} label="Clientes" icon={Users} active={activeView === ViewState.CLIENTS} onClick={() => handleNav(ViewState.CLIENTS)} />
                 </NavDropdown>
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
                     {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
-                    <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajuste de Existencias" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />
-                    <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} active={activeView === ViewState.SHORTAGES} onClick={() => handleNav(ViewState.SHORTAGES)} />
-                    <DropdownItem view={ViewState.REPLENISHMENT} label="Armar Pedido" icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />
-                    <DropdownItem view={ViewState.INITIAL_IMPORT} label="Carga Masiva" icon={FileUp} active={activeView === ViewState.INITIAL_IMPORT} onClick={() => handleNav(ViewState.INITIAL_IMPORT)} />
-                    <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios & Listas" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />
-                    <DropdownItem view={ViewState.MASS_PRODUCT_UPDATE} label="Cambios Masivos" icon={Zap} active={activeView === ViewState.MASS_PRODUCT_UPDATE} onClick={() => handleNav(ViewState.MASS_PRODUCT_UPDATE)} />
+                    {isModuleEnabled(ViewState.STOCK_ADJUSTMENT) && <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajuste de Existencias" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />}
+                    {isModuleEnabled(ViewState.SHORTAGES) && <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} active={activeView === ViewState.SHORTAGES} onClick={() => handleNav(ViewState.SHORTAGES)} />}
+                    {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Armar Pedido" icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
+                    {isModuleEnabled(ViewState.INITIAL_IMPORT) && <DropdownItem view={ViewState.INITIAL_IMPORT} label="Carga Masiva" icon={FileUp} active={activeView === ViewState.INITIAL_IMPORT} onClick={() => handleNav(ViewState.INITIAL_IMPORT)} />}
+                    {isModuleEnabled(ViewState.PRICE_UPDATES) && <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios & Listas" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />}
                 </NavDropdown>
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
                 
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
                     {isModuleEnabled(ViewState.ACCOUNTING) && <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />}
-                    <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />
+                    {isModuleEnabled(ViewState.PROVIDER_BALANCES) && <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />}
                     {isModuleEnabled(ViewState.TREASURY) && <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />}
                     <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
                 </NavDropdown>
@@ -206,7 +206,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 <div className="pt-4 mt-4 border-t border-slate-100">
                     <NavItem view={ViewState.CLOUD_HUB} label="Nube Central" icon={Cloud} active={activeView === ViewState.CLOUD_HUB} onClick={() => handleNav(ViewState.CLOUD_HUB)} />
                     <NavItem view={ViewState.CONFIG_PANEL} label="Configuración" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
-                    {user?.roleId === 'creator' && (
+                    {isCreator && (
                         <NavItem view={ViewState.LICENSE_MANAGER} label="Licencias (ROOT)" icon={Key} active={activeView === ViewState.LICENSE_MANAGER} onClick={() => handleNav(ViewState.LICENSE_MANAGER)} />
                     )}
                 </div>
