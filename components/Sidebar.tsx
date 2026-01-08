@@ -8,7 +8,7 @@ import {
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Scale, Activity, Settings2
+    Scale, Activity, Settings2, DollarSign
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
 
@@ -140,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                         <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-none mb-1">{user?.name || 'Usuario'}</p>
                             <div className="flex items-center gap-1.5">
-                                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-50 animate-pulse' : 'bg-slate-300'}`}></div>
                                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{syncStatus}</span>
                             </div>
                         </div>
@@ -157,6 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
                     <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />
+                    <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos Clientes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />
                     <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />
                     <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />
                     <DropdownItem view={ViewState.CLIENTS} label="Clientes" icon={Users} active={activeView === ViewState.CLIENTS} onClick={() => handleNav(ViewState.CLIENTS)} />
@@ -176,6 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
                     <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />
+                    <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />
                     <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
                     <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
                 </NavDropdown>
