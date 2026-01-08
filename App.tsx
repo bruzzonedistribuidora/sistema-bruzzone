@@ -6,7 +6,7 @@ import {
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Settings2
+    Settings2, DollarSign
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -16,6 +16,8 @@ import StockAdjustment from './components/StockAdjustment';
 import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
+import ClientBalances from './components/ClientBalances';
+import ProviderBalances from './components/ProviderBalances';
 import Providers from './components/Providers';
 import Treasury from './components/Treasury';
 import Accounting from './components/Accounting';
@@ -72,6 +74,8 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
     [ViewState.MARKETING]: { icon: Tag, label: "Marketing & Puntos", color: "bg-red-500" },
     [ViewState.CLIENTS]: { icon: Users, label: "Fichero Clientes", color: "bg-sky-500" },
+    [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Saldos Clientes", color: "bg-emerald-600" },
+    [ViewState.PROVIDER_BALANCES]: { icon: DollarSign, label: "Saldos Proveedores", color: "bg-orange-600" },
     [ViewState.REMITOS]: { icon: ListOrdered, label: "Remitos", color: "bg-blue-600" },
     [ViewState.PRESUPUESTOS]: { icon: FileSpreadsheet, label: "Presupuestos", color: "bg-teal-500" },
     [ViewState.SALES_ORDERS]: { icon: Package, label: "Pedidos", color: "bg-green-600" },
@@ -99,7 +103,6 @@ const App: React.FC = () => {
     const savedSession = localStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
 
-    // Detección simple de móvil
     const checkMobile = () => {
         setIsMobile(window.innerWidth < 1024);
     };
@@ -143,6 +146,8 @@ const App: React.FC = () => {
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       case ViewState.TREASURY: return <Treasury />;
       case ViewState.CLIENTS: return <Clients onOpenPortal={(c) => { setPortalPreviewClient(c); handleNavigate(ViewState.CUSTOMER_PORTAL); }} />;
+      case ViewState.CLIENT_BALANCES: return <ClientBalances onNavigateToHistory={(c) => { setPortalPreviewClient(c); handleNavigate(ViewState.CUSTOMER_PORTAL); }} />;
+      case ViewState.PROVIDER_BALANCES: return <ProviderBalances />;
       case ViewState.ONLINE_SALES: return <OnlineSales />;
       case ViewState.ACCOUNTING: return <Accounting />;
       case ViewState.STATISTICS: return <Statistics />;
@@ -187,7 +192,6 @@ const App: React.FC = () => {
     return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
   }
 
-  // Si es móvil, cargamos la aplicación móvil dedicada
   if (isMobile) {
       return <MobileApp user={loggedInUser} onLogout={handleLogout} />;
   }
