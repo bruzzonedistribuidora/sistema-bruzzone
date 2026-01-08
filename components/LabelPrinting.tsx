@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Tag, Search, Plus, Trash2, Printer, Move, LayoutGrid, X, CheckSquare, Square, MousePointer2 } from 'lucide-react';
 import { Product } from '../types';
@@ -30,7 +31,13 @@ const createMockProduct = (id: string, internalCode: string, name: string, price
   name, brand: 'Generico', provider: 'Proveedor', category: 'General', description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
   vatRate: 21, listCost: price * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: price * 0.6, profitMargin: 40,
-  priceNeto: price / 1.21, priceFinal: price, stock: 100, stockDetails: [], 
+  priceNeto: price / 1.21, priceFinal: price, 
+  stock: 100, 
+  // Added missing required stock properties
+  stockPrincipal: 100,
+  stockDeposito: 0,
+  stockSucursal: 0,
+  stockDetails: [], 
   stockMinimo: 10, stockMaximo: 20, reorderPoint: 5,
   location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
   isCombo: false,
