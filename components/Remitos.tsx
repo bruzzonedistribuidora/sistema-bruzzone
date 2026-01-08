@@ -88,6 +88,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     if (!manualItemForm.name || !manualItemForm.price) return;
     
     const priceNum = parseFloat(manualItemForm.price);
+    // Added missing required stock properties for Product interface
     const mockProduct: Product = {
         id: `manual-rem-${Date.now()}`,
         internalCodes: ['VARIO'],
@@ -111,6 +112,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         priceNeto: priceNum / 1.21,
         priceFinal: priceNum,
         stock: 0,
+        stockPrincipal: 0,
+        stockDeposito: 0,
+        stockSucursal: 0,
         stockDetails: [],
         stockMinimo: 0,
         stockMaximo: 0,
