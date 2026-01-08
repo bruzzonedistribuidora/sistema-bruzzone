@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     LayoutDashboard, Database, Receipt, ClipboardList, 
     FileSpreadsheet, Users, Truck, Wallet, Calculator, 
@@ -8,9 +8,9 @@ import {
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Scale, Activity, Settings2, DollarSign
+    Scale, Activity, Settings2, DollarSign, Key
 } from 'lucide-react';
-import { ViewState, User, CloudSyncStatus, CompanyConfig } from '../types';
+import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
 interface SidebarProps {
     activeView: ViewState;
@@ -67,23 +67,36 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
     const handleNav = (view: ViewState) => onNavigate(view);
     const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>('OFFLINE');
     const [companyConfig, setCompanyConfig] = useState<CompanyConfig | null>(null);
+    const [license, setLicense] = useState<SystemLicense | null>(null);
 
     const loadConfig = () => {
         const savedSync = JSON.parse(localStorage.getItem('ferrecloud_sync_config') || '{"enabled": false}');
         const savedCompany = JSON.parse(localStorage.getItem('company_config') || '{}');
+        const savedLicense = JSON.parse(localStorage.getItem('ferrecloud_license') || 'null');
         setSyncStatus(savedSync.enabled ? 'ONLINE' : 'OFFLINE');
         setCompanyConfig(savedCompany);
+        setLicense(savedLicense);
     };
 
     useEffect(() => {
         loadConfig();
         window.addEventListener('company_config_updated', loadConfig);
+        window.addEventListener('license_updated', loadConfig);
         window.addEventListener('storage', loadConfig);
         return () => {
             window.removeEventListener('company_config_updated', loadConfig);
+            window.removeEventListener('license_updated', loadConfig);
             window.removeEventListener('storage', loadConfig);
         };
     }, []);
+
+    // Función para validar si un módulo está habilitado por la licencia
+    const isModuleEnabled = (view: ViewState) => {
+        if (!license) return true; // Si no hay licencia cargada, permitimos todo por defecto
+        if (license.status === 'LOCKED' && user?.roleId !== 'creator') return false;
+        // Si el módulo está explícitamente en false en enabledModules, se oculta
+        return license.enabledModules[view] !== false;
+    };
 
     const renderHeader = () => {
         const mode = companyConfig?.headerDisplayMode || 'BOTH';
@@ -140,7 +153,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                         <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-none mb-1">{user?.name || 'Usuario'}</p>
                             <div className="flex items-center gap-1.5">
-                                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-50 animate-pulse' : 'bg-slate-300'}`}></div>
+                                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
                                 <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{syncStatus}</span>
                             </div>
                         </div>
@@ -156,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 <NavItem view={ViewState.ANALYTICS} label="Dashboard" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
-                    <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />
+                    {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="Punto de Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
                     <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos Clientes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />
                     <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />
                     <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />
@@ -164,7 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 </NavDropdown>
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
-                    <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />
+                    {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro Artículos" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
                     <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajuste de Existencias" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />
                     <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} active={activeView === ViewState.SHORTAGES} onClick={() => handleNav(ViewState.SHORTAGES)} />
                     <DropdownItem view={ViewState.REPLENISHMENT} label="Armar Pedido" icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />
@@ -176,34 +189,39 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user }) => {
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
                 
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
-                    <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />
+                    {isModuleEnabled(ViewState.ACCOUNTING) && <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />}
                     <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Saldos Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />
-                    <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />
+                    {isModuleEnabled(ViewState.TREASURY) && <DropdownItem view={ViewState.TREASURY} label="Arqueo de Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />}
                     <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
                 </NavDropdown>
                 
                 <NavDropdown id="presencia" label="Digital" icon={Globe}>
-                    <DropdownItem view={ViewState.ONLINE_SALES} label="Pedidos Online" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />
-                    <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Catálogo Web" icon={Laptop} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />
-                    <DropdownItem view={ViewState.PUBLIC_PORTAL} label="Portal Fidelidad" icon={Smartphone} active={activeView === ViewState.PUBLIC_PORTAL} onClick={() => handleNav(ViewState.PUBLIC_PORTAL)} />
+                    {isModuleEnabled(ViewState.ONLINE_SALES) && <DropdownItem view={ViewState.ONLINE_SALES} label="Pedidos Online" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />}
+                    {isModuleEnabled(ViewState.ECOMMERCE_ADMIN) && <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Catálogo Web" icon={Laptop} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />}
+                    {isModuleEnabled(ViewState.MARKETING) && <DropdownItem view={ViewState.PUBLIC_PORTAL} label="Portal Fidelidad" icon={Smartphone} active={activeView === ViewState.PUBLIC_PORTAL} onClick={() => handleNav(ViewState.PUBLIC_PORTAL)} />}
                 </NavDropdown>
 
-                <NavItem view={ViewState.AI_ASSISTANT} label="FerreBot IA" icon={Bot} active={activeView === ViewState.AI_ASSISTANT} onClick={() => handleNav(ViewState.AI_ASSISTANT)} />
+                {isModuleEnabled(ViewState.AI_ASSISTANT) && <NavItem view={ViewState.AI_ASSISTANT} label="FerreBot IA" icon={Bot} active={activeView === ViewState.AI_ASSISTANT} onClick={() => handleNav(ViewState.AI_ASSISTANT)} />}
                 
                 <div className="pt-4 mt-4 border-t border-slate-100">
                     <NavItem view={ViewState.CLOUD_HUB} label="Nube Central" icon={Cloud} active={activeView === ViewState.CLOUD_HUB} onClick={() => handleNav(ViewState.CLOUD_HUB)} />
                     <NavItem view={ViewState.CONFIG_PANEL} label="Configuración" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
+                    {user?.roleId === 'creator' && (
+                        <NavItem view={ViewState.LICENSE_MANAGER} label="Licencias (ROOT)" icon={Key} active={activeView === ViewState.LICENSE_MANAGER} onClick={() => handleNav(ViewState.LICENSE_MANAGER)} />
+                    )}
                 </div>
             </nav>
 
-            <div className="p-4 mt-auto">
-                <div className="bg-indigo-900 rounded-2xl p-4 text-white relative overflow-hidden group cursor-pointer" onClick={() => handleNav(ViewState.SHOP)}>
-                    <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform"><Globe size={80}/></div>
-                    <p className="text-[8px] font-black uppercase tracking-widest text-indigo-300 mb-1">Tu Sucursal Online</p>
-                    <h4 className="text-xs font-black uppercase tracking-tighter">Venta Web Propia</h4>
-                    <ArrowRight size={14} className="mt-3 text-indigo-400 group-hover:translate-x-2 transition-transform" />
+            {isModuleEnabled(ViewState.SHOP) && (
+                <div className="p-4 mt-auto">
+                    <div className="bg-indigo-900 rounded-2xl p-4 text-white relative overflow-hidden group cursor-pointer" onClick={() => handleNav(ViewState.SHOP)}>
+                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform"><Globe size={80}/></div>
+                        <p className="text-[8px] font-black uppercase tracking-widest text-indigo-300 mb-1">Tu Sucursal Online</p>
+                        <h4 className="text-xs font-black uppercase tracking-tighter">Venta Web Propia</h4>
+                        <ArrowRight size={14} className="mt-3 text-indigo-400 group-hover:translate-x-2 transition-transform" />
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };
