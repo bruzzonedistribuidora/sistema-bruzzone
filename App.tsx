@@ -1,12 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-    X, Smartphone, ShoppingBag, Plus, LayoutDashboard, Database, 
+    X, Smartphone, ShoppingBag, LayoutDashboard, Database, 
     Receipt, Truck, Wallet, Bot, Settings, FileUp, Layers, Zap, 
-    Search as SearchIcon, ChevronRight, Package, ListOrdered,
-    RotateCcw, Landmark, FileSpreadsheet, Tag, Clock, Users,
-    Calculator, TrendingUp, FileBarChart2, Building2, ShieldCheck,
-    LayoutTemplate, HardDrive, Sparkles, ShieldAlert, Globe, Heart, Cloud, Laptop,
+    Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
+    Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
@@ -68,7 +66,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Gestión Catálogo Web", color: "bg-pink-600" },
     [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda Online", color: "bg-pink-600" },
     [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
-    [ViewState.MARKETING]: { icon: Heart, label: "Marketing & Puntos", color: "bg-red-500" },
+    [ViewState.MARKETING]: { icon: Tag, label: "Marketing & Puntos", color: "bg-red-500" },
     [ViewState.CLIENTS]: { icon: Users, label: "Fichero Clientes", color: "bg-sky-500" },
     [ViewState.REMITOS]: { icon: ListOrdered, label: "Remitos", color: "bg-blue-600" },
     [ViewState.PRESUPUESTOS]: { icon: FileSpreadsheet, label: "Presupuestos", color: "bg-teal-500" },
@@ -77,7 +75,6 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.PROVIDERS]: { icon: Truck, label: "Proveedores", color: "bg-slate-800" },
     [ViewState.STATISTICS]: { icon: TrendingUp, label: "Estadísticas", color: "bg-cyan-500" },
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
-    [ViewState.BACKUP]: { icon: HardDrive, label: "Respaldo Datos", color: "bg-slate-600" },
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
     [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Monitor Faltantes", color: "bg-orange-600" },
     [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Armado Pedido", color: "bg-emerald-600" },
