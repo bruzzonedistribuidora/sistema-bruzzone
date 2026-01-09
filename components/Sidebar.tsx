@@ -8,7 +8,7 @@ import {
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Scale, Activity, Settings2, DollarSign, Key, LogOut
+    Scale, Activity, Settings2, DollarSign, Key, LogOut, Laptop2
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
@@ -170,6 +170,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                     {isModuleEnabled(ViewState.REMITOS) && <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />}
                     {isModuleEnabled(ViewState.PRESUPUESTOS) && <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />}
                     <DropdownItem view={ViewState.CLIENTS} label="Clientes" icon={Users} active={activeView === ViewState.CLIENTS} onClick={() => handleNav(ViewState.CLIENTS)} />
+                </NavDropdown>
+
+                <NavDropdown id="digital" label="E-Commerce" icon={Globe}>
+                    {isModuleEnabled(ViewState.ECOMMERCE_ADMIN) && <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Gestión Web" icon={Laptop2} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />}
+                    {isModuleEnabled(ViewState.ONLINE_SALES) && <DropdownItem view={ViewState.ONLINE_SALES} label="Hub Canales" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />}
+                    {isModuleEnabled(ViewState.MARKETING) && <DropdownItem view={ViewState.MARKETING} label="Fidelización" icon={Tag} active={activeView === ViewState.MARKETING} onClick={() => handleNav(ViewState.MARKETING)} />}
                 </NavDropdown>
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
