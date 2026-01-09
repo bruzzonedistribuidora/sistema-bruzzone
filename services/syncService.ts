@@ -6,10 +6,17 @@ export type SyncStatus = 'OFFLINE' | 'CONNECTING' | 'SYNCED' | 'DOWNLOADING' | '
 class SyncService {
     private isAutoSyncEnabled: boolean = false;
     private vaultId: string = '';
-    private pollInterval: any = null;
+    private channel: BroadcastChannel;
 
     constructor() {
         this.loadConfig();
+        // Comunicación en tiempo real entre pestañas/ventas del mismo PC
+        this.channel = new BroadcastChannel('ferrecloud_sync_channel');
+        this.channel.onmessage = (event) => {
+            if (event.data.type === 'REFRESH_REQUIRED') {
+                window.dispatchEvent(new Event('ferrecloud_products_updated'));
+            }
+        };
     }
 
     private loadConfig() {
@@ -25,92 +32,76 @@ class SyncService {
         }
     }
 
-    // Genera un "Paquete ADN" con toda la base de datos para mover entre PCs
-    async generateSyncPackage(): Promise<string> {
+    // Genera un archivo descargable con toda la base de datos
+    async exportVaultFile() {
         const products = await productDB.getAll();
         const config = localStorage.getItem('company_config');
         const clients = localStorage.getItem('ferrecloud_clients');
+        const brands = localStorage.getItem('ferrecloud_brands');
+        const categories = localStorage.getItem('ferrecloud_categories');
         
         const packageData = {
             ts: Date.now(),
             vaultId: this.vaultId,
             products,
             clients: clients ? JSON.parse(clients) : [],
+            brands: brands ? JSON.parse(brands) : [],
+            categories: categories ? JSON.parse(categories) : [],
             config: config ? JSON.parse(config) : {}
         };
 
-        // Comprimimos mínimamente convirtiendo a base64 para evitar errores de pegado
-        return btoa(unescape(encodeURIComponent(JSON.stringify(packageData))));
+        const blob = new Blob([JSON.stringify(packageData)], { type: 'application/ferrecloud' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `BOVEDA_${this.vaultId}_${new Date().toISOString().split('T')[0]}.ferrecloud`;
+        link.click();
+        URL.revokeObjectURL(url);
     }
 
-    // Restaura un paquete ADN recibido de otra PC
-    async importSyncPackage(base64Data: string): Promise<boolean> {
-        try {
-            const jsonStr = decodeURIComponent(escape(atob(base64Data)));
-            const data = JSON.parse(jsonStr);
+    // Importa un archivo recibido de otra PC
+    async importVaultFile(file: File): Promise<boolean> {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target?.result as string);
+                    if (!data.products) throw new Error("Archivo inválido");
 
-            if (!data.products) return false;
+                    await productDB.clearAll();
+                    // Guardar en bloques para no saturar memoria
+                    await productDB.saveBulk(data.products);
+                    
+                    if (data.clients) localStorage.setItem('ferrecloud_clients', JSON.stringify(data.clients));
+                    if (data.config) localStorage.setItem('company_config', JSON.stringify(data.config));
+                    if (data.brands) localStorage.setItem('ferrecloud_brands', JSON.stringify(data.brands));
+                    if (data.categories) localStorage.setItem('ferrecloud_categories', JSON.stringify(data.categories));
 
-            await productDB.clearAll();
-            await productDB.saveBulk(data.products);
-            
-            if (data.clients) localStorage.setItem('ferrecloud_clients', JSON.stringify(data.clients));
-            if (data.config) localStorage.setItem('company_config', JSON.stringify(data.config));
-
-            window.dispatchEvent(new Event('ferrecloud_products_updated'));
-            window.dispatchEvent(new Event('company_config_updated'));
-            return true;
-        } catch (e) {
-            console.error("Error al importar paquete:", e);
-            return false;
-        }
+                    window.dispatchEvent(new Event('ferrecloud_products_updated'));
+                    window.dispatchEvent(new Event('company_config_updated'));
+                    this.notifyTabs();
+                    resolve(true);
+                } catch (err) {
+                    console.error("Error importando:", err);
+                    resolve(false);
+                }
+            };
+            reader.readAsText(file);
+        });
     }
 
-    async pullFullDatabase(): Promise<boolean> {
-        // En una implementación real con servidor, aquí se haría un fetch()
-        // Como estamos en un ambiente sandbox, simulamos la sincronización de nube local
-        const vaultDataKey = `ferrecloud_vault_data_${this.vaultId}`;
-        const cloudDataRaw = localStorage.getItem(vaultDataKey);
-        
-        if (!cloudDataRaw) return false;
-
-        try {
-            const data = JSON.parse(cloudDataRaw);
-            if (data.products) {
-                await productDB.saveBulk(data.products);
-                window.dispatchEvent(new Event('ferrecloud_products_updated'));
-            }
-            return true;
-        } catch (e) {
-            return false;
-        }
+    notifyTabs() {
+        this.channel.postMessage({ type: 'REFRESH_REQUIRED' });
     }
 
     async pushToCloud(data: any, type: string) {
-        this.loadConfig();
-        if (!this.isAutoSyncEnabled || !this.vaultId) return false;
-
-        // Simulamos la persistencia en "Nube" (que otras PCs leerían si tuviéramos backend)
-        const vaultDataKey = `ferrecloud_vault_data_${this.vaultId}`;
-        const currentProducts = await productDB.getAll();
-        
-        localStorage.setItem(vaultDataKey, JSON.stringify({
-            products: currentProducts,
-            lastUpdate: Date.now()
-        }));
-
-        console.log(`[Sync] Datos enviados a boveda ${this.vaultId}`);
+        this.notifyTabs();
         return true;
     }
 
     async initializeBootstrap(): Promise<SyncStatus> {
         this.loadConfig();
-        if (!this.isAutoSyncEnabled) return 'OFFLINE';
-        return 'SYNCED';
-    }
-
-    async syncEverything() {
-        await this.pushToCloud({}, 'FULL');
+        return this.isAutoSyncEnabled ? 'SYNCED' : 'OFFLINE';
     }
 
     async linkTerminal(newVaultId: string): Promise<boolean> {
