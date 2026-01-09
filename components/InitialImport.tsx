@@ -28,6 +28,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: true },
         { key: 'name', label: 'Nombre / Descripción', required: true },
         { key: 'listCost', label: 'COSTOS LISTA (Bulto/Unidad)', required: true },
+        { key: 'purchasePackageQuantity', label: 'Cant. por Bulto', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro / Categoría', required: false },
         { key: 'provider', label: 'Proveedor', required: false },
@@ -124,6 +125,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
                 // Lógica de Precios y Descuentos
                 const listCost = parseNumber(row[mapping.listCost], 0);
+                const packQty = mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1;
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
                 const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
                 const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
@@ -151,6 +153,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || '')).toUpperCase(),
                     description: existingProduct?.description || '',
                     listCost: listCost,
+                    purchasePackageQuantity: packQty,
                     discounts: [d1, d2, d3, 0],
                     costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(4)),
                     profitMargin: margin,
