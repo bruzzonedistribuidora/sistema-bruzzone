@@ -53,6 +53,8 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
 import LicenseConsole from './components/LicenseConsole';
+// Import the LabelPrinting component
+import LabelPrinting from './components/LabelPrinting';
 import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -88,6 +90,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Faltantes", color: "bg-orange-600" },
     [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Repo", color: "bg-emerald-600" },
     [ViewState.LICENSE_MANAGER]: { icon: Key, label: "Root", color: "bg-slate-900" },
+    [ViewState.LABEL_PRINTING]: { icon: Tag, label: "Etiquetas", color: "bg-indigo-400" },
 };
 
 const App: React.FC = () => {
@@ -210,6 +213,7 @@ const App: React.FC = () => {
       case ViewState.SHORTAGES: return <Shortages onGenerateOrders={(items) => { setItemsToBill(null); handleNavigate(ViewState.REPLENISHMENT); }} />;
       case ViewState.REPLENISHMENT: return <Replenishment />;
       case ViewState.LICENSE_MANAGER: return <LicenseConsole />;
+      case ViewState.LABEL_PRINTING: return <LabelPrinting />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
