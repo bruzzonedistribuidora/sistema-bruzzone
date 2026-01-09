@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     RefreshCw, Search, Layers, TrendingUp, Save, 
     Filter, Tag, Package, Building2, CheckCircle,
     Percent, DollarSign, ArrowRight, AlertTriangle,
-    ChevronUp, ChevronDown, Calculator
+    ChevronUp, ChevronDown, Calculator, Info
 } from 'lucide-react';
 import { Product, Brand, Category, Provider } from '../types';
 import { productDB } from '../services/storageService';
@@ -112,7 +113,7 @@ const PriceUpdates: React.FC = () => {
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Proveedor</label>
                         <select 
-                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-50 transition-all"
                             value={filterProvider}
                             onChange={e => setFilterProvider(e.target.value)}
                         >
@@ -123,7 +124,7 @@ const PriceUpdates: React.FC = () => {
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Marca</label>
                         <select 
-                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-50 transition-all"
                             value={filterBrand}
                             onChange={e => setFilterBrand(e.target.value)}
                         >
@@ -134,7 +135,7 @@ const PriceUpdates: React.FC = () => {
                     <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-2">Categoría</label>
                         <select 
-                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                            className="w-full p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-50 transition-all"
                             value={filterCategory}
                             onChange={e => setFilterCategory(e.target.value)}
                         >
@@ -149,7 +150,7 @@ const PriceUpdates: React.FC = () => {
                             <input 
                                 type="text" 
                                 placeholder="Nombre o SKU..."
-                                className="w-full pl-9 p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                                className="w-full pl-9 p-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-50 transition-all"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                             />
@@ -244,7 +245,7 @@ const PriceUpdates: React.FC = () => {
                             <button 
                                 onClick={handleApplyUpdate}
                                 disabled={isApplying || !increasePercent || filteredProducts.length === 0}
-                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/50 transition-all active:scale-95 disabled:opacity-20 flex items-center justify-center gap-3 text-xs"
+                                className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/50 transition-all active:scale-95 disabled:opacity-20 flex items-center justify-center gap-3 text-xs"
                             >
                                 {isApplying ? <RefreshCw className="animate-spin" size={20}/> : <Save size={20}/>}
                                 APLICAR CAMBIOS
