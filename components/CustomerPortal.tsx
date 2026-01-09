@@ -5,7 +5,8 @@ import {
     CheckCircle, CreditCard, Banknote, Copy, X, ExternalLink, 
     ChevronRight, Smartphone, Landmark, Check, Eye, Printer, 
     Share2, Mail, MessageCircle, Download, Package, QrCode,
-    ArrowLeft, ShieldCheck, Clock, User, AlertTriangle, Info
+    ArrowLeft, ShieldCheck, Clock, User, AlertTriangle, Info,
+    Send, Headset
 } from 'lucide-react';
 import { Client, CurrentAccountMovement, CompanyConfig, PaymentAccount } from '../types';
 
@@ -36,7 +37,9 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : {
-            name: 'FERRETERIA BRUZZONE S.A.',
+            fantasyName: 'FERRETERÍA BRUZZONE S.A.',
+            whatsappNumber: '5491144556677',
+            email: 'administracion@ferrebruzzone.com.ar',
             paymentAccounts: [
                 { id: 'def-1', type: 'VIRTUAL_WALLET', bankName: 'Mercado Pago', alias: 'ferre.bruzzone.mp', cbu: '', owner: 'Bruzzone SA', active: true },
                 { id: 'def-2', type: 'BANK', bankName: 'Banco Galicia', alias: 'bruzzone.galicia', cbu: '0070012345678901234567', owner: 'Bruzzone SA', active: true }
@@ -45,7 +48,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
     }, []);
 
     const activeAccounts = useMemo(() => 
-        companyConfig.paymentAccounts.filter(acc => acc.active), 
+        (companyConfig.paymentAccounts || []).filter(acc => acc.active), 
     [companyConfig]);
 
     const handleCopy = (text: string, type: 'ALIAS' | 'CBU') => {
@@ -54,13 +57,25 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
         setTimeout(() => setCopyType('NONE'), 2000);
     };
 
+    const handleWhatsAppContact = () => {
+        const message = `Hola, soy ${client.name}. Envío este mensaje desde el Portal de Clientes para realizar una consulta o enviar un comprobante. Mi saldo actual es de $${client.balance.toLocaleString('es-AR')}.`;
+        const encoded = encodeURIComponent(message);
+        const phone = companyConfig.whatsappNumber?.replace(/[^0-9]/g, '') || '5491144556677';
+        window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
+    };
+
+    const handleEmailContact = () => {
+        const subject = `Consulta/Comprobante - ${client.name}`;
+        const body = `Hola equipo de ${companyConfig.fantasyName},\n\nSoy ${client.name} (CUIT: ${client.cuit}). Adjunto envío información referente a mi cuenta corriente.\n\nSaldo actual: $${client.balance.toLocaleString('es-AR')}.`;
+        window.location.href = `mailto:${companyConfig.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    };
+
     return (
         <div className="h-full w-full bg-slate-50 font-sans flex flex-col animate-fade-in overflow-hidden border-l border-gray-200">
             {/* HEADER COMPACTO */}
             <header className="bg-white border-b border-gray-200 px-6 h-16 flex justify-between items-center shadow-sm shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-md">
-                        {/* Import check: User is now imported from lucide-react */}
                         <User size={20} />
                     </div>
                     <div>
@@ -69,20 +84,30 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-green-50 text-green-600 rounded-full border border-green-100 text-[10px] font-black uppercase tracking-widest">
-                        <ShieldCheck size={12}/> Sesión Segura
-                    </div>
+                    <button 
+                        onClick={handleWhatsAppContact}
+                        className="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all border border-green-100 hidden sm:flex"
+                        title="Contactar por WhatsApp">
+                        <MessageCircle size={18}/>
+                    </button>
+                    <button 
+                        onClick={handleEmailContact}
+                        className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all border border-blue-100 hidden sm:flex"
+                        title="Enviar Correo">
+                        <Mail size={18}/>
+                    </button>
+                    <div className="h-8 w-px bg-slate-100 mx-1 hidden sm:block"></div>
                     <button onClick={onLogout} className="text-gray-400 hover:text-red-600 flex items-center gap-2 bg-gray-50 px-4 py-1.5 rounded-xl text-[10px] font-black transition-all border border-gray-100 uppercase tracking-widest">
-                        <LogOut size={14} /> Salir del Portal
+                        <LogOut size={14} /> Salir
                     </button>
                 </div>
             </header>
 
             {/* CONTENIDO SCROLLABLE */}
             <main className="flex-1 overflow-y-auto custom-scrollbar">
-                <div className="max-w-5xl mx-auto px-6 py-8 space-y-8 pb-20">
+                <div className="max-w-5xl mx-auto px-6 py-8 space-y-6 pb-20">
                     
-                    {/* SALDO CARD - REDISEÑADA PARA ESPACIO */}
+                    {/* SALDO CARD */}
                     <div className="relative overflow-hidden bg-slate-900 rounded-[2.5rem] p-8 md:p-10 text-white shadow-2xl shadow-slate-300">
                         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                             <TrendingUp size={180}/>
@@ -96,24 +121,54 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                     </span>
                                     <span className="text-slate-500 text-xs uppercase font-bold tracking-widest mt-2">Saldo Total Adeudado</span>
                                 </div>
-                                <div className="flex items-center justify-center lg:justify-start gap-3 text-slate-500 text-[10px] font-black uppercase tracking-widest mt-6">
-                                    <Clock size={12} /> Última actualización: Hoy {new Date().toLocaleTimeString().slice(0, 5)}
-                                </div>
                             </div>
                             <div className="flex flex-col gap-3">
                                 <button 
                                     onClick={() => { setPaymentStatus('SELECTION'); setIsPaymentModalOpen(true); }}
-                                    className="w-full bg-green-500 text-white py-5 rounded-[1.5rem] font-black hover:bg-green-400 shadow-xl shadow-green-500/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 text-lg uppercase tracking-widest">
+                                    className="w-full bg-green-500 text-white py-5 rounded-[1.5rem] font-black hover:bg-green-400 shadow-xl shadow-green-500/20 transition-all flex items-center justify-center gap-3 text-lg uppercase tracking-widest">
                                     <CreditCard size={24}/> Informar un Pago
                                 </button>
-                                <button className="w-full bg-white/10 text-white py-3 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2">
-                                    <Download size={14}/> Descargar Resumen (PDF)
-                                </button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={handleWhatsAppContact} className="bg-white/10 text-white py-3 rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest hover:bg-green-600 transition-all flex items-center justify-center gap-2">
+                                        <MessageCircle size={14}/> WhatsApp
+                                    </button>
+                                    <button onClick={handleEmailContact} className="bg-white/10 text-white py-3 rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center justify-center gap-2">
+                                        <Mail size={14}/> Email
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* TABLA DE MOVIMIENTOS - AJUSTADA */}
+                    {/* BOTONES DE SOPORTE RÁPIDO */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex items-center gap-6 group hover:border-indigo-200 transition-all">
+                            <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                <Headset size={24}/>
+                            </div>
+                            <div>
+                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-tight">Atención al Cliente</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-tight">Envíanos tus dudas por WhatsApp o Email</p>
+                                <div className="flex gap-4 mt-3">
+                                    <button onClick={handleWhatsAppContact} className="text-[10px] font-black text-green-600 uppercase hover:underline">Chat Directo</button>
+                                    <button onClick={handleEmailContact} className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Escribir Correo</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex items-center gap-6 group hover:border-emerald-200 transition-all">
+                            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                                <FileText size={24}/>
+                            </div>
+                            <div>
+                                <h4 className="font-black text-slate-800 uppercase text-xs tracking-tight">Envío de Comprobantes</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-tight">Informa tus transferencias para conciliación</p>
+                                <button onClick={() => setIsPaymentModalOpen(true)} className="text-[10px] font-black text-emerald-600 uppercase hover:underline mt-3 block">Ver Cuentas de Pago</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* TABLA DE MOVIMIENTOS */}
                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
                             <h4 className="font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 text-[10px]">
@@ -167,7 +222,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                 </div>
             </main>
 
-            {/* MODAL: MEDIOS DE PAGO - FIJADO AL VIEWPORT */}
+            {/* MODAL: MEDIOS DE PAGO */}
             {isPaymentModalOpen && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -186,7 +241,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                     <div className="space-y-3">
                                         {activeAccounts.length === 0 ? (
                                             <div className="p-10 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                                {/* Import check: AlertTriangle is now imported from lucide-react */}
                                                 <AlertTriangle size={32} className="mx-auto text-amber-500 mb-2" />
                                                 <p className="text-[10px] font-black uppercase text-slate-400">Sin cuentas configuradas</p>
                                             </div>
@@ -216,15 +270,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                         <h4 className="font-black text-xl uppercase tracking-tighter leading-none mb-1">{selectedAccount.bankName}</h4>
                                         <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{selectedAccount.owner}</p>
                                     </div>
-
-                                    {selectedAccount.qrImage && (
-                                        <div className="flex flex-col items-center gap-2 p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem]">
-                                            <div className="w-40 h-40 bg-white rounded-xl overflow-hidden shadow-inner flex items-center justify-center p-2">
-                                                <img src={selectedAccount.qrImage} alt="QR" className="w-full h-full object-contain" />
-                                            </div>
-                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Escaneá para pagar</p>
-                                        </div>
-                                    )}
 
                                     <div className="space-y-4">
                                         <div className="space-y-1.5">
@@ -269,10 +314,15 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                         <CheckCircle size={48}/>
                                     </div>
                                     <div>
-                                        <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">¡Recibido!</h4>
-                                        <p className="text-gray-500 text-xs font-medium mt-3 max-w-[240px] mx-auto leading-relaxed">Tu aviso de pago está en revisión. Actualizaremos tu saldo apenas validemos la transferencia.</p>
+                                        <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">¡Aviso Enviado!</h4>
+                                        <p className="text-gray-500 text-xs font-medium mt-3 max-w-[240px] mx-auto leading-relaxed">Su reporte está en revisión. Se acreditará tras la validación bancaria.</p>
                                     </div>
-                                    <button onClick={() => setIsPaymentModalOpen(false)} className="w-full bg-slate-900 text-white py-4 rounded-[1.2rem] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-transform text-xs">Aceptar y Volver</button>
+                                    <div className="pt-4 space-y-3">
+                                        <button onClick={handleWhatsAppContact} className="w-full bg-green-500 text-white py-4 rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg">
+                                            <MessageCircle size={16}/> Enviar Comprobante por WhatsApp
+                                        </button>
+                                        <button onClick={() => setIsPaymentModalOpen(false)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-transform text-[9px]">Cerrar Ventana</button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -280,7 +330,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                 </div>
             )}
 
-            {/* MODAL: VER COMPROBANTE DETALLADO - FIJADO AL VIEWPORT */}
+            {/* MODAL: VER COMPROBANTE DETALLADO */}
             {viewingVoucher && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white w-full max-w-lg shadow-2xl rounded-[2.5rem] overflow-hidden flex flex-col max-h-[85vh]">
@@ -313,7 +363,6 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                             
                             <div className="space-y-3">
                                 <h4 className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    {/* Import check: Info is now imported from lucide-react */}
                                     <Info size={12} className="text-indigo-600"/> Concepto del Movimiento
                                 </h4>
                                 <div className="p-6 bg-slate-50 rounded-2xl border border-slate-200">
@@ -325,8 +374,10 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ client, onLogout }) => 
                                 <button className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95">
                                     <Download size={14}/> PDF COMPLETO
                                 </button>
-                                <button className="p-4 bg-green-50 text-green-600 rounded-2xl border border-green-100 hover:bg-green-100 transition-all active:scale-90">
-                                    <Share2 size={18}/>
+                                <button 
+                                    onClick={handleWhatsAppContact}
+                                    className="p-4 bg-green-50 text-green-600 rounded-2xl border border-green-100 hover:bg-green-100 transition-all active:scale-90">
+                                    <MessageCircle size={18}/>
                                 </button>
                             </div>
                         </div>
