@@ -4,7 +4,7 @@ import {
     Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
     Calculator, Layers, ClipboardList, Bot, X, Plus,
     FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
-    ShoppingBag, Laptop, PackagePlus, Globe, Key
+    ShoppingBag, Laptop, PackagePlus, Globe, Key, Network
 } from 'lucide-react';
 import { ViewState, SystemLicense } from '../types';
 
@@ -36,12 +36,12 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.REMITOS, label: "Remitos", category: "Ventas", icon: ClipboardList, color: "bg-blue-600" },
     { id: ViewState.PRESUPUESTOS, label: "Presupuestos", category: "Ventas", icon: FileSpreadsheet, color: "bg-teal-500" },
     { id: ViewState.AI_ASSISTANT, label: "FerreBot IA", category: "Inteligencia", icon: Bot, color: "bg-indigo-900" },
-    { id: ViewState.CLOUD_HUB, label: "Nube Central", category: "Sistema", icon: Globe, color: "bg-indigo-800" },
+    { id: ViewState.CLOUD_HUB, label: "Nube / Red LAN", category: "Sistema", icon: Network, color: "bg-indigo-800" },
     { id: ViewState.LICENSE_MANAGER, label: "Licencias (ROOT)", category: "Administración", icon: Key, color: "bg-slate-900" },
 ];
 
 const DEFAULT_SHORTCUTS = [
-    ViewState.POS, ViewState.INVENTORY, ViewState.STOCK_ADJUSTMENT, 
+    ViewState.POS, ViewState.INVENTORY, ViewState.CLOUD_HUB, 
     ViewState.REPLENISHMENT, ViewState.TREASURY, ViewState.CLIENTS
 ];
 
