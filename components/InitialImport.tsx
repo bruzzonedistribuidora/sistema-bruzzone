@@ -23,11 +23,11 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const [stats, setStats] = useState({ created: 0, updated: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Listado exhaustivo basado en el fichero real de la ferretería
     const productFields = [
-        { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: true },
+        { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: false }, // Cambiado a opcional para permitir fallback
+        { key: 'barcodes', label: 'Código de Barras (EAN)', required: false },
         { key: 'name', label: 'Nombre / Descripción', required: true },
-        { key: 'listCost', label: 'COSTOS LISTA (Bulto/Unidad)', required: true },
+        { key: 'listCost', label: 'COSTOS LISTA', required: true },
         { key: 'purchasePackageQuantity', label: 'Cant. por Bulto', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro / Categoría', required: false },
@@ -41,18 +41,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'reorderPoint', label: 'Punto Pedido', required: false },
         { key: 'profitMargin', label: 'Porcentaje Ganancia (%)', required: false },
         { key: 'vatRate', label: 'Tasa (IVA %)', required: false },
-        { key: 'tasa', label: 'Tasa (Imp. Internos / Percep)', required: false },
         { key: 'disc1', label: 'Descuento 1 (%)', required: false },
-        { key: 'disc2', label: 'Descuento 2 (%)', required: false },
-        { key: 'disc3', label: 'Descuento 3 (%)', required: false },
-        { key: 'measureUnitPurchase', label: '1DeMedidaCompra', required: false },
-        { key: 'monedaCompra', label: 'Moneda Compra (ARS/USD)', required: false },
-        { key: 'monedaVenta', label: 'Moneda Venta (ARS/USD)', required: false },
-        { key: 'barcodes', label: 'Código de Barras (EAN)', required: false },
-        { key: 'providerCodes', label: 'Cod PROV (Ref Proveedor)', required: false },
-        { key: 'otrosCodigos1', label: 'Otros Codigos 1', required: false },
-        { key: 'otrosCodigos2', label: 'Otros Codigos 2', required: false },
-        { key: 'otrosCodigos3', label: 'Otros Codigos 3', required: false },
+        { key: 'measureUnitPurchase', label: 'U. Medida', required: false },
+        { key: 'providerCodes', label: 'Ref Proveedor', required: false },
     ];
 
     const parseNumber = (val: any, defaultValue: number): number => {
@@ -78,7 +69,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             setHeaders(parsedRows[0]);
             setFileRows(parsedRows.slice(1));
             
-            // Auto-mapeo inteligente por nombre de columna
             const autoMap: Record<string, number> = {};
             productFields.forEach(field => {
                 const index = parsedRows[0].findIndex(h => {
@@ -95,8 +85,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     };
 
     const processImport = async () => {
-        if (mapping.internalCodes === undefined || mapping.name === undefined || mapping.listCost === undefined) {
-            alert("Mapeo insuficiente: CODIGO, Nombre y Costo son obligatorios.");
+        if (mapping.name === undefined || mapping.listCost === undefined) {
+            alert("Mapeo insuficiente: Nombre y Costo son obligatorios.");
             return;
         }
 
@@ -118,59 +108,57 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
-                const sku = row[mapping.internalCodes]?.toString().toUpperCase();
-                if (!sku) continue;
+                
+                // LÓGICA DE FALLBACK PARA ARTÍCULOS SIN CÓDIGO PROPIO
+                let sku = row[mapping.internalCodes]?.toString().toUpperCase();
+                const barcode = row[mapping.barcodes]?.toString();
+                
+                if (!sku && barcode) {
+                    sku = barcode; // Si no hay SKU, usamos el código de barras como SKU
+                }
+                
+                if (!sku) continue; // Si no hay ninguno de los dos, ignoramos la fila
 
                 const existingProduct = productMap.get(sku);
 
-                // Lógica de Precios y Descuentos
                 const listCost = parseNumber(row[mapping.listCost], 0);
-                const packQty = mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1;
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
-                const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
-                const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
                 const margin = mapping.profitMargin !== undefined ? parseNumber(row[mapping.profitMargin], 30) : 30;
                 const vat = mapping.vatRate !== undefined ? parseNumber(row[mapping.vatRate], 21) : 21;
-                const extraTax = mapping.tasa !== undefined ? parseNumber(row[mapping.tasa], 0) : 0;
 
-                const coef = (1 - d1/100) * (1 - d2/100) * (1 - d3/100);
+                const coef = (1 - d1/100);
                 const costAfterDiscounts = listCost * coef;
                 const priceNeto = costAfterDiscounts * (1 + margin/100);
-                // El PVP Final incluye IVA + Tasa extra si existe
-                const priceFinal = (priceNeto * (1 + vat/100)) + extraTax;
+                const priceFinal = (priceNeto * (1 + vat/100));
 
                 const productData: Product = {
-                    id: existingProduct?.id || `PROD-${Date.now()}-${i}`,
+                    id: existingProduct?.id || `PROD-${sku}-${Date.now()}`,
                     internalCodes: [sku],
-                    barcodes: mapping.barcodes !== undefined ? [row[mapping.barcodes]] : (existingProduct?.barcodes || []),
+                    barcodes: barcode ? [barcode] : (existingProduct?.barcodes || []),
                     providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : (existingProduct?.providerCodes || []),
-                    otrosCodigos1: mapping.otrosCodigos1 !== undefined ? row[mapping.otrosCodigos1] : existingProduct?.otrosCodigos1,
-                    otrosCodigos2: mapping.otrosCodigos2 !== undefined ? row[mapping.otrosCodigos2] : existingProduct?.otrosCodigos2,
-                    otrosCodigos3: mapping.otrosCodigos3 !== undefined ? row[mapping.otrosCodigos3] : existingProduct?.otrosCodigos3,
                     name: (row[mapping.name] || 'ARTICULO SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : (existingProduct?.brand || 'GENÉRICO')).toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : (existingProduct?.category || 'GENERAL')).toUpperCase(),
                     provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || '')).toUpperCase(),
                     description: existingProduct?.description || '',
                     listCost: listCost,
-                    purchasePackageQuantity: packQty,
-                    discounts: [d1, d2, d3, 0],
+                    purchasePackageQuantity: mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1,
+                    discounts: [d1, 0, 0, 0],
                     costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(4)),
                     profitMargin: margin,
                     vatRate: vat,
-                    tasa: extraTax,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
                     priceFinal: parseFloat(priceFinal.toFixed(2)),
+                    stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
                     stockPrincipal: mapping.stockPrincipal !== undefined ? parseNumber(row[mapping.stockPrincipal], 0) : (existingProduct?.stockPrincipal || 0),
                     stockDeposito: mapping.stockDeposito !== undefined ? parseNumber(row[mapping.stockDeposito], 0) : (existingProduct?.stockDeposito || 0),
                     stockSucursal: mapping.stockSucursal !== undefined ? parseNumber(row[mapping.stockSucursal], 0) : (existingProduct?.stockSucursal || 0),
-                    stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
                     stockMinimo: mapping.stockMinimo !== undefined ? parseNumber(row[mapping.stockMinimo], 0) : (existingProduct?.stockMinimo || 0),
                     stockMaximo: mapping.stockMaximo !== undefined ? parseNumber(row[mapping.stockMaximo], 0) : (existingProduct?.stockMaximo || 0),
                     reorderPoint: mapping.reorderPoint !== undefined ? parseNumber(row[mapping.reorderPoint], 0) : (existingProduct?.reorderPoint || 0),
                     measureUnitPurchase: (mapping.measureUnitPurchase !== undefined ? row[mapping.measureUnitPurchase] : (existingProduct?.measureUnitPurchase || 'UNIDAD')).toUpperCase(),
-                    purchaseCurrency: (mapping.monedaCompra !== undefined ? row[mapping.monedaCompra] : (existingProduct?.purchaseCurrency || 'ARS')).toUpperCase(),
-                    saleCurrency: (mapping.monedaVenta !== undefined ? row[mapping.monedaVenta] : (existingProduct?.saleCurrency || 'ARS')).toUpperCase(),
+                    purchaseCurrency: 'ARS',
+                    saleCurrency: 'ARS',
                     location: existingProduct?.location || '',
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
                     isCombo: existingProduct?.isCombo || false,
@@ -205,20 +193,13 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 shrink-0">
                 <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Sincronización de Base de Datos</h2>
-                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Procesador de Ficheros Pro (+140k registros)</p>
+                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Importador Inteligente</h2>
+                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Soporta artículos sin SKU (usa Código de Barras)</p>
                 </div>
                 {step === 2 && (
                     <div className="ml-auto flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-[9px] font-black text-slate-400 uppercase">Criterio:</p>
-                            <select className="bg-slate-50 border rounded-lg p-1 text-[10px] font-black uppercase" value={matchKey} onChange={e => setMatchKey(e.target.value)}>
-                                <option value="internalCodes">Por CODIGO Propio</option>
-                                <option value="barcodes">Por Cod. de Barras</option>
-                            </select>
-                        </div>
                         <button onClick={processImport} disabled={isProcessing} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 hover:bg-indigo-600 transition-all">
-                             {isProcessing ? <RefreshCw className="animate-spin" size={14}/> : <CheckCircle size={14}/>} {isProcessing ? 'Sincronizando...' : 'Iniciar Carga'}
+                             {isProcessing ? <RefreshCw className="animate-spin" size={14}/> : <CheckCircle size={14}/>} {isProcessing ? 'Procesando...' : 'Iniciar Carga'}
                         </button>
                     </div>
                 )}
@@ -234,7 +215,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                             <FileUp size={48} className="text-slate-200 mx-auto mb-4 group-hover:text-indigo-400 group-hover:scale-110 transition-transform" />
                             <span className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">Seleccionar CSV / TXT</span>
                         </div>
-                        <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Formatos admitidos: Separado por ";" o Tabulación</p>
                     </div>
                 </div>
             )}
@@ -244,7 +224,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     <div className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                         <div className="flex items-center gap-3 mb-6 border-b pb-4 shrink-0">
                             <Settings2 size={18} className="text-indigo-600"/>
-                            <h3 className="text-xs font-black uppercase tracking-widest">Configurar Mapeo de Columnas</h3>
+                            <h3 className="text-xs font-black uppercase tracking-widest">Mapeo de Columnas</h3>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 space-y-2">
                             {productFields.map(field => (
@@ -264,22 +244,11 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                 </div>
                             ))}
                         </div>
-                        {isProcessing && (
-                            <div className="mt-6 space-y-2 shrink-0">
-                                <div className="flex justify-between text-[10px] font-black uppercase text-indigo-600">
-                                    <span>Progreso General</span>
-                                    <span>{progress}%</span>
-                                </div>
-                                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-600 transition-all duration-500 shadow-lg" style={{ width: `${progress}%` }}></div>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <div className="lg:col-span-7 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Vista Previa de Origen ({fileRows.length.toLocaleString()} filas)</h3>
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Vista Previa ({fileRows.length.toLocaleString()} filas)</h3>
                         </div>
                         <div className="overflow-auto flex-1 custom-scrollbar">
                             <table className="w-full text-left border-collapse">
@@ -296,9 +265,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                     ))}
                                 </tbody>
                             </table>
-                            {fileRows.length > 30 && (
-                                <div className="p-4 text-center text-slate-300 font-bold uppercase text-[9px] italic border-t">... y {(fileRows.length - 30).toLocaleString()} filas más ...</div>
-                            )}
                         </div>
                     </div>
                 </div>
