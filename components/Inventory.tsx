@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Search, Plus, Package, X, Save, DollarSign, 
     Barcode, Pen, Trash2, Tag, Layers, Info, 
@@ -7,7 +7,7 @@ import {
     Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
     Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
     PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet,
-    PackagePlus, Link2
+    PackagePlus, Link2, Upload
 } from 'lucide-react';
 import { Product, Provider, CompanyConfig, Branch, Brand, Category } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -19,23 +19,19 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [isExporting, setIsExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState<{type: 'BRAND' | 'CATEGORY', active: boolean}>({type: 'BRAND', active: false});
   
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [entityForm, setEntityForm] = useState<{id?: string, name: string}>({ name: '' });
-  const [quickAddName, setQuickAddName] = useState('');
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
 
-  const [bulkCost, setBulkCost] = useState<number>(0);
-
   const providers: Provider[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'), []);
-  const branches: Branch[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_branches') || '[]'), []);
 
   useEffect(() => { localStorage.setItem('ferrecloud_brands', JSON.stringify(brands)); }, [brands]);
   useEffect(() => { localStorage.setItem('ferrecloud_categories', JSON.stringify(categories)); }, [categories]);
@@ -45,7 +41,7 @@ const Inventory: React.FC = () => {
           const results = await productDB.search(searchTerm);
           setProducts(results);
       } else {
-          const initial = await productDB.getAll(150);
+          const initial = await productDB.getAll(100);
           setProducts(initial);
       }
   };
@@ -60,35 +56,8 @@ const Inventory: React.FC = () => {
   const sortedProducts = useMemo(() => {
     let sortableItems = [...products];
     sortableItems.sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        switch (sortConfig.key) {
-            case 'code':
-                aValue = a.internalCodes?.[0] || '';
-                bValue = b.internalCodes?.[0] || '';
-                break;
-            case 'name':
-                aValue = (a.name || '').toLowerCase();
-                bValue = (b.name || '').toLowerCase();
-                break;
-            case 'category':
-                aValue = (a.category || '').toLowerCase();
-                bValue = (b.category || '').toLowerCase();
-                break;
-            case 'stock':
-                aValue = a.stock || 0;
-                bValue = b.stock || 0;
-                break;
-            case 'price':
-                aValue = a.priceFinal || 0;
-                bValue = b.priceFinal || 0;
-                break;
-            default:
-                aValue = a[sortConfig.key as keyof Product] || '';
-                bValue = b[sortConfig.key as keyof Product] || '';
-        }
-
+        let aValue = a[sortConfig.key as keyof Product] || '';
+        let bValue = b[sortConfig.key as keyof Product] || '';
         if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
         return 0;
@@ -97,98 +66,73 @@ const Inventory: React.FC = () => {
   }, [products, sortConfig]);
 
   const requestSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
+    let direction: 'asc' | 'desc' = (sortConfig.key === key && sortConfig.direction === 'asc') ? 'desc' : 'asc';
     setSortConfig({ key, direction });
   };
 
-  const getSortIcon = (key: string) => {
-    if (sortConfig.key !== key) return <div className="w-3 h-3 opacity-20"><ChevronUp size={12}/></div>;
-    return sortConfig.direction === 'asc' ? <ChevronUp size={12} className="text-indigo-400"/> : <ChevronDown size={12} className="text-indigo-400"/>;
+  // --- FUNCIONES DE IMPORT/EXPORT PARA MARCAS Y RUBROS ---
+  const exportEntities = (type: 'BRANDS' | 'CATEGORIES') => {
+    const data = type === 'BRANDS' ? brands : categories;
+    const headers = "ID;NOMBRE\n";
+    const csv = data.map(item => `${item.id};${item.name}`).join("\n");
+    const blob = new Blob(["\uFEFF" + headers + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${type}_EXPORT.csv`;
+    link.click();
   };
 
-  const handlePedir = (p: Product) => {
-      if (addToReplenishmentQueue(p)) {
-          alert(`Articulo ${p.name} agregado.`);
-      }
-  };
+  const importEntities = (e: React.ChangeEvent<HTMLInputElement>, type: 'BRANDS' | 'CATEGORIES') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const lines = content.split("\n").slice(1);
+        const newItems = lines.map(line => {
+            const [id, name] = line.split(";");
+            if (!name) return null;
+            return { id: id || Date.now().toString() + Math.random(), name: name.trim().toUpperCase() };
+        }).filter(Boolean) as any[];
 
-  const handleDeleteProduct = async (p: Product) => {
-      if (confirm(`¿Eliminar "${p.name}"?`)) {
-          await productDB.delete(p.id);
-      }
-  };
-
-  const handleExportCatalog = async () => {
-      setIsExporting(true);
-      try {
-          const all = await productDB.getAll();
-          if (all.length === 0) return;
-
-          const headers = ["SKU", "ARTICULO", "MARCA", "PVP FINAL", "STOCK"];
-          const csvRows = all.map(p => [p.internalCodes[0] || '', p.name, p.brand, p.priceFinal, p.stock]);
-
-          let csvContent = "\uFEFF" + headers.join(";") + "\n";
-          csvRows.forEach(row => { csvContent += row.join(";") + "\n"; });
-
-          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.setAttribute("href", url);
-          link.setAttribute("download", `CATALOGO.csv`);
-          link.click();
-      } finally { setIsExporting(false); }
-  };
-
-  useEffect(() => {
-    const listCost = Number(formData.listCost) || 0;
-    const d1 = Number(formData.discounts?.[0]) || 0;
-    const d2 = Number(formData.discounts?.[1]) || 0;
-    const d3 = Number(formData.discounts?.[2]) || 0;
-    const coefBonif = (1 - d1/100) * (1 - d2/100) * (1 - d3/100);
-    const costAfterDiscounts = listCost * coefBonif;
-    const margin = Number(formData.profitMargin) || 0;
-    const priceNeto = costAfterDiscounts * (1 + margin / 100);
-    const vatRate = Number(formData.vatRate) || 0;
-    const priceFinal = priceNeto * (1 + vatRate / 100);
-    const totalStock = Number(formData.stockPrincipal || 0) + Number(formData.stockDeposito || 0) + Number(formData.stockSucursal || 0);
-
-    setFormData(prev => ({ ...prev, coeficienteBonificacionCosto: parseFloat(coefBonif.toFixed(5)), costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(2)), priceNeto: parseFloat(priceNeto.toFixed(2)), priceFinal: parseFloat(priceFinal.toFixed(2)), stock: totalStock }));
-  }, [formData.listCost, formData.discounts, formData.profitMargin, formData.vatRate, formData.stockPrincipal, formData.stockDeposito, formData.stockSucursal]);
-
-  const handleOpenModal = (p?: Product) => {
-    if (p) {
-        setFormData({ ...p, internalCodes: p.internalCodes || [''], barcodes: p.barcodes || [''], providerCodes: p.providerCodes || [''], discounts: p.discounts || [0, 0, 0, 0] });
-    } else {
-        setFormData({ id: Date.now().toString(), internalCodes: [''], barcodes: [''], providerCodes: [''], purchasePackageQuantity: 1, name: '', brand: '', provider: '', category: '', listCost: 0, profitMargin: 30, vatRate: 21, stock: 0, stockPrincipal: 0, stockDeposito: 0, stockSucursal: 0, discounts: [0, 0, 0, 0] });
-    }
-    setModalTab('GENERAL');
-    setIsModalOpen(true);
+        if (type === 'BRANDS') setBrands(prev => [...prev, ...newItems]);
+        else setCategories(prev => [...prev, ...newItems]);
+        alert(`Importación de ${type} completada.`);
+    };
+    reader.readAsText(file);
   };
 
   return (
     <div className="p-3 h-full flex flex-col space-y-3 bg-slate-50 overflow-hidden font-sans">
-      <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm shrink-0">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-3">
+      <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm shrink-0">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-2">
             <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-slate-900 text-indigo-400 rounded-xl"><Boxes size={24}/></div>
+                <div className="p-2 bg-slate-900 text-indigo-400 rounded-xl"><Boxes size={20}/></div>
                 <div>
-                    <h2 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Stock</h2>
-                    <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none">Catálogo Maestro</p>
+                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-tighter">Inventario Maestro</h2>
+                    <p className="text-slate-400 text-[8px] font-bold uppercase tracking-widest leading-none">Gestión de 140k Artículos</p>
                 </div>
             </div>
 
-            <div className="flex bg-slate-100 rounded-xl p-1 shadow-inner border border-slate-200">
-                <button onClick={() => setInventoryTab('PRODUCTS')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'PRODUCTS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Artículos</button>
-                <button onClick={() => setInventoryTab('BRANDS')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'BRANDS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Marcas</button>
-                <button onClick={() => setInventoryTab('CATEGORIES')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'CATEGORIES' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Rubros</button>
+            <div className="flex bg-slate-100 rounded-xl p-0.5 border border-slate-200">
+                <button onClick={() => setInventoryTab('PRODUCTS')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'PRODUCTS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Artículos</button>
+                <button onClick={() => setInventoryTab('BRANDS')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'BRANDS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Marcas</button>
+                <button onClick={() => setInventoryTab('CATEGORIES')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'CATEGORIES' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Rubros</button>
+                <button onClick={() => setInventoryTab('PROVIDERS')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${inventoryTab === 'PROVIDERS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>Proveedores</button>
             </div>
 
             <div className="flex gap-2">
-                <button onClick={() => inventoryTab === 'PRODUCTS' ? handleOpenModal() : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-black shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest active:scale-95">
-                    <Plus size={14} /> Nuevo {inventoryTab === 'PRODUCTS' ? 'Artículo' : 'Rubro'}
+                {(inventoryTab === 'BRANDS' || inventoryTab === 'CATEGORIES') && (
+                    <div className="flex gap-1 mr-2 border-r pr-2">
+                        <button onClick={() => exportEntities(inventoryTab)} className="p-2 text-slate-500 hover:text-indigo-600" title="Exportar CSV"><Download size={14}/></button>
+                        <label className="p-2 text-slate-500 hover:text-indigo-600 cursor-pointer" title="Importar CSV">
+                            <Upload size={14}/>
+                            <input type="file" className="hidden" accept=".csv" onChange={(e) => importEntities(e, inventoryTab)} />
+                        </label>
+                    </div>
+                )}
+                <button onClick={() => inventoryTab === 'PRODUCTS' ? setIsModalOpen(true) : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black shadow-lg flex items-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest">
+                    <Plus size={14} /> Nuevo
                 </button>
             </div>
           </div>
@@ -196,44 +140,37 @@ const Inventory: React.FC = () => {
 
       <div className="flex-1 overflow-hidden">
         {inventoryTab === 'PRODUCTS' && (
-            <div className="h-full flex flex-col space-y-3 animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 shrink-0 flex gap-2">
+            <div className="h-full flex flex-col space-y-2 animate-fade-in">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-1.5 shrink-0 flex gap-2">
                     <div className="relative flex-1 group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={16} />
-                        <input type="text" placeholder="Buscar artículo..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent rounded-xl text-[11px] font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                        <input type="text" placeholder="Buscar artículo..." className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-transparent rounded-xl text-[10px] font-bold outline-none focus:bg-white focus:border-indigo-100 transition-all uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-hidden flex flex-col">
                     <div className="flex-1 overflow-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse table-fixed">
-                            <thead className="bg-slate-900 sticky top-0 z-20 text-[9px] uppercase font-black text-slate-300 tracking-wider">
+                            <thead className="bg-slate-900 sticky top-0 z-20 text-[8px] uppercase font-black text-slate-300 tracking-wider">
                                 <tr>
-                                    <th className="w-[12%] px-4 py-3 cursor-pointer hover:bg-slate-800" onClick={() => requestSort('code')}>SKU {getSortIcon('code')}</th>
-                                    <th className="w-[45%] px-4 py-3 cursor-pointer hover:bg-slate-800" onClick={() => requestSort('name')}>Descripción {getSortIcon('name')}</th>
-                                    <th className="w-[15%] px-4 py-3 cursor-pointer hover:bg-slate-800 text-center" onClick={() => requestSort('stock')}>Stock {getSortIcon('stock')}</th>
-                                    <th className="w-[18%] px-4 py-3 cursor-pointer hover:bg-slate-700 text-right bg-slate-800" onClick={() => requestSort('price')}>PVP Final {getSortIcon('price')}</th>
-                                    <th className="w-[10%] px-4 py-3 text-center">Gestión</th>
+                                    <th className="w-[15%] px-4 py-3 cursor-pointer" onClick={() => requestSort('internalCodes')}>SKU</th>
+                                    <th className="w-[40%] px-4 py-3 cursor-pointer" onClick={() => requestSort('name')}>Descripción</th>
+                                    <th className="w-[15%] px-4 py-3 text-center cursor-pointer" onClick={() => requestSort('stock')}>Stock</th>
+                                    <th className="w-[15%] px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('priceFinal')}>PVP Final</th>
+                                    <th className="w-[15%] px-4 py-3 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {sortedProducts.map(p => (
-                                    <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
-                                        <td className="px-4 py-2.5"><p className="font-mono font-black text-indigo-700 text-[10px] bg-indigo-50/50 px-1.5 py-0.5 rounded border border-indigo-100/50 truncate">{p.internalCodes?.[0] || 'S/C'}</p></td>
-                                        <td className="px-4 py-2.5">
-                                            <p className="font-black text-slate-800 uppercase text-xs truncate leading-tight">{p.name}</p>
-                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{p.brand} • {p.provider}</p>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-center">
-                                            <span className={`text-sm font-black tracking-tighter ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600' : 'text-slate-900'}`}>{p.stock}</span>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right font-black text-slate-900 bg-indigo-50/5">
-                                            <p className="text-sm tracking-tighter text-indigo-800 font-black">${p.priceFinal?.toLocaleString('es-AR')}</p>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-center">
-                                            <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenModal(p)} className="p-1.5 text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-600 hover:text-white transition-all"><Pen size={12}/></button>
-                                                <button onClick={() => handleDeleteProduct(p)} className="p-1.5 text-red-400 bg-red-50 rounded hover:bg-red-600 hover:text-white transition-all"><Trash2 size={12}/></button>
+                                    <tr key={p.id} className="hover:bg-slate-50 transition-colors text-[10px]">
+                                        <td className="px-4 py-2 font-mono font-bold text-indigo-600 truncate">{p.internalCodes?.[0]}</td>
+                                        <td className="px-4 py-2 font-black uppercase text-slate-700 truncate">{p.name}</td>
+                                        <td className="px-4 py-2 text-center font-bold">{p.stock}</td>
+                                        <td className="px-4 py-2 text-right font-black text-slate-900">${p.priceFinal?.toLocaleString()}</td>
+                                        <td className="px-4 py-2">
+                                            <div className="flex justify-center gap-1">
+                                                <button onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pen size={12}/></button>
+                                                <button onClick={async () => { if(confirm('¿Eliminar?')) await productDB.delete(p.id); }} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={12}/></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -244,8 +181,59 @@ const Inventory: React.FC = () => {
                 </div>
             </div>
         )}
+        {inventoryTab === 'BRANDS' && (
+            <div className="bg-white rounded-2xl border p-4 h-full overflow-y-auto custom-scrollbar animate-fade-in">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {brands.map(b => (
+                        <div key={b.id} className="p-3 bg-slate-50 border rounded-xl flex justify-between items-center group">
+                            <span className="text-[10px] font-black uppercase truncate">{b.name}</span>
+                            <button onClick={() => setBrands(brands.filter(x => x.id !== b.id))} className="text-slate-200 group-hover:text-red-500"><X size={12}/></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+        {inventoryTab === 'CATEGORIES' && (
+            <div className="bg-white rounded-2xl border p-4 h-full overflow-y-auto custom-scrollbar animate-fade-in">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {categories.map(c => (
+                        <div key={c.id} className="p-3 bg-slate-50 border rounded-xl flex justify-between items-center group">
+                            <span className="text-[10px] font-black uppercase truncate">{c.name}</span>
+                            <button onClick={() => setCategories(categories.filter(x => x.id !== c.id))} className="text-slate-200 group-hover:text-red-500"><X size={12}/></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         {inventoryTab === 'PROVIDERS' && <Providers />}
       </div>
+
+      {isEntityModalOpen && (
+          <div className="fixed inset-0 z-[300] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden">
+                  <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                      <h3 className="text-[10px] font-black uppercase tracking-widest">Añadir {inventoryTab === 'BRANDS' ? 'Marca' : 'Rubro'}</h3>
+                      <button onClick={() => setIsEntityModalOpen(false)}><X size={16}/></button>
+                  </div>
+                  <div className="p-5 space-y-4">
+                      <input 
+                        className="w-full p-3 bg-slate-100 border rounded-xl outline-none font-black text-xs uppercase" 
+                        placeholder="Nombre..." 
+                        autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                const val = (e.target as HTMLInputElement).value;
+                                if (inventoryTab === 'BRANDS') setBrands([...brands, { id: Date.now().toString(), name: val.toUpperCase() }]);
+                                else setCategories([...categories, { id: Date.now().toString(), name: val.toUpperCase() }]);
+                                setIsEntityModalOpen(false);
+                            }
+                        }}
+                      />
+                      <p className="text-[8px] text-slate-400 uppercase text-center">Presione ENTER para guardar</p>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
