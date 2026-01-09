@@ -4,9 +4,9 @@ import {
     ArrowUpRight, ArrowDownLeft, Scale, ShieldCheck, 
     ShieldAlert, Receipt, ShoppingCart, 
     History, AlertTriangle, Info,
-    ArrowLeftRight, LineChart as ChartIcon, FileText
+    ArrowLeftRight, LineChart as ChartIcon, FileText,
+    TrendingDown, CheckCircle2, Search
 } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { DailyExpense, Purchase } from '../types';
 
 type AccSection = 'FISCAL' | 'CASHFLOW' | 'EQUILIBRIO' | 'RESULTADOS';
@@ -14,6 +14,7 @@ type AccSection = 'FISCAL' | 'CASHFLOW' | 'EQUILIBRIO' | 'RESULTADOS';
 const Accounting: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AccSection>('FISCAL');
   const [fiscalTab, setFiscalTab] = useState<'VENTAS' | 'COMPRAS'>('VENTAS');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // --- CARGA DE DATOS DESDE STORAGE ---
   const sales: any[] = useMemo(() => {
@@ -30,7 +31,7 @@ const Accounting: React.FC = () => {
     } catch (e) { return []; }
   }, []);
 
-  // --- LÓGICA FISCAL (LIBRO DE IVA) ---
+  // --- LÓGICA FISCAL (LIBRO DE IVA Y DECISIÓN) ---
   const fiscalReport = useMemo(() => {
     // Procesar Ventas (IVA Débito)
     const v_list = sales.map(s => {
@@ -66,21 +67,23 @@ const Accounting: React.FC = () => {
     const totalCredito = c_list.reduce((a, c) => a + c.iva, 0);
     const balance = totalDebito - totalCredito;
 
-    // Lógica de decisión: ¿Conviene comprar o facturar?
+    // Estrategia solicitada por el usuario
     const strategy = balance > 0 
         ? {
             title: "ESTRATEGIA RECOMENDADA: COMPRAR STOCK",
-            desc: "Tu IVA Débito supera al Crédito. Es el momento ideal para reponer mercadería y generar Crédito Fiscal para compensar tu deuda impositiva.",
+            desc: "Tu IVA Débito (Ventas) es mayor al Crédito (Compras). Para reducir el pago de impuestos de este mes, te conviene realizar compras de mercadería ahora y generar crédito fiscal.",
             color: "bg-orange-500",
             icon: ShoppingCart,
-            status: "Saldo a Pagar"
+            status: "IVA a Pagar",
+            accent: "border-orange-200 text-orange-600"
           }
         : {
-            title: "ESTRATEGIA RECOMENDADA: IMPULSAR VENTAS",
-            desc: "Tienes saldo de IVA a favor acumulado. Puedes emitir facturas con tranquilidad ya que no tendrás desembolso de efectivo para el pago de IVA.",
+            title: "ESTRATEGIA RECOMENDADA: FACTURAR / VENDER",
+            desc: "Tienes IVA Crédito acumulado a tu favor. Es un excelente momento para emitir facturas de venta, ya que no tendrás que desembolsar efectivo para cubrir el IVA generado.",
             color: "bg-emerald-600",
             icon: Receipt,
-            status: "Saldo a Favor"
+            status: "IVA a Favor",
+            accent: "border-emerald-200 text-emerald-600"
           };
 
     return { 
@@ -92,6 +95,15 @@ const Accounting: React.FC = () => {
         strategy
     };
   }, [sales, purchases]);
+
+  const filteredItems = useMemo(() => {
+    const list = fiscalTab === 'VENTAS' ? fiscalReport.ventas : fiscalReport.compras;
+    if (!searchTerm) return list;
+    return list.filter(item => 
+        item.entity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [fiscalTab, fiscalReport, searchTerm]);
 
   return (
     <div className="p-6 h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden font-sans">
@@ -105,7 +117,7 @@ const Accounting: React.FC = () => {
             <div>
                 <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter leading-none">Contabilidad & Fiscal</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-2 flex items-center gap-2">
-                    <Activity size={14} className="text-green-500 animate-pulse"/> Control Impositivo y Estrategia de Negocio
+                    <Activity size={14} className="text-green-500 animate-pulse"/> Análisis de Posición Impositiva Real
                 </p>
             </div>
         </div>
@@ -132,15 +144,15 @@ const Accounting: React.FC = () => {
           {activeSection === 'FISCAL' && (
               <div className="h-full flex flex-col space-y-6 animate-fade-in overflow-hidden">
                   
-                  {/* ASISTENTE DE DECISIÓN ESTRATÉGICA */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 shrink-0">
-                        <div className={`md:col-span-8 ${fiscalReport.strategy.color} rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden flex items-center gap-8`}>
+                  {/* MONITOR ESTRATÉGICO */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 shrink-0">
+                        <div className={`lg:col-span-8 ${fiscalReport.strategy.color} rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden flex items-center gap-8`}>
                             <div className="absolute top-0 right-0 p-6 opacity-10"><ShieldCheck size={120}/></div>
                             <div className="p-5 bg-white/20 rounded-3xl shrink-0 backdrop-blur-md">
                                 <fiscalReport.strategy.icon size={48}/>
                             </div>
                             <div className="relative z-10">
-                                <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.3em] mb-2">Monitor Fiscal Bruzzone</p>
+                                <p className="text-white/60 text-[10px] font-black uppercase tracking-[0.3em] mb-2">Monitor Fiscal Estratégico</p>
                                 <h4 className="text-xl font-black uppercase tracking-tight leading-tight mb-2">
                                     {fiscalReport.strategy.title}
                                 </h4>
@@ -148,18 +160,18 @@ const Accounting: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="md:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center text-center">
+                        <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col justify-center text-center">
                             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Posición Neta Estimada</p>
                             <h3 className={`text-4xl font-black tracking-tighter ${fiscalReport.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                 ${Math.abs(fiscalReport.balance).toLocaleString('es-AR', {minimumFractionDigits: 2})}
                             </h3>
-                            <span className={`text-[10px] font-bold uppercase mt-2 px-3 py-1 rounded-full w-fit mx-auto ${fiscalReport.balance > 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                            <span className={`text-[10px] font-bold uppercase mt-2 px-3 py-1 rounded-full w-fit mx-auto border ${fiscalReport.strategy.accent}`}>
                                 {fiscalReport.strategy.status}
                             </span>
                         </div>
                   </div>
 
-                  {/* MINI CARDS DE TOTALES */}
+                  {/* CARDS DE TOTALES */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 shrink-0">
                         <div className="bg-white p-6 rounded-3xl border border-red-100 flex justify-between items-center shadow-sm">
                             <div>
@@ -179,17 +191,29 @@ const Accounting: React.FC = () => {
 
                   {/* TABLAS DEL LIBRO DE IVA */}
                   <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 shrink-0">
                             <div className="flex bg-slate-200 rounded-xl p-1 shadow-inner">
-                                <button onClick={() => setFiscalTab('VENTAS')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${fiscalTab === 'VENTAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Libro Ventas</button>
-                                <button onClick={() => setFiscalTab('COMPRAS')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${fiscalTab === 'COMPRAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}>Libro Compras</button>
+                                <button onClick={() => setFiscalTab('VENTAS')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${fiscalTab === 'VENTAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Libro Ventas</button>
+                                <button onClick={() => setFiscalTab('COMPRAS')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${fiscalTab === 'COMPRAS' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Libro Compras</button>
                             </div>
-                            <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-2 shadow-lg hover:bg-slate-800 transition-all">
-                                <Download size={14}/> Exportar Excel
-                            </button>
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <div className="relative flex-1 md:w-64">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar por entidad o ID..." 
+                                        className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-500 transition-all uppercase"
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <button className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase flex items-center gap-2 shadow-lg hover:bg-slate-800 transition-all">
+                                    <Download size={14}/> Exportar Excel
+                                </button>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
-                            <table className="w-full text-left">
+                            <table className="w-full text-left border-collapse">
                                 <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest sticky top-0 z-10">
                                     <tr>
                                         <th className="px-8 py-5">Fecha</th>
@@ -201,9 +225,9 @@ const Accounting: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-[11px]">
-                                    {(fiscalTab === 'VENTAS' ? fiscalReport.ventas : fiscalReport.compras).map((doc, idx) => (
+                                    {filteredItems.map((doc, idx) => (
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="px-8 py-4 font-bold text-slate-400">{doc.date}</td>
+                                            <td className="px-8 py-4 font-bold text-slate-400 group-hover:text-slate-600">{doc.date}</td>
                                             <td className="px-4 py-4 font-black text-slate-800 uppercase tracking-tight">{doc.id}</td>
                                             <td className="px-4 py-4 font-bold text-slate-500 uppercase truncate max-w-[200px]">{doc.entity}</td>
                                             <td className="px-6 py-4 text-right font-medium text-slate-400">${doc.neto.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
@@ -211,7 +235,7 @@ const Accounting: React.FC = () => {
                                             <td className="px-8 py-4 text-right font-black text-slate-900">${doc.total.toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
                                         </tr>
                                     ))}
-                                    {(fiscalTab === 'VENTAS' ? fiscalReport.ventas : fiscalReport.compras).length === 0 && (
+                                    {filteredItems.length === 0 && (
                                         <tr>
                                             <td colSpan={6} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">
                                                 <ShieldAlert size={48} className="mx-auto mb-4 opacity-10"/>
@@ -226,11 +250,13 @@ const Accounting: React.FC = () => {
               </div>
           )}
 
+          {/* OTRAS SECCIONES EN CONSTRUCCIÓN */}
           {activeSection !== 'FISCAL' && (
               <div className="h-full flex items-center justify-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200">
                   <div className="text-center opacity-30">
-                      <ChartIcon size={64} className="mx-auto mb-4"/>
-                      <p className="font-black uppercase tracking-widest">Sección en proceso de consolidación de datos</p>
+                      <ChartIcon size={64} className="mx-auto mb-4 text-slate-300"/>
+                      <p className="font-black uppercase tracking-widest text-slate-400">Sección en proceso de consolidación de datos financieros</p>
+                      <p className="text-[10px] font-bold uppercase mt-2">Módulo {activeSection}</p>
                   </div>
               </div>
           )}
