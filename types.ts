@@ -83,7 +83,7 @@ export interface Product {
   category: string; 
   description: string; 
   listCost: number; 
-  purchasePackageQuantity?: number; 
+  purchasePackageQuantity: number; 
   costAfterDiscounts: number; 
   discounts: number[]; 
   profitMargin: number; 
