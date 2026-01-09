@@ -6,7 +6,7 @@ import {
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Settings2, DollarSign, Key, ShieldAlert
+    Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -53,9 +53,9 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
 import LicenseConsole from './components/LicenseConsole';
-// Import the LabelPrinting component
 import LabelPrinting from './components/LabelPrinting';
 import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
+import { syncService } from './services/syncService';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
@@ -104,6 +104,7 @@ const App: React.FC = () => {
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
 
   const loadLicense = () => {
     const saved = localStorage.getItem('ferrecloud_license');
@@ -117,6 +118,24 @@ const App: React.FC = () => {
     loadLicense();
     window.addEventListener('license_updated', loadLicense);
 
+    // BACKGROUND SYNC MONITOR
+    const handleSyncRequest = async (e: any) => {
+        setIsCloudSyncing(true);
+        const { type, data } = e.detail || {};
+        await syncService.pushToCloud(data, type || 'GENERIC');
+        setTimeout(() => setIsCloudSyncing(false), 2000);
+    };
+
+    window.addEventListener('ferrecloud_sync_request', handleSyncRequest);
+
+    // Initial Pull
+    const initialSync = async () => {
+        setIsCloudSyncing(true);
+        await syncService.pullFromCloud();
+        setIsCloudSyncing(false);
+    };
+    initialSync();
+
     const checkMobile = () => {
         setIsMobile(window.innerWidth < 1024);
     };
@@ -125,6 +144,7 @@ const App: React.FC = () => {
     return () => {
         window.removeEventListener('resize', checkMobile);
         window.removeEventListener('license_updated', loadLicense);
+        window.removeEventListener('ferrecloud_sync_request', handleSyncRequest);
     };
   }, []);
 
@@ -237,35 +257,44 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={handleLogout} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className="h-10 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
-            {openViews.map((view) => {
-                const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
-                const Icon = config.icon;
-                return (
-                    <button 
-                        key={view} 
-                        onClick={() => setActiveView(view)} 
-                        className={`flex items-center gap-2 px-3 h-8 rounded-t-lg transition-all border-x border-t relative group min-w-[100px] max-w-[160px] ${
-                            activeView === view 
-                            ? 'bg-slate-50 text-indigo-600 border-slate-200 font-black' 
-                            : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
-                        }`}
-                    >
-                        <Icon size={12} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
-                        <span className="text-[9px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
-                            {config.label}
-                        </span>
-                        {view !== ViewState.DASHBOARD && (
-                            <div 
-                                onClick={(e) => closeView(view, e)}
-                                className={`p-0.5 rounded transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
-                            >
-                                <X size={10} />
-                            </div>
-                        )}
-                    </button>
-                );
-            })}
+        <header className="h-10 bg-white border-b border-slate-200 flex items-center px-4 justify-between z-50 shrink-0 shadow-sm">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1">
+                {openViews.map((view) => {
+                    const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
+                    const Icon = config.icon;
+                    return (
+                        <button 
+                            key={view} 
+                            onClick={() => setActiveView(view)} 
+                            className={`flex items-center gap-2 px-3 h-8 rounded-t-lg transition-all border-x border-t relative group min-w-[100px] max-w-[160px] ${
+                                activeView === view 
+                                ? 'bg-slate-50 text-indigo-600 border-slate-200 font-black' 
+                                : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
+                            }`}
+                        >
+                            <Icon size={12} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
+                            <span className="text-[9px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                                {config.label}
+                            </span>
+                            {view !== ViewState.DASHBOARD && (
+                                <div 
+                                    onClick={(e) => closeView(view, e)}
+                                    className={`p-0.5 rounded transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
+                                >
+                                    <X size={10} />
+                                </div>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+            
+            <div className="flex items-center gap-4 px-4 border-l border-slate-100">
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${isCloudSyncing ? 'bg-indigo-50 text-indigo-600' : 'bg-green-50 text-green-600'}`}>
+                    {isCloudSyncing ? <RefreshCw size={10} className="animate-spin"/> : <Cloud size={10}/>}
+                    {isCloudSyncing ? 'Sincronizando' : 'Cloud Ok'}
+                </div>
+            </div>
         </header>
 
         <main className="flex-1 relative bg-slate-50 overflow-hidden">
