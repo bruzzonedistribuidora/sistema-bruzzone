@@ -19,7 +19,7 @@ const Inventory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [isExporting, setIsExporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
@@ -28,7 +28,6 @@ const Inventory: React.FC = () => {
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
   
   const [formData, setFormData] = useState<Partial<Product>>({});
-  const [entityForm, setEntityForm] = useState<{id?: string, name: string}>({ name: '' });
   const [modalTab, setModalTab] = useState<'GENERAL' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
 
   const providers: Provider[] = useMemo(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'), []);
@@ -68,6 +67,41 @@ const Inventory: React.FC = () => {
   const requestSort = (key: string) => {
     let direction: 'asc' | 'desc' = (sortConfig.key === key && sortConfig.direction === 'asc') ? 'desc' : 'asc';
     setSortConfig({ key, direction });
+  };
+
+  const handlePedir = (p: Product) => {
+      if (addToReplenishmentQueue(p)) {
+          alert(`Articulo ${p.name} agregado a la cola de reposición.`);
+      }
+  };
+
+  const handleSaveProduct = async () => {
+      if (!formData.name) return;
+      setIsSaving(true);
+      try {
+          // Aseguramos estructura básica de ecommerce si no existe
+          const productToSave: Product = {
+              ...formData,
+              id: formData.id || Date.now().toString(),
+              ecommerce: formData.ecommerce || { isPublished: false },
+              internalCodes: formData.internalCodes || ['S/C'],
+              barcodes: formData.barcodes || [],
+              providerCodes: formData.providerCodes || [],
+              discounts: formData.discounts || [0,0,0,0],
+              comboItems: formData.comboItems || [],
+              stockDetails: formData.stockDetails || []
+          } as Product;
+
+          await productDB.save(productToSave);
+          setIsModalOpen(false);
+          setFormData({});
+          await loadProducts();
+      } catch (err) {
+          console.error(err);
+          alert("Error al guardar el artículo");
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   // --- FUNCIONES DE IMPORT/EXPORT PARA MARCAS Y RUBROS ---
@@ -131,7 +165,7 @@ const Inventory: React.FC = () => {
                         </label>
                     </div>
                 )}
-                <button onClick={() => inventoryTab === 'PRODUCTS' ? setIsModalOpen(true) : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black shadow-lg flex items-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest">
+                <button onClick={() => { setFormData({}); setIsModalOpen(true); }} className="bg-slate-900 text-white px-4 py-2 rounded-xl font-black shadow-lg flex items-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest">
                     <Plus size={14} /> Nuevo
                 </button>
             </div>
@@ -154,10 +188,10 @@ const Inventory: React.FC = () => {
                             <thead className="bg-slate-900 sticky top-0 z-20 text-[8px] uppercase font-black text-slate-300 tracking-wider">
                                 <tr>
                                     <th className="w-[15%] px-4 py-3 cursor-pointer" onClick={() => requestSort('internalCodes')}>SKU</th>
-                                    <th className="w-[40%] px-4 py-3 cursor-pointer" onClick={() => requestSort('name')}>Descripción</th>
-                                    <th className="w-[15%] px-4 py-3 text-center cursor-pointer" onClick={() => requestSort('stock')}>Stock</th>
+                                    <th className="w-[35%] px-4 py-3 cursor-pointer" onClick={() => requestSort('name')}>Descripción</th>
+                                    <th className="w-[12%] px-4 py-3 text-center cursor-pointer" onClick={() => requestSort('stock')}>Stock</th>
                                     <th className="w-[15%] px-4 py-3 text-right cursor-pointer" onClick={() => requestSort('priceFinal')}>PVP Final</th>
-                                    <th className="w-[15%] px-4 py-3 text-center">Acciones</th>
+                                    <th className="w-[23%] px-4 py-3 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -168,8 +202,9 @@ const Inventory: React.FC = () => {
                                         <td className="px-4 py-2 text-center font-bold">{p.stock}</td>
                                         <td className="px-4 py-2 text-right font-black text-slate-900">${p.priceFinal?.toLocaleString()}</td>
                                         <td className="px-4 py-2">
-                                            <div className="flex justify-center gap-1">
-                                                <button onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pen size={12}/></button>
+                                            <div className="flex justify-center gap-1.5">
+                                                <button onClick={() => handlePedir(p)} className="p-1.5 text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-600 hover:text-white transition-all" title="Pedir Reposición"><Truck size={12}/></button>
+                                                <button onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-1.5 text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Editar"><Pen size={12}/></button>
                                                 <button onClick={async () => { if(confirm('¿Eliminar?')) await productDB.delete(p.id); }} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={12}/></button>
                                             </div>
                                         </td>
@@ -207,6 +242,57 @@ const Inventory: React.FC = () => {
         )}
         {inventoryTab === 'PROVIDERS' && <Providers />}
       </div>
+
+      {isModalOpen && (
+          <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                          <Package size={20}/>
+                          <h3 className="text-xs font-black uppercase tracking-widest">{formData.id ? 'Ficha de Artículo' : 'Nuevo Artículo'}</h3>
+                      </div>
+                      <button onClick={() => setIsModalOpen(false)}><X size={20}/></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar bg-slate-50">
+                      <div className="bg-white p-5 rounded-2xl border space-y-4">
+                          <label className="text-[9px] font-black uppercase text-slate-400">Descripción Principal</label>
+                          <input className="w-full p-3 bg-slate-50 border rounded-xl font-black text-xs uppercase" placeholder="EJ: MARTILLO BOLITA 500GR..." value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Código SKU</label>
+                                  <input className="w-full p-2 bg-slate-50 border rounded-lg font-mono text-[10px] font-bold uppercase" value={formData.internalCodes?.[0] || ''} onChange={e => setFormData({...formData, internalCodes: [e.target.value.toUpperCase()]})} />
+                              </div>
+                              <div>
+                                  <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Stock Actual</label>
+                                  <input type="number" className="w-full p-2 bg-slate-50 border rounded-lg font-black text-xs" value={formData.stock || 0} onChange={e => setFormData({...formData, stock: parseFloat(e.target.value) || 0})} />
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Precio Final ($)</label>
+                                  <input type="number" className="w-full p-3 bg-indigo-50 border-indigo-200 border rounded-xl font-black text-lg text-indigo-600" value={formData.priceFinal || 0} onChange={e => setFormData({...formData, priceFinal: parseFloat(e.target.value) || 0})} />
+                              </div>
+                              <div>
+                                  <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Marca</label>
+                                  <select className="w-full p-3 bg-slate-50 border rounded-xl font-black text-[10px] uppercase" value={formData.brand || ''} onChange={e => setFormData({...formData, brand: e.target.value})}>
+                                      <option value="">-- SELECCIONE --</option>
+                                      {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                  </select>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                  <div className="p-5 border-t bg-white flex justify-end gap-3">
+                      <button onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-slate-400 font-black text-[10px] uppercase">Cancelar</button>
+                      <button onClick={handleSaveProduct} disabled={isSaving} className="bg-slate-900 text-white px-10 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 hover:bg-indigo-600 transition-all">
+                          {isSaving ? <RefreshCw className="animate-spin" size={14}/> : <Save size={14}/>} Guardar Cambios
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       {isEntityModalOpen && (
           <div className="fixed inset-0 z-[300] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
