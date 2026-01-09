@@ -58,36 +58,36 @@ import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
     [ViewState.ANALYTICS]: { icon: BarChart3, label: "Dashboard", color: "bg-indigo-600" },
-    [ViewState.INVENTORY]: { icon: Database, label: "Inventario Maestro", color: "bg-indigo-500" },
+    [ViewState.INVENTORY]: { icon: Database, label: "Inventario", color: "bg-indigo-500" },
     [ViewState.STOCK_ADJUSTMENT]: { icon: Settings2, label: "Ajuste Stock", color: "bg-slate-800" },
-    [ViewState.POS]: { icon: Receipt, label: "Punto de Venta", color: "bg-emerald-500" },
-    [ViewState.PURCHASES]: { icon: Truck, label: "Compras / Gastos", color: "bg-blue-500" },
+    [ViewState.POS]: { icon: Receipt, label: "POS", color: "bg-emerald-500" },
+    [ViewState.PURCHASES]: { icon: Truck, label: "Compras", color: "bg-blue-500" },
     [ViewState.TREASURY]: { icon: Wallet, label: "Tesorería", color: "bg-orange-500" },
     [ViewState.ACCOUNTING]: { icon: Calculator, label: "Contabilidad", color: "bg-violet-600" },
-    [ViewState.AI_ASSISTANT]: { icon: Bot, label: "Asistente IA", color: "bg-pink-500" },
-    [ViewState.CONFIG_PANEL]: { icon: Settings, label: "Configuración", color: "bg-slate-700" },
-    [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador Excel", color: "bg-indigo-600" },
-    [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Precios & Listas", color: "bg-violet-500" },
-    [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Cambios Masivos", color: "bg-amber-500" },
-    [ViewState.ONLINE_SALES]: { icon: OrderIcon, label: "Hub de Ventas Online", color: "bg-indigo-600" },
-    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Gestión Catálogo Web", color: "bg-pink-600" },
-    [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda Online", color: "bg-pink-600" },
-    [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal Fidelidad", color: "bg-amber-500" },
-    [ViewState.MARKETING]: { icon: Tag, label: "Marketing & Puntos", color: "bg-red-500" },
-    [ViewState.CLIENTS]: { icon: Users, label: "Fichero Clientes", color: "bg-sky-500" },
-    [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Saldos Clientes", color: "bg-emerald-600" },
-    [ViewState.PROVIDER_BALANCES]: { icon: DollarSign, label: "Saldos Proveedores", color: "bg-orange-600" },
+    [ViewState.AI_ASSISTANT]: { icon: Bot, label: "FerreBot", color: "bg-pink-500" },
+    [ViewState.CONFIG_PANEL]: { icon: Settings, label: "Ajustes", color: "bg-slate-700" },
+    [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador", color: "bg-indigo-600" },
+    [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Precios", color: "bg-violet-500" },
+    [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Masivos", color: "bg-amber-500" },
+    [ViewState.ONLINE_SALES]: { icon: OrderIcon, label: "Online", color: "bg-indigo-600" },
+    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Web Admin", color: "bg-pink-600" },
+    [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda", color: "bg-pink-600" },
+    [ViewState.PUBLIC_PORTAL]: { icon: Smartphone, label: "Portal", color: "bg-amber-500" },
+    [ViewState.MARKETING]: { icon: Tag, label: "Marketing", color: "bg-red-500" },
+    [ViewState.CLIENTS]: { icon: Users, label: "Clientes", color: "bg-sky-500" },
+    [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Saldos", color: "bg-emerald-600" },
+    [ViewState.PROVIDER_BALANCES]: { icon: DollarSign, label: "Deudas", color: "bg-orange-600" },
     [ViewState.REMITOS]: { icon: ListOrdered, label: "Remitos", color: "bg-blue-600" },
     [ViewState.PRESUPUESTOS]: { icon: FileSpreadsheet, label: "Presupuestos", color: "bg-teal-500" },
     [ViewState.SALES_ORDERS]: { icon: Package, label: "Pedidos", color: "bg-green-600" },
-    [ViewState.CREDIT_NOTES]: { icon: RotateCcw, label: "Notas de Crédito", color: "bg-red-500" },
+    [ViewState.CREDIT_NOTES]: { icon: RotateCcw, label: "NC", color: "bg-red-500" },
     [ViewState.PROVIDERS]: { icon: Truck, label: "Proveedores", color: "bg-slate-800" },
-    [ViewState.STATISTICS]: { icon: TrendingUp, label: "Estadísticas", color: "bg-cyan-500" },
+    [ViewState.STATISTICS]: { icon: TrendingUp, label: "Stats", color: "bg-cyan-500" },
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-400" },
-    [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube Central", color: "bg-indigo-900" },
-    [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Monitor Faltantes", color: "bg-orange-600" },
-    [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Armado Pedido", color: "bg-emerald-600" },
-    [ViewState.LICENSE_MANAGER]: { icon: Key, label: "Licencias (ROOT)", color: "bg-slate-900" },
+    [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Cloud", color: "bg-indigo-900" },
+    [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Faltantes", color: "bg-orange-600" },
+    [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Repo", color: "bg-emerald-600" },
+    [ViewState.LICENSE_MANAGER]: { icon: Key, label: "Root", color: "bg-slate-900" },
 };
 
 const App: React.FC = () => {
@@ -147,12 +147,13 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setLoggedInUser(null);
     localStorage.removeItem('ferrecloud_session');
+    setOpenViews([ViewState.DASHBOARD]);
+    setActiveView(ViewState.DASHBOARD);
   };
 
   const renderViewContent = (view: ViewState) => {
     const isCreator = loggedInUser?.roleId === 'creator';
     
-    // Bloqueo total si la licencia no es válida, excepto para el creador
     if (systemLicense?.status === 'LOCKED' && !isCreator) {
         return (
             <div className="h-full flex items-center justify-center bg-slate-100 p-10">
@@ -160,11 +161,7 @@ const App: React.FC = () => {
                     <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
                         <ShieldAlert size={64}/>
                     </div>
-                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">SISTEMA BLOQUEADO</h3>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed italic">Su licencia ha sido suspendida. Contacte al proveedor del software para regularizar el servicio.</p>
-                    <div className="pt-6 border-t border-slate-100">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Soporte Técnico Root Cloud</p>
-                    </div>
+                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">BLOQUEADO</h3>
                 </div>
             </div>
         );
@@ -233,10 +230,10 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
-      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} />
+      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={handleLogout} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
+        <header className="h-10 bg-white border-b border-slate-200 flex items-center px-4 gap-1 z-50 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
             {openViews.map((view) => {
                 const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
                 const Icon = config.icon;
@@ -244,26 +241,23 @@ const App: React.FC = () => {
                     <button 
                         key={view} 
                         onClick={() => setActiveView(view)} 
-                        className={`flex items-center gap-3 px-4 h-10 rounded-t-xl transition-all border-x border-t relative group min-w-[140px] max-w-[200px] ${
+                        className={`flex items-center gap-2 px-3 h-8 rounded-t-lg transition-all border-x border-t relative group min-w-[100px] max-w-[160px] ${
                             activeView === view 
-                            ? 'bg-slate-50 text-indigo-600 border-slate-200 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] font-black' 
+                            ? 'bg-slate-50 text-indigo-600 border-slate-200 font-black' 
                             : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
                         }`}
                     >
-                        <Icon size={14} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
-                        <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                        <Icon size={12} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
+                        <span className="text-[9px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
                             {config.label}
                         </span>
                         {view !== ViewState.DASHBOARD && (
                             <div 
                                 onClick={(e) => closeView(view, e)}
-                                className={`p-1 rounded-md transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
+                                className={`p-0.5 rounded transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
                             >
-                                <X size={12} />
+                                <X size={10} />
                             </div>
-                        )}
-                        {activeView === view && (
-                            <div className="absolute bottom-[-1px] left-0 w-full h-[2px] bg-indigo-600"></div>
                         )}
                     </button>
                 );
@@ -271,16 +265,9 @@ const App: React.FC = () => {
         </header>
 
         <main className="flex-1 relative bg-slate-50 overflow-hidden">
-          {openViews.map((view) => (
-            <div 
-              key={view} 
-              className={`absolute inset-0 transition-opacity duration-200 ${
-                activeView === view ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-              }`}
-            >
-              {renderViewContent(view)}
+            <div className="absolute inset-0 z-10">
+                {renderViewContent(activeView)}
             </div>
-          ))}
         </main>
       </div>
     </div>
