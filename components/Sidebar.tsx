@@ -8,7 +8,7 @@ import {
     Settings, Sparkles, ShieldAlert, RotateCcw, ArrowLeftRight, FileUp, ChevronDown, ArrowRight,
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Scale, Activity, Settings2, DollarSign, Key, LogOut, Laptop2
+    Scale, Activity, Settings2, DollarSign, Key, LogOut, Laptop2, Network
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
@@ -71,10 +71,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
     const [license, setLicense] = useState<SystemLicense | null>(null);
 
     const loadConfig = () => {
-        const savedSync = JSON.parse(localStorage.getItem('ferrecloud_sync_config') || '{"enabled": false}');
+        const savedSync = localStorage.getItem('ferrecloud_file_sync');
         const savedCompany = JSON.parse(localStorage.getItem('company_config') || '{}');
         const savedLicense = JSON.parse(localStorage.getItem('ferrecloud_license') || 'null');
-        setSyncStatus(savedSync.enabled ? 'ONLINE' : 'OFFLINE');
+        setSyncStatus(savedSync === 'ACTIVE' ? 'ONLINE' : 'OFFLINE');
         setCompanyConfig(savedCompany);
         setLicense(savedLicense);
     };
@@ -162,6 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
 
             <nav className="flex-1 p-3 space-y-0.5">
                 <NavItem view={ViewState.DASHBOARD} label="Escritorio" icon={LayoutDashboard} active={activeView === ViewState.DASHBOARD} onClick={() => handleNav(ViewState.DASHBOARD)} />
+                <NavItem view={ViewState.CLOUD_HUB} label="Nube / Red" icon={Network} active={activeView === ViewState.CLOUD_HUB} onClick={() => handleNav(ViewState.CLOUD_HUB)} />
                 <NavItem view={ViewState.ANALYTICS} label="Dashboard" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
