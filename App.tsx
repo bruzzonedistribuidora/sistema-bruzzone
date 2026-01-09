@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     X, Smartphone, ShoppingBag, LayoutDashboard, Database, 
@@ -136,13 +137,20 @@ const App: React.FC = () => {
 
     runBootstrap();
 
+    // 🔄 ESCUCHADOR DE CAMBIOS EXTERNOS (Otras PCs)
+    const handleRemotePulse = () => {
+        setCloudStatus('SYNCING');
+        setTimeout(() => setCloudStatus('UP_TO_DATE'), 1500);
+    };
+    window.addEventListener('ferrecloud_sync_pulse', handleRemotePulse);
+
+    // 📤 ESCUCHADOR DE CAMBIOS LOCALES PARA SUBIDA
     const handleSyncRequest = async (e: any) => {
         setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
         await syncService.pushToCloud(data, type || 'GENERIC');
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1000);
     };
-
     window.addEventListener('ferrecloud_sync_request', handleSyncRequest);
 
     const checkMobile = () => { setIsMobile(window.innerWidth < 1024); };
@@ -155,6 +163,7 @@ const App: React.FC = () => {
         window.removeEventListener('ferrecloud_sync_request', handleSyncRequest);
         window.removeEventListener('ferrecloud_sync_updated', runBootstrap);
         window.removeEventListener('ferrecloud_sync_config_updated', runBootstrap);
+        window.removeEventListener('ferrecloud_sync_pulse', handleRemotePulse);
     };
   }, []);
 
