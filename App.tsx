@@ -6,7 +6,7 @@ import {
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw
+    Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -104,7 +104,9 @@ const App: React.FC = () => {
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [portalPreviewClient, setPortalPreviewClient] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
-  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  
+  // ESTADO DE NUBE: 'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'
+  const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
 
   const loadLicense = () => {
     const saved = localStorage.getItem('ferrecloud_license');
@@ -118,29 +120,36 @@ const App: React.FC = () => {
     loadLicense();
     window.addEventListener('license_updated', loadLicense);
 
-    // BACKGROUND SYNC MONITOR
+    // 🚀 BOOTSTRAP DE NUBE AL INICIAR
+    const initializeApp = async () => {
+        setCloudStatus('SYNCING');
+        const result = await syncService.initializeBootstrap();
+        if (result === 'SYNCED') {
+            setCloudStatus('UP_TO_DATE');
+            // Recargar productos en la UI si fuera necesario
+            window.dispatchEvent(new Event('ferrecloud_products_updated'));
+        } else {
+            setCloudStatus('OFFLINE');
+        }
+    };
+    initializeApp();
+
+    // 🔄 ESCUCHADOR DE CAMBIOS LOCALES PARA SUBIDA INMEDIATA
     const handleSyncRequest = async (e: any) => {
-        setIsCloudSyncing(true);
+        setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
         await syncService.pushToCloud(data, type || 'GENERIC');
-        setTimeout(() => setIsCloudSyncing(false), 2000);
+        setTimeout(() => setCloudStatus('UP_TO_DATE'), 1000);
     };
 
     window.addEventListener('ferrecloud_sync_request', handleSyncRequest);
-
-    // Initial Pull
-    const initialSync = async () => {
-        setIsCloudSyncing(true);
-        await syncService.pullFromCloud();
-        setIsCloudSyncing(false);
-    };
-    initialSync();
 
     const checkMobile = () => {
         setIsMobile(window.innerWidth < 1024);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
+
     return () => {
         window.removeEventListener('resize', checkMobile);
         window.removeEventListener('license_updated', loadLicense);
@@ -184,7 +193,8 @@ const App: React.FC = () => {
                     <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
                         <ShieldAlert size={64}/>
                     </div>
-                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">BLOQUEADO</h3>
+                    <h3 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">SISTEMA BLOQUEADO</h3>
+                    <p className="text-slate-400 font-bold text-xs uppercase">Contacte con soporte para activar su terminal.</p>
                 </div>
             </div>
         );
@@ -290,9 +300,9 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4 px-4 border-l border-slate-100">
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${isCloudSyncing ? 'bg-indigo-50 text-indigo-600' : 'bg-green-50 text-green-600'}`}>
-                    {isCloudSyncing ? <RefreshCw size={10} className="animate-spin"/> : <Cloud size={10}/>}
-                    {isCloudSyncing ? 'Sincronizando' : 'Cloud Ok'}
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${cloudStatus === 'SYNCING' ? 'bg-indigo-50 text-indigo-600' : cloudStatus === 'UP_TO_DATE' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : <WifiOff size={10}/>)}
+                    {cloudStatus === 'SYNCING' ? 'Sincronizando' : cloudStatus === 'UP_TO_DATE' ? 'Bóveda Conectada' : 'Offline'}
                 </div>
             </div>
         </header>
