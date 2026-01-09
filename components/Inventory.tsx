@@ -117,6 +117,12 @@ const Inventory: React.FC = () => {
       }
   };
 
+  const handleDeleteProduct = async (p: Product) => {
+      if (confirm(`¿Está seguro de que desea ELIMINAR el artículo "${p.name}"?\nEsta acción es irreversible.`)) {
+          await productDB.delete(p.id);
+      }
+  };
+
   const handleExportCatalog = async () => {
       setIsExporting(true);
       try {
@@ -350,7 +356,7 @@ const Inventory: React.FC = () => {
                     </button>
                 )}
                 {inventoryTab !== 'PROVIDERS' && (
-                    <button onClick={() => inventoryTab === 'PRODUCTS' ? handleOpenModal() : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-8 py-3.5 rounded-[1.8rem] font-black shadow-xl flex items-center gap-3 hover:bg-indigo-600 transition-all uppercase text-[10px] tracking-widest active:scale-95">
+                    <button onClick={() => inventoryTab === 'PRODUCTS' ? handleOpenModal() : setIsEntityModalOpen(true)} className="bg-slate-900 text-white px-8 py-3.5 rounded-[1.8rem] font-black shadow-xl flex items-center justify-center gap-3 hover:bg-indigo-600 transition-all uppercase text-[10px] tracking-widest active:scale-95">
                         <Plus size={18} /> Nuevo {inventoryTab === 'PRODUCTS' ? 'Artículo' : inventoryTab === 'BRANDS' ? 'Marca' : 'Rubro'}
                     </button>
                 )}
@@ -379,19 +385,19 @@ const Inventory: React.FC = () => {
                         <table className="w-full text-left border-collapse table-fixed">
                             <thead className="bg-slate-900 sticky top-0 z-20 text-xs uppercase font-black text-slate-300 tracking-wider">
                                 <tr>
-                                    <th className="w-[12%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
+                                    <th className="w-[10%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('code')}>
                                         <div className="flex items-center gap-2">SKU {getSortIcon('code')}</div>
                                     </th>
                                     <th className="w-[45%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors" onClick={() => requestSort('name')}>
                                         <div className="flex items-center gap-2">Descripción Comercial {getSortIcon('name')}</div>
                                     </th>
-                                    <th className="w-[13%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
+                                    <th className="w-[12%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('category')}>
                                         <div className="flex items-center justify-center gap-2">Rubro {getSortIcon('category')}</div>
                                     </th>
-                                    <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('stock')}>
+                                    <th className="w-[14%] px-6 py-5 cursor-pointer hover:bg-slate-800 transition-colors text-center" onClick={() => requestSort('stock')}>
                                         <div className="flex items-center justify-center gap-2">Stock Total {getSortIcon('stock')}</div>
                                     </th>
-                                    <th className="w-[15%] px-6 py-5 cursor-pointer hover:bg-slate-700 transition-colors text-right bg-slate-800" onClick={() => requestSort('price')}>
+                                    <th className="w-[19%] px-6 py-5 cursor-pointer hover:bg-slate-700 transition-colors text-right bg-slate-800" onClick={() => requestSort('price')}>
                                         <div className="flex items-center justify-end gap-2">PVP Final {getSortIcon('price')}</div>
                                     </th>
                                 </tr>
@@ -400,35 +406,36 @@ const Inventory: React.FC = () => {
                                 {sortedProducts.map(p => (
                                     <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors group">
                                         <td className="px-6 py-6">
-                                            <p className="font-mono font-black text-indigo-600 truncate text-xs">{p.internalCodes?.[0] || 'S/C'}</p>
+                                            <p className="font-mono font-black text-indigo-700 truncate text-[11px] bg-indigo-50/50 px-2 py-0.5 rounded border border-indigo-100/50">{p.internalCodes?.[0] || 'S/C'}</p>
                                         </td>
                                         <td className="px-6 py-6">
-                                            <p className="font-black text-slate-800 uppercase text-base leading-tight mb-1 truncate" title={p.name}>{p.name}</p>
+                                            <p className="font-black text-slate-800 uppercase text-lg leading-tight mb-1 truncate" title={p.name}>{p.name}</p>
                                             <div className="flex gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                                 <span className="text-indigo-400">{p.brand}</span>
-                                                <span className="w-1 h-1 bg-slate-200 rounded-full mt-1"></span>
+                                                <span className="w-1 h-1 bg-slate-200 rounded-full mt-1.5"></span>
                                                 <span>{p.provider}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-6 text-center">
-                                            <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase inline-block truncate max-w-full">{p.category}</span>
+                                            <span className="bg-slate-50 text-slate-500 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase inline-block truncate max-w-full tracking-tighter">{p.category}</span>
                                         </td>
                                         <td className="px-6 py-6 text-center">
                                             <div className="flex flex-col items-center gap-2">
-                                                <span className={`text-lg font-black tracking-tighter ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600 animate-pulse' : 'text-slate-900'}`}>{p.stock?.toLocaleString()}</span>
-                                                <div className="flex gap-1.5 text-[8px] font-black uppercase tracking-tighter">
+                                                <span className={`text-xl font-black tracking-tighter ${p.stock <= (p.stockMinimo || 0) ? 'text-red-600 animate-pulse' : 'text-slate-900'}`}>{p.stock?.toLocaleString()}</span>
+                                                <div className="flex gap-1 text-[8px] font-black uppercase tracking-tighter scale-90">
                                                     <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100" title="Salón">P:{p.stockPrincipal || 0}</span>
                                                     <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100" title="Depósito">D:{p.stockDeposito || 0}</span>
                                                     <span className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded border border-orange-100" title="Sucursal">S:{p.stockSucursal || 0}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-6 text-right font-black text-slate-900 bg-indigo-50/10">
+                                        <td className="px-6 py-6 text-right font-black text-slate-900 bg-indigo-50/5">
                                             <div className="flex flex-col items-end gap-1">
-                                                <p className="text-2xl tracking-tighter text-indigo-700">${p.priceFinal?.toLocaleString('es-AR')}</p>
+                                                <p className="text-2xl tracking-tighter text-indigo-800 font-black">${p.priceFinal?.toLocaleString('es-AR')}</p>
                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handlePedir(p)} className="p-2 bg-white text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all"><Truck size={12}/></button>
-                                                    <button onClick={() => handleOpenModal(p)} className="p-2 bg-white text-indigo-600 rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"><Pen size={12}/></button>
+                                                    <button onClick={() => handlePedir(p)} className="p-2.5 bg-white text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all" title="Pedir Reposición"><Truck size={14}/></button>
+                                                    <button onClick={() => handleOpenModal(p)} className="p-2.5 bg-white text-indigo-600 rounded-lg shadow-sm border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all" title="Editar"><Pen size={14}/></button>
+                                                    <button onClick={() => handleDeleteProduct(p)} className="p-2.5 bg-white text-red-400 rounded-lg shadow-sm border border-red-100 hover:bg-red-600 hover:text-white transition-all" title="Eliminar"><Trash2 size={14}/></button>
                                                 </div>
                                             </div>
                                         </td>
@@ -712,7 +719,7 @@ const Inventory: React.FC = () => {
                                                   <input type="number" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xl" value={formData.tasa} onChange={e => setFormData({...formData, tasa: parseFloat(e.target.value) || 0})} />
                                               </div>
                                               <div>
-                                                  <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Imp. Interno (%)</label>
+                                                  <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">Imp. Interno (%)</label>
                                                   <input type="number" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xl" value={formData.alicuotaImpuestoInterno} onChange={e => setFormData({...formData, alicuotaImpuestoInterno: parseFloat(e.target.value) || 0})} />
                                               </div>
                                           </div>
