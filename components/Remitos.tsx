@@ -9,7 +9,7 @@ import {
     PackagePlus, Save, Truck
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem } from '../types';
-import { addToReplenishmentQueue } from '../services/storageService';
+import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 interface RemitosProps {
     initialItems?: InvoiceItem[];
@@ -88,7 +88,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     if (!manualItemForm.name || !manualItemForm.price) return;
     
     const priceNum = parseFloat(manualItemForm.price);
-    // Added missing required stock properties for Product interface
+    // Added missing required properties like purchasePackageQuantity for Product interface
     const mockProduct: Product = {
         id: `manual-rem-${Date.now()}`,
         internalCodes: ['VARIO'],
@@ -106,6 +106,8 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         saleCurrency: 'ARS',
         vatRate: 21.0,
         listCost: priceNum * 0.7,
+        // Added purchasePackageQuantity to fix property missing error
+        purchasePackageQuantity: 1,
         discounts: [0,0,0,0],
         costAfterDiscounts: priceNum * 0.7,
         profitMargin: 30,
