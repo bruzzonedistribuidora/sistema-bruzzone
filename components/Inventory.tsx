@@ -103,6 +103,7 @@ const Inventory: React.FC = () => {
               internalCodes: formData.internalCodes || ['S/C'],
               barcodes: formData.barcodes || [],
               providerCodes: formData.providerCodes || [],
+              purchasePackageQuantity: formData.purchasePackageQuantity || 1,
               stock: (formData.stockPrincipal || 0) + (formData.stockDeposito || 0) + (formData.stockSucursal || 0),
               ecommerce: formData.ecommerce || { isPublished: false }
           } as Product;
@@ -139,7 +140,7 @@ const Inventory: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-                <button onClick={() => { setFormData({vatRate: 21, profitMargin: 30, discounts: [0,0,0,0], purchaseCurrency: 'ARS', saleCurrency: 'ARS', measureUnitPurchase: 'UNIDAD', measureUnitSale: 'UNIDAD', conversionFactor: 1}); setModalTab('GENERAL'); setIsModalOpen(true); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black shadow-lg flex items-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest">
+                <button onClick={() => { setFormData({vatRate: 21, profitMargin: 30, discounts: [0,0,0,0], purchaseCurrency: 'ARS', saleCurrency: 'ARS', measureUnitPurchase: 'UNIDAD', measureUnitSale: 'UNIDAD', conversionFactor: 1, purchasePackageQuantity: 1}); setModalTab('GENERAL'); setIsModalOpen(true); }} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black shadow-lg flex items-center gap-2 hover:bg-indigo-600 transition-all uppercase text-[9px] tracking-widest">
                     <Plus size={14} /> Nuevo Artículo
                 </button>
             </div>
@@ -209,7 +210,7 @@ const Inventory: React.FC = () => {
       {/* MODAL FICHA MAESTRA COMPLETA */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh]">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[95vh]">
                   <div className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-3">
                           <Package size={22} className="text-indigo-400"/>
@@ -242,7 +243,7 @@ const Inventory: React.FC = () => {
                                       <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Descripción del Artículo</label>
                                       <input className="w-full p-3 bg-slate-50 border rounded-xl font-black text-xs uppercase" placeholder="EJ: MARTILLO BOLITA 500GR..." value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
                                   </div>
-                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                       <div>
                                           <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Código Interno (SKU)</label>
                                           <input className="w-full p-2.5 bg-slate-50 border rounded-xl font-mono text-[11px] font-bold uppercase" value={formData.internalCodes?.[0] || ''} onChange={e => setFormData({...formData, internalCodes: [e.target.value.toUpperCase()]})} />
@@ -254,6 +255,10 @@ const Inventory: React.FC = () => {
                                       <div>
                                           <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Cód. Proveedor</label>
                                           <input className="w-full p-2.5 bg-slate-50 border rounded-xl font-mono text-[11px] uppercase" value={formData.providerCodes?.[0] || ''} onChange={e => setFormData({...formData, providerCodes: [e.target.value.toUpperCase()]})} />
+                                      </div>
+                                      <div>
+                                          <label className="text-[8px] font-black uppercase text-indigo-400 block mb-1">Cant. por Bulto</label>
+                                          <input type="number" className="w-full p-2.5 bg-indigo-50 border-2 border-indigo-100 rounded-xl font-black text-[11px] text-center" value={formData.purchasePackageQuantity || 1} onChange={e => setFormData({...formData, purchasePackageQuantity: parseInt(e.target.value) || 1})} />
                                       </div>
                                   </div>
                               </div>
