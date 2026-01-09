@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     X, Smartphone, ShoppingBag, LayoutDashboard, Database, 
@@ -6,7 +5,8 @@ import {
     Package, ListOrdered, RotateCcw, FileSpreadsheet, Tag, Users,
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
-    Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2
+    Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
+    CloudIcon
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -132,6 +132,7 @@ const App: React.FC = () => {
     loadLicense();
     window.addEventListener('license_updated', loadLicense);
     window.addEventListener('ferrecloud_sync_updated', runBootstrap);
+    window.addEventListener('ferrecloud_sync_config_updated', runBootstrap);
 
     runBootstrap();
 
@@ -153,6 +154,7 @@ const App: React.FC = () => {
         window.removeEventListener('license_updated', loadLicense);
         window.removeEventListener('ferrecloud_sync_request', handleSyncRequest);
         window.removeEventListener('ferrecloud_sync_updated', runBootstrap);
+        window.removeEventListener('ferrecloud_sync_config_updated', runBootstrap);
     };
   }, []);
 
@@ -297,15 +299,17 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4 px-4 border-l border-slate-100">
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all ${
-                    cloudStatus === 'SYNCING' ? 'bg-indigo-50 text-indigo-600' : 
-                    cloudStatus === 'UP_TO_DATE' ? 'bg-green-50 text-green-600' : 
-                    cloudStatus === 'ERROR' ? 'bg-red-50 text-red-600' :
-                    'bg-slate-50 text-slate-400'
-                }`}>
-                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : <WifiOff size={10}/>)}
-                    {cloudStatus === 'SYNCING' ? 'Sincronizando' : cloudStatus === 'UP_TO_DATE' ? 'Bóveda Conectada' : cloudStatus === 'ERROR' ? 'Error Nube' : 'Sin Vínculo Cloud'}
-                </div>
+                <button 
+                    onClick={() => handleNavigate(ViewState.CLOUD_HUB)}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all hover:scale-105 active:scale-95 ${
+                        cloudStatus === 'SYNCING' ? 'bg-indigo-50 text-indigo-600' : 
+                        cloudStatus === 'UP_TO_DATE' ? 'bg-green-50 text-green-600' : 
+                        cloudStatus === 'ERROR' ? 'bg-red-50 text-red-600' :
+                        'bg-slate-900 text-white shadow-lg'
+                    }`}>
+                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : <CloudIcon size={10}/>)}
+                    {cloudStatus === 'SYNCING' ? 'Sincronizando' : cloudStatus === 'UP_TO_DATE' ? 'Bóveda Conectada' : cloudStatus === 'ERROR' ? 'Error Nube' : 'Vincular Cloud'}
+                </button>
             </div>
         </header>
 
