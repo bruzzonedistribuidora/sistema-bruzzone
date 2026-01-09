@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     Cloud, RefreshCw, Database, Key, Download, Upload, Globe, Server, Copy,
@@ -38,12 +37,17 @@ const CloudHub: React.FC = () => {
         setConfig(prev => ({ ...prev, enabled: !prev.enabled }));
     };
 
-    const runFullSync = async () => {
+    const runFullGlobalSync = async () => {
+        if (!config.enabled) {
+            alert("Debe activar el interruptor de AUTO-SYNC primero.");
+            return;
+        }
         setIsProcessing(true);
         try {
-            await syncService.syncMasterDatabase();
-            setConfig(prev => ({ ...prev, lastSync: new Date().toLocaleString() }));
-            alert("✅ Base de datos maestra (140k artículos) sincronizada con la nube.");
+            await syncService.syncEverything();
+            const now = new Date().toLocaleString();
+            setConfig(prev => ({ ...prev, lastSync: now }));
+            alert("✅ Sincronización Global Exitosa: Se han subido configuraciones, clientes, ventas y los 140.000 artículos a la nube.");
         } catch (error) {
             alert("Error durante la sincronización masiva.");
         } finally {
@@ -97,10 +101,10 @@ const CloudHub: React.FC = () => {
                             </span>
                         </div>
                         <p className="text-gray-400 mt-2 font-bold uppercase tracking-widest text-xs">
-                             Sincronización Automática Global
+                             Persistencia Total en Tiempo Real
                         </p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase mt-3 italic flex items-center gap-2">
-                            <History size={12}/> Última vez: {config.lastSync}
+                            <History size={12}/> Última Sincro: {config.lastSync}
                         </p>
                     </div>
                 </div>
@@ -109,10 +113,10 @@ const CloudHub: React.FC = () => {
                         onClick={handleToggleAutoSync}
                         className={`px-8 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${config.enabled ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
                         {config.enabled ? <ToggleRight size={24}/> : <ToggleLeft size={24}/>}
-                        {config.enabled ? 'AUTO-SYNC ACTIVO' : 'ACTIVAR AUTO-SYNC'}
+                        {config.enabled ? 'SISTEMA VINCULADO' : 'VINCULAR A LA NUBE'}
                     </button>
-                    <button onClick={runFullSync} disabled={isProcessing || !config.enabled} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-30">
-                        <RefreshCw size={18}/> Sincronizar Ahora
+                    <button onClick={runFullGlobalSync} disabled={isProcessing || !config.enabled} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-30">
+                        <RefreshCw size={18}/> Sincronizar Todo Ahora
                     </button>
                 </div>
             </div>
@@ -124,11 +128,11 @@ const CloudHub: React.FC = () => {
                         <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter">Bóveda Multi-PC</h3>
                     </div>
                     <p className="text-slate-500 font-medium text-sm leading-relaxed">
-                        Copia este código en el resto de tus computadoras para que compartan el mismo stock y precios. 
-                        <strong> Cualquier cambio en una PC se verá reflejado en las demás al instante.</strong>
+                        Copia este código en el resto de tus computadoras para que compartan el mismo stock, precios, clientes y ventas. 
+                        <strong> Cualquier cambio en una PC se sincronizará automáticamente.</strong>
                     </p>
                     <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-dashed border-indigo-100 space-y-4">
-                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">ID de Sincronización Maestra</label>
+                        <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest block text-center">ID de Bóveda Cloud</label>
                         <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-indigo-50 shadow-inner">
                             <span className="text-3xl font-mono font-black text-slate-800 tracking-widest">{config.vaultId}</span>
                             <button onClick={() => { navigator.clipboard.writeText(config.vaultId); alert("ID Copiado"); }} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all active:scale-90 shadow-lg">
@@ -146,7 +150,7 @@ const CloudHub: React.FC = () => {
                             <h3 className="text-xl font-black uppercase tracking-tighter">Configuración Endpoint</h3>
                         </div>
                         <p className="text-xs text-slate-400 font-medium leading-relaxed">
-                            URL del servidor central de Ferretería Bruzzone. Este servicio garantiza que los 140.000 artículos estén siempre actualizados.
+                            URL del servidor central de sincronización. Este servicio garantiza que los 140.000 artículos estén siempre idénticos en todas sus terminales.
                         </p>
                         <div className="space-y-4">
                             <div className="relative">
@@ -162,7 +166,7 @@ const CloudHub: React.FC = () => {
                             <div className="p-4 bg-blue-600/10 rounded-2xl border border-blue-500/20 flex items-start gap-4">
                                 <Info className="text-indigo-400 shrink-0" size={20}/>
                                 <p className="text-[10px] text-indigo-300 font-medium leading-relaxed uppercase">
-                                    Si cambias el servidor, asegúrate de que el Vault ID sea el mismo en todas las terminales para evitar duplicación de datos.
+                                    Nota: Los 140k artículos se suben de forma escalonada para no saturar su conexión a internet.
                                 </p>
                             </div>
                         </div>
@@ -176,12 +180,12 @@ const CloudHub: React.FC = () => {
                         <AlertTriangle size={32}/>
                     </div>
                     <div>
-                        <h4 className="text-xl font-black text-amber-900 uppercase tracking-tighter leading-none mb-1">Backup de Seguridad</h4>
-                        <p className="text-xs text-amber-700 font-medium">Aunque uses la nube, siempre es recomendable tener un respaldo local.</p>
+                        <h4 className="text-xl font-black text-amber-900 uppercase tracking-tighter leading-none mb-1">Backup de Seguridad (Manual)</h4>
+                        <p className="text-xs text-amber-700 font-medium">Aunque use la nube, siempre descargue un respaldo JSON semanal por seguridad extra.</p>
                     </div>
                 </div>
                 <button onClick={exportFullDatabase} className="bg-amber-500 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-amber-600 transition-all">
-                    Descargar Respaldo JSON
+                    Descargar Backup Maestro
                 </button>
             </div>
         </div>
