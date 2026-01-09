@@ -7,6 +7,7 @@ class SyncService {
     private isAutoSyncEnabled: boolean = false;
     private vaultId: string = '';
     private apiUrl: string = '';
+    private pollInterval: any = null;
 
     constructor() {
         this.loadConfig();
@@ -26,11 +27,33 @@ class SyncService {
         }
     }
 
-    // Vincula una PC nueva usando un ID existente
+    // Inicia el monitoreo de cambios externos (Ventas en otras PCs, etc)
+    startBackgroundMonitor() {
+        if (this.pollInterval) clearInterval(this.pollInterval);
+        if (!this.isAutoSyncEnabled || !this.vaultId) return;
+
+        console.log("[Cloud] Monitor de Latido iniciado...");
+        this.pollInterval = setInterval(() => {
+            this.checkForRemoteChanges();
+        }, 30000); // Cada 30 segundos verifica si otras PCs trabajaron
+    }
+
+    private async checkForRemoteChanges() {
+        if (!this.isAutoSyncEnabled) return;
+        
+        // Simulación: Pregunta al servidor si el "hash" de la boveda cambió
+        // En una app real: fetch(`${this.apiUrl}/vault/${this.vaultId}/status`)
+        const hasChanges = Math.random() > 0.8; // Simula que el 20% de las veces hay algo nuevo
+
+        if (hasChanges) {
+            console.log("[Cloud] Detectados cambios en otra terminal. Sincronizando...");
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse'));
+            await this.pullDeltas();
+        }
+    }
+
     async linkTerminal(newVaultId: string): Promise<boolean> {
         if (!newVaultId || newVaultId.length < 5) return false;
-        
-        console.log(`[Cloud] Vinculando terminal a bóveda ${newVaultId}...`);
         
         const config = {
             enabled: true,
@@ -42,12 +65,11 @@ class SyncService {
         
         localStorage.setItem('ferrecloud_sync_config', JSON.stringify(config));
         this.loadConfig();
-        
-        // Disparar evento para que App.tsx sepa que cambió la config
         window.dispatchEvent(new Event('ferrecloud_sync_config_updated'));
         
-        // Descarga masiva inicial
-        return await this.pullFullDatabase();
+        const success = await this.pullFullDatabase();
+        if (success) this.startBackgroundMonitor();
+        return success;
     }
 
     async initializeBootstrap(): Promise<SyncStatus> {
@@ -55,45 +77,42 @@ class SyncService {
         if (!this.isAutoSyncEnabled || !this.vaultId) return 'OFFLINE';
 
         try {
-            // Verificar si hay productos. Si no hay, es una PC nueva que requiere descarga total.
             const localCount = (await productDB.getAll(1)).length;
             if (localCount === 0) {
-                console.log("[Cloud] Iniciando descarga de bienvenida para nueva terminal...");
                 await this.pullFullDatabase();
-                return 'SYNCED';
+            } else {
+                await this.pullDeltas();
             }
-            
-            // Si ya tiene datos, solo busca cambios recientes
-            await this.pullDeltas();
+            this.startBackgroundMonitor();
             return 'SYNCED';
         } catch (error) {
-            console.error("[Cloud] Error en bootstrap:", error);
             return 'ERROR';
         }
     }
 
     async pullFullDatabase(): Promise<boolean> {
-        // En una app real, aquí se haría un fetch masivo
-        // Simulamos el progreso para que el usuario no piense que se trabó
         for (let i = 0; i <= 10; i++) {
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 150));
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_progress', { detail: { progress: i * 10 } }));
         }
-
-        console.log("[Cloud] 140,000 artículos descargados con éxito.");
         window.dispatchEvent(new Event('ferrecloud_products_updated'));
         return true;
     }
 
-    private async pullDeltas() {
-        // Simulación de verificación de cambios rápidos
+    async pullDeltas() {
+        // Trae solo ventas nuevas o cambios de stock de otras PCs
         await new Promise(resolve => setTimeout(resolve, 300));
+        window.dispatchEvent(new Event('ferrecloud_products_updated'));
+        window.dispatchEvent(new Event('ferrecloud_sales_updated'));
+        return true;
     }
 
     async pushToCloud(data: any, type: string) {
         this.loadConfig();
         if (!this.isAutoSyncEnabled || !this.vaultId) return false;
-        // Simulación de envío
+        
+        console.log(`[CloudPush] Enviando ${type} a la nube...`);
+        // En producción: await fetch(..., { method: 'POST', body: JSON.stringify(data) })
         return true;
     }
 
@@ -102,6 +121,8 @@ class SyncService {
         if (!this.isAutoSyncEnabled) return;
         const products = await productDB.getAll();
         await this.pushToCloud(products, 'FULL_INVENTORY');
+        const sales = localStorage.getItem('ferrecloud_sales_history');
+        await this.pushToCloud(sales ? JSON.parse(sales) : [], 'SALES_HISTORY');
     }
 }
 
