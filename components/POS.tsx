@@ -35,6 +35,7 @@ interface POSProps {
 }
 
 const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito, onTransformToBudget }) => {
+    // Put all state declarations at the top to avoid TDZ (Temporal Dead Zone) issues
     const [activeTab, setActiveTab] = useState<'SALES' | 'HISTORY'>('SALES');
     const [productSearch, setProductSearch] = useState('');
     const [showProductResults, setShowProductResults] = useState(false);
@@ -47,10 +48,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [salesHistory, setSalesHistory] = useState<any[]>(() => JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
 
+    // Moved these up to fix 'used before its declaration' errors in useMemo below
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [selectedClient, setSelectedClient] = useState<Client>(DEFAULT_CLIENT);
     const [paymentMethod, setPaymentMethod] = useState<string>('EFECTIVO');
-    
     const [selectedSystemId, setSelectedSystemId] = useState<string>('');
     const [cardMode, setCardMode] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
@@ -60,10 +61,18 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         setProducts(all);
     };
 
+    const loadHistory = () => {
+        setSalesHistory(JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]'));
+    };
+
     useEffect(() => {
         loadProducts();
         window.addEventListener('ferrecloud_products_updated', loadProducts);
-        return () => window.removeEventListener('ferrecloud_products_updated', loadProducts);
+        window.addEventListener('ferrecloud_sales_updated', loadHistory);
+        return () => {
+            window.removeEventListener('ferrecloud_products_updated', loadProducts);
+            window.removeEventListener('ferrecloud_sales_updated', loadHistory);
+        };
     }, []);
 
     const companyConfig: CompanyConfig = useMemo(() => {
@@ -130,19 +139,39 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         const saleId = `VEN-${Date.now().toString().slice(-6)}`;
         const timestamp = new Date().toLocaleString();
 
-        const sale = { id: saleId, isFiscal, date: timestamp, client: selectedClient.name, total: totals.total, method: paymentMethod, items: cart.map(i => ({ sku: i.product.internalCodes[0], name: i.product.name, qty: i.quantity, price: i.appliedPrice })) };
+        const sale = { 
+            id: saleId, 
+            isFiscal, 
+            date: timestamp, 
+            client: selectedClient.name, 
+            total: totals.total, 
+            method: paymentMethod, 
+            items: cart.map(i => ({ sku: i.product.internalCodes[0], name: i.product.name, qty: i.quantity, price: i.appliedPrice })) 
+        };
+        
         const newHistory = [sale, ...salesHistory];
         setSalesHistory(newHistory);
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(newHistory));
 
+        // ACTUALIZAR STOCK LOCAL Y DISPARAR SINCRONIZACIÓN NUBE
         const productsToUpdate: Product[] = [];
         for (const item of cart) {
             const prod = products.find(p => p.id === item.product.id);
             if (prod) {
-                productsToUpdate.push({ ...prod, stockPrincipal: Math.max(0, (prod.stockPrincipal || 0) - item.quantity), stock: Math.max(0, (prod.stock || 0) - item.quantity) });
+                const updatedProd = { 
+                    ...prod, 
+                    stockPrincipal: Math.max(0, (prod.stockPrincipal || 0) - item.quantity), 
+                    stock: Math.max(0, (prod.stock || 0) - item.quantity) 
+                };
+                productsToUpdate.push(updatedProd);
             }
         }
         await productDB.saveBulk(productsToUpdate);
+
+        // DISPARAR PUSH DE VENTA A LA NUBE
+        window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { 
+            detail: { type: 'NEW_SALE', data: { sale, stockUpdates: productsToUpdate } } 
+        }));
 
         if (!['CTACTE', 'CHEQUE', 'E-CHEQ'].includes(paymentMethod) && activeRegister) {
             const movement: TreasuryMovement = { id: `MV-${Date.now()}`, date: timestamp, type: 'INCOME', subtype: 'VENTA', paymentMethod: paymentMethod as any, amount: totals.total, description: `VENTA #${saleId} - ${selectedClient.name}`, cashRegisterId: activeRegister.id };
@@ -253,7 +282,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                         </div>
                     </div>
 
-                    {/* PANEL DE PAGO DERECHO */}
                     <div className="w-[340px] flex flex-col gap-2 shrink-0 overflow-y-auto custom-scrollbar pr-1">
                         <div className="bg-slate-900 rounded-[1.5rem] p-4 text-white shadow-xl flex flex-col relative overflow-hidden shrink-0">
                             <h3 className="text-[8px] font-black uppercase tracking-widest text-indigo-400 mb-3 border-b border-white/10 pb-1.5">Medios de Pago</h3>
