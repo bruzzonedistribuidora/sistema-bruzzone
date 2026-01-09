@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
@@ -17,33 +16,29 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const [fileRows, setFileRows] = useState<string[][]>([]);
     const [headers, setHeaders] = useState<string[]>([]);
     const [mapping, setMapping] = useState<Record<string, number>>({});
-    const [matchKey, setMatchKey] = useState<string>('internalCodes'); 
     const [isProcessing, setIsProcessing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [stats, setStats] = useState({ created: 0, updated: 0 });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const productFields = [
-        { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: false }, // Cambiado a opcional para permitir fallback
+        { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: false },
         { key: 'barcodes', label: 'Código de Barras (EAN)', required: false },
         { key: 'name', label: 'Nombre / Descripción', required: true },
         { key: 'listCost', label: 'COSTOS LISTA', required: true },
         { key: 'purchasePackageQuantity', label: 'Cant. por Bulto', required: false },
+        { key: 'measureUnitSale', label: 'U. de Venta', required: false },
+        { key: 'conversionFactor', label: 'Factor Venta (Multiplicador)', required: false },
         { key: 'brand', label: 'Marca', required: false },
         { key: 'category', label: 'Rubro / Categoría', required: false },
         { key: 'provider', label: 'Proveedor', required: false },
         { key: 'stock', label: 'Stock Total', required: false },
         { key: 'stockPrincipal', label: 'Stock Local / Mostrador', required: false },
         { key: 'stockDeposito', label: 'Stock Depósito', required: false },
-        { key: 'stockSucursal', label: 'Stock Sucursal', required: false },
         { key: 'stockMinimo', label: 'Stock Mínimo', required: false },
-        { key: 'stockMaximo', label: 'Stock Máximo', required: false },
-        { key: 'reorderPoint', label: 'Punto Pedido', required: false },
         { key: 'profitMargin', label: 'Porcentaje Ganancia (%)', required: false },
         { key: 'vatRate', label: 'Tasa (IVA %)', required: false },
         { key: 'disc1', label: 'Descuento 1 (%)', required: false },
-        { key: 'measureUnitPurchase', label: 'U. Medida', required: false },
-        { key: 'providerCodes', label: 'Ref Proveedor', required: false },
     ];
 
     const parseNumber = (val: any, defaultValue: number): number => {
@@ -97,7 +92,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         const productMap = new Map<string, Product>();
         currentProducts.forEach(p => productMap.set(p.internalCodes[0].toString().toUpperCase(), p));
 
-        const CHUNK_SIZE = 4000;
+        const CHUNK_SIZE = 5000;
         let index = 0;
         let createdCount = 0;
         let updatedCount = 0;
@@ -108,43 +103,39 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
             for (let i = index; i < limit; i++) {
                 const row = fileRows[i];
-                
-                // LÓGICA DE FALLBACK PARA ARTÍCULOS SIN CÓDIGO PROPIO
                 let sku = row[mapping.internalCodes]?.toString().toUpperCase();
                 const barcode = row[mapping.barcodes]?.toString();
-                
-                if (!sku && barcode) {
-                    sku = barcode; // Si no hay SKU, usamos el código de barras como SKU
-                }
-                
-                if (!sku) continue; // Si no hay ninguno de los dos, ignoramos la fila
+                if (!sku && barcode) sku = barcode;
+                if (!sku) continue;
 
                 const existingProduct = productMap.get(sku);
-
                 const listCost = parseNumber(row[mapping.listCost], 0);
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
+                const factor = mapping.conversionFactor !== undefined ? parseNumber(row[mapping.conversionFactor], 1) : 1;
                 const margin = mapping.profitMargin !== undefined ? parseNumber(row[mapping.profitMargin], 30) : 30;
                 const vat = mapping.vatRate !== undefined ? parseNumber(row[mapping.vatRate], 21) : 21;
 
-                const coef = (1 - d1/100);
-                const costAfterDiscounts = listCost * coef;
-                const priceNeto = costAfterDiscounts * (1 + margin/100);
+                const unitCostBase = (listCost * (1 - d1/100)) * factor;
+                const priceNeto = unitCostBase * (1 + margin/100);
                 const priceFinal = (priceNeto * (1 + vat/100));
 
                 const productData: Product = {
                     id: existingProduct?.id || `PROD-${sku}-${Date.now()}`,
                     internalCodes: [sku],
                     barcodes: barcode ? [barcode] : (existingProduct?.barcodes || []),
-                    providerCodes: mapping.providerCodes !== undefined ? [row[mapping.providerCodes]] : (existingProduct?.providerCodes || []),
+                    // Fix: Include missing required properties for type 'Product'
+                    providerCodes: existingProduct?.providerCodes || [],
                     name: (row[mapping.name] || 'ARTICULO SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : (existingProduct?.brand || 'GENÉRICO')).toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : (existingProduct?.category || 'GENERAL')).toUpperCase(),
                     provider: (mapping.provider !== undefined ? row[mapping.provider] : (existingProduct?.provider || '')).toUpperCase(),
-                    description: existingProduct?.description || '',
                     listCost: listCost,
-                    purchasePackageQuantity: mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1,
+                    conversionFactor: factor,
+                    measureUnitSale: (mapping.measureUnitSale !== undefined ? row[mapping.measureUnitSale] : (existingProduct?.measureUnitSale || 'UNIDAD')).toUpperCase(),
+                    // Fix: Include missing required measureUnitPurchase
+                    measureUnitPurchase: existingProduct?.measureUnitPurchase || 'UNIDAD',
                     discounts: [d1, 0, 0, 0],
-                    costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(4)),
+                    costAfterDiscounts: parseFloat((listCost * (1 - d1/100)).toFixed(4)),
                     profitMargin: margin,
                     vatRate: vat,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
@@ -152,23 +143,24 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
                     stockPrincipal: mapping.stockPrincipal !== undefined ? parseNumber(row[mapping.stockPrincipal], 0) : (existingProduct?.stockPrincipal || 0),
                     stockDeposito: mapping.stockDeposito !== undefined ? parseNumber(row[mapping.stockDeposito], 0) : (existingProduct?.stockDeposito || 0),
-                    stockSucursal: mapping.stockSucursal !== undefined ? parseNumber(row[mapping.stockSucursal], 0) : (existingProduct?.stockSucursal || 0),
+                    // Fix: Include missing required stockSucursal
+                    stockSucursal: existingProduct?.stockSucursal || 0,
                     stockMinimo: mapping.stockMinimo !== undefined ? parseNumber(row[mapping.stockMinimo], 0) : (existingProduct?.stockMinimo || 0),
-                    stockMaximo: mapping.stockMaximo !== undefined ? parseNumber(row[mapping.stockMaximo], 0) : (existingProduct?.stockMaximo || 0),
-                    reorderPoint: mapping.reorderPoint !== undefined ? parseNumber(row[mapping.reorderPoint], 0) : (existingProduct?.reorderPoint || 0),
-                    measureUnitPurchase: (mapping.measureUnitPurchase !== undefined ? row[mapping.measureUnitPurchase] : (existingProduct?.measureUnitPurchase || 'UNIDAD')).toUpperCase(),
+                    // Fix: Include missing required reorderPoint
+                    reorderPoint: existingProduct?.reorderPoint || 0,
                     purchaseCurrency: 'ARS',
                     saleCurrency: 'ARS',
-                    location: existingProduct?.location || '',
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
                     isCombo: existingProduct?.isCombo || false,
                     comboItems: existingProduct?.comboItems || [],
-                    stockDetails: existingProduct?.stockDetails || []
+                    stockDetails: existingProduct?.stockDetails || [],
+                    description: existingProduct?.description || '',
+                    purchasePackageQuantity: mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1,
+                    location: existingProduct?.location || ''
                 };
 
                 if (existingProduct) updatedCount++;
                 else createdCount++;
-
                 chunkProducts.push(productData);
             }
 
@@ -193,8 +185,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
             <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 shrink-0">
                 <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Importador Inteligente</h2>
-                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Soporta artículos sin SKU (usa Código de Barras)</p>
+                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Importador Masivo Pro</h2>
+                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Soporta Unidad de Venta y Factor de Conversión</p>
                 </div>
                 {step === 2 && (
                     <div className="ml-auto flex items-center gap-4">
@@ -209,11 +201,11 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 <div className="flex-1 flex items-center justify-center animate-fade-in">
                     <div className="max-w-xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-8">
                         <FileSpreadsheet size={64} className="text-slate-100 mx-auto" />
-                        <h3 className="text-xl font-black uppercase text-slate-800 tracking-tight">Carga de Fichero Maestro</h3>
+                        <h3 className="text-xl font-black uppercase text-slate-800 tracking-tight">Seleccionar Archivo Maestro</h3>
                         <div className="group border-4 border-dashed border-slate-100 rounded-[3rem] p-16 hover:border-indigo-400 hover:bg-indigo-50 transition-all cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
                             <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleFileUpload} />
                             <FileUp size={48} className="text-slate-200 mx-auto mb-4 group-hover:text-indigo-400 group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">Seleccionar CSV / TXT</span>
+                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600">CSV / TXT / EXCEL</span>
                         </div>
                     </div>
                 </div>
@@ -221,10 +213,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
 
             {step === 2 && (
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden animate-fade-in">
-                    <div className="lg:col-span-5 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+                    <div className="lg:col-span-4 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                         <div className="flex items-center gap-3 mb-6 border-b pb-4 shrink-0">
                             <Settings2 size={18} className="text-indigo-600"/>
-                            <h3 className="text-xs font-black uppercase tracking-widest">Mapeo de Columnas</h3>
+                            <h3 className="text-xs font-black uppercase tracking-widest">Mapear Columnas</h3>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 space-y-2">
                             {productFields.map(field => (
@@ -234,21 +226,22 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{field.label}</label>
                                     </div>
                                     <select 
-                                        className="max-w-[180px] p-2 bg-white border-2 border-transparent rounded-xl text-[10px] font-bold outline-none focus:border-indigo-600 shadow-sm"
+                                        className="max-w-[150px] p-2 bg-white border rounded-xl text-[10px] font-bold outline-none focus:border-indigo-600 shadow-sm"
                                         value={mapping[field.key] ?? ""}
                                         onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}
                                     >
                                         <option value="">-- Ignorar --</option>
-                                        {headers.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
+                                        {headers.map((h, i) => <option key={i} value={i}>{h || `Col ${i + 1}`}</option>)}
                                     </select>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="lg:col-span-7 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
                         <div className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em]">Vista Previa ({fileRows.length.toLocaleString()} filas)</h3>
+                            <span className="text-[10px] font-black text-indigo-400">Progreso: {progress}%</span>
                         </div>
                         <div className="overflow-auto flex-1 custom-scrollbar">
                             <table className="w-full text-left border-collapse">
@@ -258,9 +251,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {fileRows.slice(0, 30).map((row, i) => (
+                                    {fileRows.slice(0, 50).map((row, i) => (
                                         <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                            {row.map((cell, j) => <td key={j} className="px-4 py-2 text-[10px] font-medium text-slate-500 border-r truncate max-w-[150px]">{cell}</td>)}
+                                            {row.map((cell, j) => <td key={j} className="px-4 py-2 text-[10px] font-medium text-slate-500 border-r truncate max-w-[200px]">{cell}</td>)}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -274,21 +267,21 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 <div className="h-full flex items-center justify-center animate-fade-in">
                     <div className="max-w-2xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-10">
                         <div className="w-24 h-24 bg-green-50 text-green-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><CheckCircle size={48}/></div>
-                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Sincronización Completa</h3>
+                        <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Importación Exitosa</h3>
                         
                         <div className="grid grid-cols-2 gap-6">
                             <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Items Nuevos</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Artículos Creados</p>
                                 <p className="text-5xl font-black text-indigo-600 tracking-tighter">{stats.created.toLocaleString()}</p>
                             </div>
                             <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Items Actualizados</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Artículos Actualizados</p>
                                 <p className="text-5xl font-black text-green-600 tracking-tighter">{stats.updated.toLocaleString()}</p>
                             </div>
                         </div>
 
                         <button onClick={onComplete} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95">
-                            Explorar Catálogo <ArrowRight size={20}/>
+                            Ir al Catálogo <ArrowRight size={20}/>
                         </button>
                     </div>
                 </div>
