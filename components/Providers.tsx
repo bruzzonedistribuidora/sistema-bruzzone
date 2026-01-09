@@ -53,9 +53,25 @@ const Providers: React.FC = () => {
     }, [providers, searchTerm, sortConfig]);
 
     const handleSave = () => {
-        if (!formData.name || !formData.cuit) return;
-        setProviders(prev => isEditing ? prev.map(p => p.id === formData.id ? formData as Provider : p) : [formData as Provider, ...prev]);
+        if (!formData.name || !formData.cuit) {
+            alert("Razón Social y CUIT son obligatorios");
+            return;
+        }
+        
+        const providerData: Provider = {
+            ...formData,
+            id: formData.id || Date.now().toString(),
+            balance: formData.balance || 0,
+            defaultDiscounts: formData.defaultDiscounts || [0, 0, 0]
+        } as Provider;
+
+        setProviders(prev => isEditing 
+            ? prev.map(p => p.id === providerData.id ? providerData : p) 
+            : [providerData, ...prev]
+        );
+        
         setIsModalOpen(false);
+        setFormData({ id: '', name: '', cuit: '', contact: '', phone: '', email: '', address: '', balance: 0, defaultDiscounts: [0,0,0], taxCondition: 'Responsable Inscripto' });
     };
 
     const handleExport = () => {
@@ -78,7 +94,7 @@ const Providers: React.FC = () => {
             <div className="h-full flex flex-col bg-slate-50 animate-fade-in overflow-hidden border-l border-slate-200">
                 <div className="bg-white p-4 border-b flex justify-between items-center shrink-0">
                     <button onClick={() => setSelectedProvider(null)} className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase">
-                        <ArrowLeft size={14}/> Volver
+                        <ArrowLeft size={14}/> Volver al Listado
                     </button>
                     <div className="text-center">
                         <h3 className="font-black text-xs uppercase text-slate-800">{selectedProvider.name}</h3>
@@ -108,7 +124,6 @@ const Providers: React.FC = () => {
                     <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex flex-col min-h-[300px]">
                         <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
                             <h4 className="text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><History size={14}/> Movimientos en Cuenta</h4>
-                            <button className="text-[8px] font-black uppercase bg-white/10 px-2 py-1 rounded">Ver Detalle Completo</button>
                         </div>
                         <div className="flex-1 overflow-auto">
                             <table className="w-full text-left">
@@ -143,8 +158,8 @@ const Providers: React.FC = () => {
                     <input type="text" placeholder="Filtrar proveedores..." className="w-full pl-9 pr-4 py-2 bg-slate-50 border rounded-xl text-[10px] font-bold outline-none uppercase" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={handleExport} className="p-2 text-slate-400 hover:text-indigo-600"><Download size={16}/></button>
-                    <button onClick={() => { setIsEditing(false); setFormData({}); setIsModalOpen(true); }} className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[8px] uppercase tracking-widest shadow-md">Nuevo Prov.</button>
+                    <button onClick={handleExport} className="p-2 text-slate-400 hover:text-indigo-600" title="Exportar Proveedores"><Download size={16}/></button>
+                    <button onClick={() => { setIsEditing(false); setFormData({id: '', name: '', cuit: '', contact: '', phone: '', email: '', address: '', balance: 0, defaultDiscounts: [0,0,0], taxCondition: 'Responsable Inscripto'}); setIsModalOpen(true); }} className="bg-indigo-600 text-white px-3 py-1.5 rounded-xl font-black text-[8px] uppercase tracking-widest shadow-md">Nuevo Prov.</button>
                 </div>
             </div>
 
@@ -190,20 +205,20 @@ const Providers: React.FC = () => {
                         <div className="p-6 space-y-4 overflow-y-auto">
                             <div>
                                 <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">CUIT</label>
-                                <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-black text-xs" value={formData.cuit} onChange={e => setFormData({...formData, cuit: e.target.value})} />
+                                <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-black text-xs" value={formData.cuit || ''} onChange={e => setFormData({...formData, cuit: e.target.value})} />
                             </div>
                             <div>
                                 <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Razón Social</label>
-                                <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-black text-xs uppercase" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
+                                <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-black text-xs uppercase" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value.toUpperCase()})} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Contacto</label>
-                                    <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-bold text-xs uppercase" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} />
+                                    <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-bold text-xs uppercase" value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} />
                                 </div>
                                 <div>
                                     <label className="text-[8px] font-black text-slate-400 uppercase block mb-1">Teléfono</label>
-                                    <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-bold text-xs" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                    <input className="w-full p-2.5 bg-slate-100 border rounded-xl font-bold text-xs" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} />
                                 </div>
                             </div>
                             <button onClick={handleSave} className="w-full py-3 bg-slate-900 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-600 transition-all mt-4">Guardar Registro</button>
