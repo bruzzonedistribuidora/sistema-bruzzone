@@ -12,7 +12,10 @@ const createMockProduct = (id: string, internalCode: string, name: string, price
   id, internalCodes: [internalCode], barcodes: [internalCode], providerCodes: [],
   name, brand, provider: 'Proveedor Demo', category, description: '',
   measureUnitSale: 'Unidad', measureUnitPurchase: 'Unidad', conversionFactor: 1, purchaseCurrency: 'ARS', saleCurrency: 'ARS',
-  vatRate: 21, listCost: priceFinal * 0.6, discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 40,
+  vatRate: 21, listCost: priceFinal * 0.6,
+  // Added purchasePackageQuantity to fix property missing error
+  purchasePackageQuantity: 1,
+  discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 40,
   priceNeto: priceFinal / 1.21, priceFinal: priceFinal, 
   stock, 
   // Added missing required stock properties
@@ -21,7 +24,7 @@ const createMockProduct = (id: string, internalCode: string, name: string, price
   stockSucursal: 0,
   stockDetails: [], 
   stockMinimo: 10, stockMaximo: 20, reorderPoint: 5,
-  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false },
+  location: '', ecommerce: { mercadoLibre: false, tiendaNube: false, webPropia: false, isPublished: false },
   isCombo: false,
   comboItems: []
 });
