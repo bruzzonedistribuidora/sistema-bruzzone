@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Cloud, RefreshCw, Key, Download, Upload, Globe, Copy,
     Zap, ShieldCheck, Info, History, Monitor, Wifi, WifiOff,
-    CheckCircle2, ArrowRight, Loader2
+    CheckCircle2, ArrowRight, Loader2, CloudDownload, DatabaseZap
 } from 'lucide-react';
 import { CloudConfig, CloudSyncStatus } from '../types';
 import { syncService } from '../services/syncService';
@@ -42,7 +42,9 @@ const CloudHub: React.FC = () => {
             if (success) {
                 const updated = JSON.parse(localStorage.getItem('ferrecloud_sync_config') || '{}');
                 setConfig(updated);
-                alert("✅ ¡PC Vinculada! Los datos se han descargado correctamente.");
+                alert("✅ ¡PC Vinculada! Los datos de la PC Madre se han descargado correctamente.");
+            } else {
+                alert("No se encontraron datos para ese ID de Bóveda.");
             }
         } catch (error) {
             alert("Error al vincular. Verifique su conexión.");
@@ -52,14 +54,21 @@ const CloudHub: React.FC = () => {
         }
     };
 
-    const handleCreateVault = () => {
-        if (confirm("Se creará una nueva bóveda vacía en la nube para esta PC. ¿Desea continuar?")) {
+    const handleCreateVault = async () => {
+        if (confirm("Se creará una nueva bóveda en la nube usando los datos de ESTA COMPUTADORA como base maestra. ¿Desea continuar?")) {
             const newConfig = { ...config, enabled: true };
             localStorage.setItem('ferrecloud_sync_config', JSON.stringify(newConfig));
             setConfig(newConfig);
-            syncService.syncEverything();
-            alert("Bóveda creada. Ahora puede usar este ID en otras computadoras.");
+            await syncService.syncEverything();
+            alert("✅ Bóveda Maestra creada. Use este ID en sus otras computadoras para que hereden estos productos.");
         }
+    };
+
+    const handleForceSync = async () => {
+        setIsLinking(true);
+        const success = await syncService.pullFullDatabase();
+        setIsLinking(false);
+        if (success) alert("✅ Sincronización forzada completada. Los productos están actualizados.");
     };
 
     return (
@@ -81,12 +90,12 @@ const CloudHub: React.FC = () => {
                             </span>
                         </div>
                         <p className="text-gray-400 mt-2 font-bold uppercase tracking-widest text-xs">
-                             Sincronización Total Multi-PC
+                             Sincronización Total de 140.000 Artículos
                         </p>
                         {isLinking && (
                             <div className="mt-4 w-64 space-y-2">
                                 <div className="flex justify-between text-[9px] font-black text-indigo-600 uppercase">
-                                    <span>Descargando Base...</span>
+                                    <span>Transfiriendo Base...</span>
                                     <span>{syncProgress}%</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -96,11 +105,18 @@ const CloudHub: React.FC = () => {
                         )}
                     </div>
                 </div>
-                {!config.enabled && (
+                {config.enabled ? (
+                    <button 
+                        onClick={handleForceSync}
+                        disabled={isLinking}
+                        className="bg-slate-900 text-white px-8 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all hover:bg-indigo-600">
+                        <CloudDownload size={20}/> Forzar Descarga de Bóveda
+                    </button>
+                ) : (
                     <button 
                         onClick={handleCreateVault}
                         className="bg-slate-900 text-white px-8 py-4 rounded-[1.8rem] font-black text-xs uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 transition-all hover:bg-slate-800">
-                        Convertir esta PC en Maestra
+                        <DatabaseZap size={20}/> Convertir esta PC en Madre
                     </button>
                 )}
             </div>
@@ -112,13 +128,13 @@ const CloudHub: React.FC = () => {
                     <div className="relative z-10 space-y-6">
                         <div className="flex items-center gap-4 border-b border-white/10 pb-6">
                             <div className="p-3 bg-white/10 text-indigo-400 rounded-2xl"><ShieldCheck size={24}/></div>
-                            <h3 className="text-xl font-black uppercase tracking-tighter">Tu ID de Bóveda</h3>
+                            <h3 className="text-xl font-black uppercase tracking-tighter">Tu ID de Bóveda Maestra</h3>
                         </div>
                         <p className="text-sm text-slate-400 leading-relaxed">
-                            Si esta es tu computadora principal, copia este código y úsalo en las otras computadoras de la ferretería.
+                            Copia este código y úsalo en las otras computadoras de la ferretería para clonar el catálogo y las ventas.
                         </p>
                         <div className="bg-white/5 border-2 border-dashed border-white/20 p-8 rounded-[2rem] text-center">
-                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Código de Enlace</p>
+                             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4">Código de Enlace Único</p>
                              <div className="flex items-center justify-center gap-4">
                                 <span className="text-4xl font-mono font-black text-white tracking-widest">{config.vaultId}</span>
                                 <button onClick={() => { navigator.clipboard.writeText(config.vaultId); alert("ID Copiado"); }} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-500 shadow-lg transition-all active:scale-90">
@@ -130,17 +146,17 @@ const CloudHub: React.FC = () => {
                 </div>
 
                 {/* OPCIÓN 2: PC NUEVA (VINCULAR) */}
-                <div className="bg-white rounded-[2.5rem] p-10 border border-gray-100 shadow-sm flex flex-col">
+                <div className="bg-white rounded-[2.5rem] p-10 border border-gray-200 shadow-sm flex flex-col">
                     <div className="flex items-center gap-4 border-b pb-6">
                         <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Monitor size={24}/></div>
-                        <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter">Vincular PC Nueva</h3>
+                        <h3 className="font-black text-xl text-slate-800 uppercase tracking-tighter">Vincular Terminal Nueva</h3>
                     </div>
                     <div className="flex-1 py-8 space-y-6">
                         <p className="text-sm text-slate-500 font-medium">
-                            ¿Quieres que esta computadora tenga los mismos 140.000 artículos y ventas de tu PC principal?
+                            Ingresa el código de la PC Madre para descargar automáticamente todo el inventario y empezar a trabajar.
                         </p>
                         <div className="space-y-4">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Ingresa el ID de la PC Maestra</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ID de PC Madre</label>
                             <input 
                                 type="text" 
                                 placeholder="EJ: BRUZZONE-X4Y2"
@@ -154,7 +170,7 @@ const CloudHub: React.FC = () => {
                             disabled={isLinking || !inputVaultId}
                             className="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-700 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-30">
                             {isLinking ? <Loader2 className="animate-spin" size={20}/> : <RefreshCw size={20}/>}
-                            Vincular y Descargar Todo
+                            Descargar Base de PC Madre
                         </button>
                     </div>
                 </div>
@@ -165,11 +181,12 @@ const CloudHub: React.FC = () => {
                     <Info size={32}/>
                 </div>
                 <div>
-                    <h4 className="text-lg font-black text-indigo-900 uppercase tracking-tighter mb-1">¿Cómo funciona la sincronización?</h4>
-                    <p className="text-xs text-indigo-700 font-medium leading-relaxed">
-                        Una vez vinculadas, las computadoras comparten una "Bóveda" encriptada en la nube. 
-                        Cuando vendes un artículo en el mostrador, el stock se descuenta en el resto de las terminales en tiempo real (requiere internet). 
-                        Si una PC se queda sin conexión, los cambios se enviarán apenas vuelva el internet.
+                    <h4 className="text-lg font-black text-indigo-900 uppercase tracking-tighter mb-1">¿Cómo asegurar la sincronización?</h4>
+                    <p className="text-xs text-indigo-700 font-medium leading-relaxed uppercase">
+                        1. En la PC que tiene los productos, pulsa "Convertir en Madre".<br/>
+                        2. Copia el ID generado.<br/>
+                        3. En las otras PCs, pega el ID y pulsa "Descargar Base".<br/>
+                        4. Cualquier cambio en stock o precios se reflejará en 15 segundos en todas las pantallas.
                     </p>
                 </div>
             </div>
