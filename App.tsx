@@ -115,29 +115,32 @@ const App: React.FC = () => {
 
   const runBootstrap = async () => {
       setCloudStatus('SYNCING');
-      const result = await syncService.initializeBootstrap();
-      if (result === 'SYNCED') {
-          setCloudStatus('UP_TO_DATE');
-          window.dispatchEvent(new Event('ferrecloud_products_updated'));
-      } else if (result === 'OFFLINE') {
-          setCloudStatus('OFFLINE');
-      } else {
+      try {
+          const result = await syncService.initializeBootstrap();
+          if (result === 'UP_TO_DATE' || result === 'SYNCED') {
+              setCloudStatus('UP_TO_DATE');
+          } else if (result === 'OFFLINE') {
+              setCloudStatus('OFFLINE');
+          } else {
+              setCloudStatus('IDLE');
+          }
+      } catch (err) {
           setCloudStatus('ERROR');
       }
   };
 
   useEffect(() => {
-    const savedSession = localStorage.getItem('ferrecloud_session');
+    // Cambiado de localStorage a sessionStorage para requerir login por cada apertura de pestaña
+    const savedSession = sessionStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
 
     loadLicense();
     window.addEventListener('license_updated', loadLicense);
-    window.addEventListener('ferrecloud_sync_updated', runBootstrap);
-    window.addEventListener('ferrecloud_sync_config_updated', runBootstrap);
-
+    
+    // Iniciar bootstrap de red
     runBootstrap();
 
-    // 🔄 ESCUCHADOR DE CAMBIOS EXTERNOS (Otras PCs)
+    // 🔄 ESCUCHADOR DE CAMBIOS EXTERNOS (Pulso de red)
     const handleRemotePulse = () => {
         setCloudStatus('SYNCING');
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1500);
@@ -148,8 +151,12 @@ const App: React.FC = () => {
     const handleSyncRequest = async (e: any) => {
         setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
-        await syncService.pushToCloud(data, type || 'GENERIC');
-        setTimeout(() => setCloudStatus('UP_TO_DATE'), 1000);
+        try {
+            await syncService.pushToCloud(data, type || 'GENERIC');
+            setCloudStatus('UP_TO_DATE');
+        } catch (err) {
+            setCloudStatus('ERROR');
+        }
     };
     window.addEventListener('ferrecloud_sync_request', handleSyncRequest);
 
@@ -161,8 +168,6 @@ const App: React.FC = () => {
         window.removeEventListener('resize', checkMobile);
         window.removeEventListener('license_updated', loadLicense);
         window.removeEventListener('ferrecloud_sync_request', handleSyncRequest);
-        window.removeEventListener('ferrecloud_sync_updated', runBootstrap);
-        window.removeEventListener('ferrecloud_sync_config_updated', runBootstrap);
         window.removeEventListener('ferrecloud_sync_pulse', handleRemotePulse);
     };
   }, []);
@@ -186,7 +191,7 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setLoggedInUser(null);
-    localStorage.removeItem('ferrecloud_session');
+    sessionStorage.removeItem('ferrecloud_session');
     setOpenViews([ViewState.DASHBOARD]);
     setActiveView(ViewState.DASHBOARD);
   };
@@ -263,7 +268,7 @@ const App: React.FC = () => {
   }
 
   if (!loggedInUser) {
-    return <Login onLogin={(u) => { setLoggedInUser(u); localStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
+    return <Login onLogin={(u) => { setLoggedInUser(u); sessionStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
   }
 
   if (isMobile) {
@@ -309,14 +314,15 @@ const App: React.FC = () => {
             
             <div className="flex items-center gap-4 px-4 border-l border-slate-100">
                 <button 
-                    onClick={() => handleNavigate(ViewState.CLOUD_HUB)}
+                    onClick={() => { runBootstrap(); handleNavigate(ViewState.CLOUD_HUB); }}
                     className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all hover:scale-105 active:scale-95 ${
                         cloudStatus === 'SYNCING' ? 'bg-indigo-50 text-indigo-600' : 
                         cloudStatus === 'UP_TO_DATE' ? 'bg-green-50 text-green-600' : 
                         cloudStatus === 'ERROR' ? 'bg-red-50 text-red-600' :
+                        cloudStatus === 'OFFLINE' ? 'bg-slate-100 text-slate-400' :
                         'bg-slate-900 text-white shadow-lg'
                     }`}>
-                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : <CloudIcon size={10}/>)}
+                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : (cloudStatus === 'ERROR' ? <AlertTriangle size={10}/> : <CloudIcon size={10}/>))}
                     {cloudStatus === 'SYNCING' ? 'Sincronizando' : cloudStatus === 'UP_TO_DATE' ? 'Bóveda Conectada' : cloudStatus === 'ERROR' ? 'Error Nube' : 'Vincular Cloud'}
                 </button>
             </div>
