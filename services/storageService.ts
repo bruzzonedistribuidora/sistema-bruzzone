@@ -1,4 +1,3 @@
-
 import { Product, ReplenishmentItem } from '../types';
 
 const DB_NAME = 'FerreCloudDB';
@@ -21,11 +20,6 @@ class ProductDB {
                     store.createIndex('name', 'name', { unique: false });
                     store.createIndex('brand', 'brand', { unique: false });
                     store.createIndex('webPropia', 'ecommerce.webPropia', { unique: false });
-                } else {
-                    const store = (event.target as IDBOpenDBRequest).transaction?.objectStore(STORE_NAME);
-                    if (store && !store.indexNames.contains('webPropia')) {
-                        store.createIndex('webPropia', 'ecommerce.webPropia', { unique: false });
-                    }
                 }
             };
 
@@ -35,6 +29,17 @@ class ProductDB {
             };
 
             request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getStats(): Promise<{ count: number }> {
+        const db = await this.init();
+        return new Promise((resolve) => {
+            const transaction = db.transaction(STORE_NAME, 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.count();
+            request.onsuccess = () => resolve({ count: request.result });
+            request.onerror = () => resolve({ count: 0 });
         });
     }
 
@@ -74,7 +79,8 @@ class ProductDB {
             const request = store.openCursor();
 
             request.onsuccess = (event) => {
-                const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+                // Fix: Access cursor via request.result instead of incorrect cast on event.target
+                const cursor = request.result;
                 if (cursor && results.length < 50) {
                     const p = cursor.value as Product;
                     const matches = 
@@ -100,8 +106,6 @@ class ProductDB {
             const request = store.put(product);
             request.onsuccess = () => {
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                // Trigger auto-sync
-                window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { detail: { type: 'PRODUCT', data: product } }));
                 resolve();
             };
             request.onerror = () => reject(request.error);
@@ -110,25 +114,28 @@ class ProductDB {
 
     async saveBulk(products: Product[]): Promise<void> {
         const db = await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            
-            products.forEach(p => {
-                try {
+        const CHUNK_SIZE = 10000;
+        
+        for (let i = 0; i < products.length; i += CHUNK_SIZE) {
+            const chunk = products.slice(i, i + CHUNK_SIZE);
+            await new Promise<void>((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                
+                chunk.forEach(p => {
                     store.put(p);
-                } catch (e) {
-                    console.error("Error guardando producto en bulk:", p.id, e);
-                }
-            });
+                });
 
-            transaction.oncomplete = () => {
-                window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { detail: { type: 'BULK_PRODUCTS' } }));
-                resolve();
-            };
-            transaction.onerror = () => reject(transaction.error);
-        });
+                transaction.oncomplete = () => {
+                    const progress = Math.round(((i + chunk.length) / products.length) * 100);
+                    window.dispatchEvent(new CustomEvent('ferrecloud_sync_progress', { detail: { progress } }));
+                    resolve();
+                };
+                transaction.onerror = () => reject(transaction.error);
+            });
+        }
+        
+        window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
     }
 
     async clearAll(): Promise<void> {
@@ -137,10 +144,7 @@ class ProductDB {
             const transaction = db.transaction(STORE_NAME, 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.clear();
-            request.onsuccess = () => {
-                window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                resolve();
-            };
+            request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
     }
@@ -153,7 +157,6 @@ class ProductDB {
             const request = store.delete(id);
             request.onsuccess = () => {
                 window.dispatchEvent(new CustomEvent('ferrecloud_products_updated'));
-                window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { detail: { type: 'DELETE_PRODUCT', id } }));
                 resolve();
             };
             request.onerror = () => reject(request.error);
