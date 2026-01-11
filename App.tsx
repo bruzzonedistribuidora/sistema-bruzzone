@@ -132,7 +132,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Cambiado de localStorage a sessionStorage para requerir login por cada apertura de pestaña
     const savedSession = sessionStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
 
@@ -142,14 +141,14 @@ const App: React.FC = () => {
     // Iniciar bootstrap de red
     runBootstrap();
 
-    // 🔄 ESCUCHADOR DE CAMBIOS EXTERNOS (Pulso de red)
+    // ESCUCHADOR DE CAMBIOS EXTERNOS
     const handleRemotePulse = () => {
         setCloudStatus('SYNCING');
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1500);
     };
     window.addEventListener('ferrecloud_sync_pulse', handleRemotePulse);
 
-    // 📤 ESCUCHADOR DE CAMBIOS LOCALES PARA SUBIDA
+    // ESCUCHADOR DE CAMBIOS LOCALES PARA SUBIDA
     const handleSyncRequest = async (e: any) => {
         setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
