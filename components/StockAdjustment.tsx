@@ -76,6 +76,7 @@ const StockAdjustment: React.FC = () => {
 
         const checkAdjustment = (loc: 'PRINCIPAL' | 'DEPOSITO' | 'SUCURSAL', oldVal: number, newVal: number) => {
             if (oldVal !== newVal) {
+                // Fix: Changed newQty to newVal to match StockAdjustmentLog interface in types.ts (Error on line 86)
                 logs.push({
                     id: `LOG-${Date.now()}-${Math.random()}`,
                     date: new Date().toLocaleString(),
@@ -83,7 +84,7 @@ const StockAdjustment: React.FC = () => {
                     productName: selectedProduct.name,
                     location: loc,
                     oldQty: oldVal,
-                    newQty: newVal,
+                    newVal: newVal,
                     reason: adjustmentReason.toUpperCase(),
                     user
                 });
@@ -307,7 +308,6 @@ const StockAdjustment: React.FC = () => {
                         <div className="p-8 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center shrink-0">
                             <h3 className="font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3"><History size={22} className="text-indigo-600"/> Libro de Auditoría de Stock</h3>
                             <button onClick={() => { if(confirm('¿Desea borrar el historial?')) setHistory([]); }} className="text-[9px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2 hover:underline">
-                                {/* Added Trash2 to handle manual history clearance */}
                                 <Trash2 size={14}/> Limpiar Registro
                             </button>
                         </div>
@@ -327,7 +327,8 @@ const StockAdjustment: React.FC = () => {
                                     {history.length === 0 ? (
                                         <tr><td colSpan={6} className="py-40 text-center text-slate-300 font-black uppercase tracking-widest">Sin ajustes registrados</td></tr>
                                     ) : history.map(log => {
-                                        const diff = log.newQty - log.oldQty;
+                                        // Fix: Changed log.newQty to log.newVal to match StockAdjustmentLog interface in types.ts (Error on line 330)
+                                        const diff = log.newVal - log.oldQty;
                                         return (
                                             <tr key={log.id} className="hover:bg-slate-50 transition-colors group">
                                                 <td className="px-8 py-5 font-bold text-slate-400">{log.date}</td>
@@ -345,10 +346,11 @@ const StockAdjustment: React.FC = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-8 py-5 text-center">
-                                                    <div className="flex flex-col items-center">
+                                                    <div className="flex items-center flex-col">
                                                         <span className="text-slate-400 font-bold line-through">{log.oldQty}</span>
                                                         <ArrowRight size={10} className="text-slate-300 my-0.5"/>
-                                                        <span className="font-black text-slate-900 text-sm">{log.newQty}</span>
+                                                        {/* Fix: Changed log.newQty to log.newVal to match StockAdjustmentLog interface in types.ts (Error on line 351) */}
+                                                        <span className="font-black text-slate-900 text-sm">{log.newVal}</span>
                                                         <span className={`text-[8px] font-black uppercase mt-1 ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                             ({diff > 0 ? '+' : ''}{diff})
                                                         </span>
