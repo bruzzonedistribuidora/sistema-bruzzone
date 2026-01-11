@@ -7,7 +7,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
-    CloudIcon
+    CloudIcon, Boxes as BoxesIcon
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -47,6 +47,7 @@ import Presupuestos from './components/Presupuestos';
 import SalesOrders from './components/SalesOrders';
 import CreditNotes from './components/CreditNotes';
 import MassProductUpdate from './components/MassProductUpdate';
+import MassStockUpdate from './components/MassStockUpdate';
 import StockTransfers from './components/StockTransfers';
 import CloudHub from './components/CloudHub';
 import Login from './components/Login';
@@ -72,6 +73,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.INITIAL_IMPORT]: { icon: FileUp, label: "Importador", color: "bg-indigo-600" },
     [ViewState.PRICE_UPDATES]: { icon: Layers, label: "Precios", color: "bg-violet-500" },
     [ViewState.MASS_PRODUCT_UPDATE]: { icon: Zap, label: "Masivos", color: "bg-amber-500" },
+    [ViewState.MASS_STOCK_UPDATE]: { icon: BoxesIcon, label: "Excel Stock", color: "bg-emerald-600" },
     [ViewState.ONLINE_SALES]: { icon: OrderIcon, label: "Online", color: "bg-indigo-600" },
     [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop, label: "Web Admin", color: "bg-pink-600" },
     [ViewState.SHOP]: { icon: ShoppingBag, label: "Tienda", color: "bg-pink-600" },
@@ -220,6 +222,7 @@ const App: React.FC = () => {
       case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment />;
       case ViewState.PROVIDERS: return <Providers />;
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate />;
+      case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       case ViewState.TREASURY: return <Treasury />;
       case ViewState.CLIENTS: return <Clients onOpenPortal={(c) => { setPortalPreviewClient(c); handleNavigate(ViewState.CUSTOMER_PORTAL); }} />;
