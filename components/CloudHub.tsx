@@ -4,7 +4,8 @@ import {
     Cloud, RefreshCw, Link2, Save, 
     Zap, Timer, Play, Pause, Info,
     CloudDownload, CheckCircle2, Smartphone,
-    Database, Network, Wifi, ShieldCheck
+    Database, Network, Wifi, ShieldCheck,
+    AlertCircle, CheckCircle
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { productDB } from '../services/storageService';
@@ -12,6 +13,7 @@ import { productDB } from '../services/storageService';
 const CloudHub: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [syncProgress, setSyncProgress] = useState(0);
+    const [syncMessage, setSyncMessage] = useState("");
     const [vaultId, setVaultId] = useState(syncService.getVaultId() || '');
     const [stats, setStats] = useState({ count: 0 });
     const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'Nunca');
@@ -25,10 +27,15 @@ const CloudHub: React.FC = () => {
         refreshStats();
         const handleProgress = (e: any) => {
             setSyncProgress(e.detail.progress);
+            if (e.detail.message) setSyncMessage(e.detail.message);
+            
             if (e.detail.progress === 100) {
                 refreshStats();
                 setLastSync(new Date().toLocaleString());
-                setTimeout(() => setSyncProgress(0), 3000);
+                setTimeout(() => {
+                    setSyncProgress(0);
+                    setSyncMessage("");
+                }, 4000);
             }
         };
         window.addEventListener('ferrecloud_sync_progress', handleProgress);
@@ -46,9 +53,7 @@ const CloudHub: React.FC = () => {
         setIsProcessing(true);
         const success = await syncService.syncFromRemote();
         setIsProcessing(false);
-        if (success) {
-            alert("✅ ¡Sincronizado con éxito!");
-        } else {
+        if (!success && syncProgress === 0) {
             alert("❌ No se encontró respaldo en la nube para este ID.");
         }
     };
@@ -56,10 +61,13 @@ const CloudHub: React.FC = () => {
     const handleBackup = async () => {
         if (!vaultId) return alert("Configura tu ID de Bóveda.");
         setIsProcessing(true);
-        await syncService.pushToCloud(null, 'MANUAL_BACKUP');
+        const success = await syncService.pushToCloud(null, 'MANUAL_BACKUP');
         setIsProcessing(false);
-        setLastSync(new Date().toLocaleString());
-        alert("✅ Base de datos subida a la nube maestra.");
+        if (success) {
+            setLastSync(new Date().toLocaleString());
+        } else {
+            alert("❌ El respaldo falló. Verifica tu conexión.");
+        }
     };
 
     return (
@@ -84,7 +92,7 @@ const CloudHub: React.FC = () => {
                             <div className="flex gap-3">
                                 <input 
                                     type="text" 
-                                    placeholder="EJ: BRUZZONE-CENTRAL"
+                                    placeholder="EJ: MI-FERRETERIA-PRO"
                                     className="flex-1 p-4 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-indigo-400 outline-none focus:border-indigo-500 transition-all uppercase"
                                     value={vaultId}
                                     onChange={(e) => setVaultId(e.target.value)}
@@ -95,7 +103,7 @@ const CloudHub: React.FC = () => {
                                     <Save size={20}/>
                                 </button>
                             </div>
-                            <p className="text-[9px] text-slate-500 font-bold uppercase ml-2 italic">Usa esta misma clave en tu celular para ver los mismos datos.</p>
+                            <p className="text-[9px] text-slate-500 font-bold uppercase ml-2 italic">Esta clave es necesaria para que tus celulares vean los mismos datos.</p>
                         </div>
 
                         <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 grid grid-cols-2 gap-4">
@@ -104,7 +112,7 @@ const CloudHub: React.FC = () => {
                                 <p className="text-3xl font-black">{stats.count.toLocaleString()}</p>
                             </div>
                             <div className="text-center">
-                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Última Sincronización</p>
+                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Último Respaldo</p>
                                 <p className="text-xs font-black text-indigo-400 uppercase mt-2">{lastSync}</p>
                             </div>
                         </div>
@@ -112,16 +120,19 @@ const CloudHub: React.FC = () => {
                 </div>
             </div>
 
-            {syncProgress > 0 && (
-                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-500 shadow-2xl animate-pulse">
+            {(syncProgress > 0 || isProcessing) && (
+                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-500 shadow-2xl animate-fade-in">
                     <div className="flex justify-between items-center mb-4">
-                        <span className="font-black text-indigo-600 uppercase tracking-widest text-xs flex items-center gap-2">
-                            <RefreshCw className="animate-spin" size={14}/> Sincronizando Datos...
-                        </span>
-                        <span className="font-black text-2xl text-slate-900">{syncProgress}%</span>
+                        <div className="space-y-1">
+                            <span className="font-black text-indigo-600 uppercase tracking-widest text-xs flex items-center gap-2">
+                                <RefreshCw className="animate-spin" size={14}/> Procesando Datos...
+                            </span>
+                            <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{syncMessage}</p>
+                        </div>
+                        <span className="font-black text-3xl text-slate-900">{syncProgress}%</span>
                     </div>
                     <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden border border-slate-200">
-                        <div className="h-full bg-indigo-600 transition-all duration-500" style={{ width: `${syncProgress}%` }}></div>
+                        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${syncProgress}%` }}></div>
                     </div>
                 </div>
             )}
@@ -134,18 +145,18 @@ const CloudHub: React.FC = () => {
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Descargar de la Nube</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Traer datos al celular / PC</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sincronizar este dispositivo</p>
                         </div>
                     </div>
                     <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                        Si realizaste cambios en otra computadora, pulsa este botón para actualizar este dispositivo.
+                        Trae los datos desde la nube maestra. Úsalo en tus celulares o PCs adicionales para estar al día.
                     </p>
                     <button 
                         onClick={handleManualSync}
                         disabled={isProcessing}
                         className="w-full bg-indigo-600 text-white py-6 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30">
-                        {isProcessing ? <RefreshCw className="animate-spin" size={24}/> : <RefreshCw size={24}/>}
-                        Actualizar este Dispositivo
+                        {isProcessing ? <RefreshCw className="animate-spin" size={24}/> : <CloudDownload size={24}/>}
+                        {isProcessing ? 'Descargando...' : 'Actualizar este Dispositivo'}
                     </button>
                 </div>
 
@@ -155,19 +166,19 @@ const CloudHub: React.FC = () => {
                             <Zap size={28}/>
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Subir a la Nube</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hacer respaldo maestro</p>
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Respaldar en la Nube</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Subir cambios a la nube</p>
                         </div>
                     </div>
                     <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                        Guarda el estado actual de tu ferretería en la nube para que esté disponible en tus otros celulares.
+                        Guarda el estado actual de los 140k artículos. Recomendado hacerlo al final del día o tras cambios masivos.
                     </p>
                     <button 
                         onClick={handleBackup}
                         disabled={isProcessing}
                         className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30">
                         {isProcessing ? <RefreshCw className="animate-spin" size={24}/> : <ShieldCheck size={24}/>}
-                        Respaldar en la Nube
+                        {isProcessing ? 'Respaldando...' : 'Subir a Bóveda Cloud'}
                     </button>
                 </div>
             </div>
@@ -177,17 +188,10 @@ const CloudHub: React.FC = () => {
                     <Smartphone size={48}/>
                 </div>
                 <div className="space-y-4">
-                    <h4 className="text-2xl font-black text-slate-950 uppercase tracking-tighter">¿Cómo usarlo en el celular?</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                            <p className="text-[10px] font-black text-indigo-600 uppercase mb-2">1. En la PC</p>
-                            <p className="text-xs text-slate-600 font-bold">Carga tus artículos y pulsa "Respaldar en la Nube" arriba.</p>
-                        </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                            <p className="text-[10px] font-black text-indigo-600 uppercase mb-2">2. En el Celular</p>
-                            <p className="text-xs text-slate-600 font-bold">Pon el mismo ID de Bóveda y pulsa "Actualizar este Dispositivo".</p>
-                        </div>
-                    </div>
+                    <h4 className="text-2xl font-black text-slate-950 uppercase tracking-tighter">Gestión de Alta Capacidad</h4>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                        El sistema utiliza un motor de sincronización por fragmentos diseñado para manejar los 140.000 artículos sin saturar la memoria del celular. No cierre la pestaña mientras la barra de progreso esté activa.
+                    </p>
                 </div>
             </div>
         </div>
