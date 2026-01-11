@@ -40,14 +40,29 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
 
     useEffect(() => {
         const performSearch = async () => {
-            if (searchTerm.length > 2) {
-                const results = await productDB.search(searchTerm);
+            const term = searchTerm.trim().toUpperCase();
+            if (term.length > 2) {
+                const results = await productDB.search(term);
+                
+                // DETECCION AUTOMATICA ESCANER EN MOVIL
+                const exactMatch = results.find(p => 
+                    p.internalCodes.some(c => c.toUpperCase() === term) || 
+                    (p.barcodes && p.barcodes.some(b => b.toUpperCase() === term))
+                );
+
+                if (exactMatch && term.length > 5) { // Evitar SKUs muy cortos accidentales
+                    addToCart(exactMatch);
+                    setSearchTerm('');
+                    setSearchResults([]);
+                    return;
+                }
+
                 setSearchResults(results);
             } else {
                 setSearchResults([]);
             }
         };
-        const timer = setTimeout(performSearch, 300);
+        const timer = setTimeout(performSearch, 200); // Reducido para mayor respuesta
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
@@ -72,6 +87,13 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
             }
             return [...prev, { product, quantity: 1, appliedPrice: product.priceFinal, subtotal: product.priceFinal }];
         });
+    };
+
+    const handlePedir = (e: React.MouseEvent, p: Product) => {
+        e.stopPropagation();
+        if (addToReplenishmentQueue(p)) {
+            alert(`✅ ${p.name} enviado a reposición.`);
+        }
     };
 
     const cartTotal = cart.reduce((acc, curr) => acc + curr.subtotal, 0);
@@ -165,7 +187,7 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                                 <input 
                                     type="text" 
-                                    placeholder="Buscar en el local..."
+                                    placeholder="Escanear (Auto) o Escribir..."
                                     className="w-full pl-12 pr-10 py-4 bg-white border-2 border-transparent rounded-2xl shadow-sm font-bold text-sm outline-none focus:border-indigo-500 transition-all uppercase"
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
@@ -183,9 +205,16 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
                                         <p className="text-lg font-black text-slate-900">${p.priceFinal.toLocaleString()}</p>
                                     </div>
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${p.stock > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                                            Stock: {p.stock}
-                                        </span>
+                                        <div className="flex gap-2">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${p.stock > 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                Stock: {p.stock}
+                                            </span>
+                                            <button 
+                                                onClick={(e) => handlePedir(e, p)}
+                                                className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600 uppercase flex items-center gap-1 border border-emerald-100">
+                                                <Truck size={10}/> Pedir
+                                            </button>
+                                        </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => addToCart(p)} className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-lg active:scale-90 transition-transform">
                                                 <Plus size={16}/>
