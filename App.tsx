@@ -47,7 +47,7 @@ import Presupuestos from './components/Presupuestos';
 import SalesOrders from './components/SalesOrders';
 import CreditNotes from './components/CreditNotes';
 import MassProductUpdate from './components/MassProductUpdate';
-import MassStockUpdate from './components/MassStockUpdate.tsx';
+import MassStockUpdate from './components/MassStockUpdate';
 import StockTransfers from './components/StockTransfers';
 import CloudHub from './components/CloudHub';
 import Login from './components/Login';
