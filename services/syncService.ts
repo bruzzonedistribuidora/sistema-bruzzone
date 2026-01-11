@@ -1,5 +1,5 @@
 
-import { productDB } from './storageService';
+import { productDB, cloudSimDB } from './storageService';
 
 export type SyncStatus = 'OFFLINE' | 'CONNECTING' | 'SYNCED' | 'DOWNLOADING' | 'UPLOADING' | 'ERROR' | 'UP_TO_DATE';
 
@@ -15,7 +15,6 @@ class SyncService {
     setVaultId(id: string) {
         this.vaultId = id.toUpperCase();
         localStorage.setItem('ferrecloud_vault_id', this.vaultId);
-        // Notificar cambio global
         window.dispatchEvent(new Event('ferrecloud_sync_config_updated'));
     }
 
@@ -23,86 +22,84 @@ class SyncService {
         return this.vaultId;
     }
 
-    // Sincronización transparente (Simulada para este entorno)
     async syncFromRemote(): Promise<boolean> {
         if (!this.vaultId || this.isProcessing) return false;
         this.isProcessing = true;
 
         try {
-            this.notifyProgress(5);
-            console.log(`[Cloud] Sincronizando Bóveda: ${this.vaultId}`);
+            this.notifyProgress(5, "Conectando con la Bóveda...");
             
-            // Simulamos la recuperación de datos globales
-            // En producción, aquí haríamos un fetch a un backend real o un JSON store centralizado
-            const globalRes = localStorage.getItem(`global_vault_${this.vaultId}`);
+            // Simulación de latencia de red
+            await new Promise(r => setTimeout(r, 1000));
             
-            if (!globalRes) {
+            const data = await cloudSimDB.getFromVault(this.vaultId);
+            
+            if (!data) {
                 this.isProcessing = false;
-                this.notifyProgress(0);
+                this.notifyProgress(0, "ID no encontrado.");
                 return false;
             }
 
-            const data = JSON.parse(globalRes);
-            this.notifyProgress(30);
+            this.notifyProgress(20, "Descargando Catálogo Maestro...");
 
             if (data.products && data.products.length > 0) {
-                // Actualizar IndexedDB local con los datos de la nube
+                // El método saveBulk de productDB ya maneja el progreso interno
                 await productDB.saveBulk(data.products);
             }
 
-            this.notifyProgress(100);
+            this.notifyProgress(100, "Sincronización completa.");
             this.isProcessing = false;
+            localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse'));
             return true;
         } catch (e) {
             console.error("Error en sincronización remota:", e);
             this.isProcessing = false;
-            this.notifyProgress(0);
+            this.notifyProgress(0, "Error de red.");
             return false;
         }
     }
 
-    // Subir cambios locales a la nube global
-    async pushToCloud(data: any, type: string): Promise<void> {
-        if (!this.vaultId) return;
+    async pushToCloud(data: any, type: string): Promise<boolean> {
+        if (!this.vaultId || this.isProcessing) return false;
+        this.isProcessing = true;
         
-        console.log(`[Cloud] Subiendo cambios de tipo: ${type}`);
-        
-        // Obtenemos todos los productos actuales para el respaldo maestro
-        const allProducts = await productDB.getAll();
-        const payload = {
-            vaultId: this.vaultId,
-            lastUpdate: new Date().toISOString(),
-            products: allProducts,
-            stats: { count: allProducts.length }
-        };
+        try {
+            this.notifyProgress(10, "Calculando volumen de datos...");
+            
+            const allProducts = await productDB.getAll();
+            this.notifyProgress(40, `Empaquetando ${allProducts.length.toLocaleString()} artículos...`);
+            
+            // Simular tiempo de procesamiento de empaquetado
+            await new Promise(r => setTimeout(r, 800));
 
-        // Guardar en el "Almacén Global Simulado"
-        localStorage.setItem(`global_vault_${this.vaultId}`, JSON.stringify(payload));
-        localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
-        
-        // Disparar evento para que otros dispositivos (pestañas) se enteren
-        window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
-    }
+            const payload = {
+                vaultId: this.vaultId,
+                lastUpdate: new Date().toISOString(),
+                products: allProducts,
+                stats: { count: allProducts.length }
+            };
 
-    startAutoSync(minutes: number) {
-        this.stopAutoSync();
-        if (minutes <= 0) return;
-
-        this.autoSyncTimer = setInterval(() => {
-            if (!this.isProcessing) this.syncFromRemote();
-        }, minutes * 60 * 1000);
-    }
-
-    stopAutoSync() {
-        if (this.autoSyncTimer) {
-            clearInterval(this.autoSyncTimer);
-            this.autoSyncTimer = null;
+            this.notifyProgress(70, "Subiendo a Bóveda Cloud...");
+            await cloudSimDB.saveToVault(this.vaultId, payload);
+            
+            this.notifyProgress(100, "Respaldo exitoso.");
+            localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
+            this.isProcessing = false;
+            window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
+            return true;
+        } catch (err) {
+            console.error("Error al respaldar:", err);
+            this.isProcessing = false;
+            this.notifyProgress(0, "Falla en el respaldo.");
+            return false;
         }
     }
 
-    private notifyProgress(progress: number) {
-        window.dispatchEvent(new CustomEvent('ferrecloud_sync_progress', { detail: { progress } }));
+    private notifyProgress(progress: number, message: string = "") {
+        window.dispatchEvent(new CustomEvent('ferrecloud_sync_progress', { 
+            detail: { progress, message } 
+        }));
     }
 
     async initializeBootstrap(): Promise<SyncStatus> {
@@ -110,7 +107,6 @@ class SyncService {
         
         const stats = await productDB.getStats();
         if (stats.count === 0) {
-            // Si no hay datos, intentar descargar inmediatamente
             const success = await this.syncFromRemote();
             return success ? 'SYNCED' : 'ERROR';
         }
