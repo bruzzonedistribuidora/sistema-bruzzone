@@ -1,9 +1,58 @@
+
 import { Product, ReplenishmentItem } from '../types';
 
 const DB_NAME = 'FerreCloudDB';
 const STORE_NAME = 'products';
 const DB_VERSION = 2;
 
+// --- CLOUD SIMULATOR (IndexedDB alternativo para simular la nube sin límites de 5MB) ---
+const CLOUD_DB_NAME = 'FerreCloud_VirtualVault';
+const CLOUD_STORE_NAME = 'vault_data';
+
+class CloudSimulatorDB {
+    private db: IDBDatabase | null = null;
+
+    async init(): Promise<IDBDatabase> {
+        if (this.db) return this.db;
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(CLOUD_DB_NAME, 1);
+            request.onupgradeneeded = (e) => {
+                const db = (e.target as IDBOpenDBRequest).result;
+                if (!db.objectStoreNames.contains(CLOUD_STORE_NAME)) {
+                    db.createObjectStore(CLOUD_STORE_NAME, { keyPath: 'vaultId' });
+                }
+            };
+            request.onsuccess = () => { this.db = request.result; resolve(request.result); };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async saveToVault(vaultId: string, data: any): Promise<void> {
+        const db = await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(CLOUD_STORE_NAME, 'readwrite');
+            const store = transaction.objectStore(CLOUD_STORE_NAME);
+            const request = store.put({ vaultId, ...data, timestamp: new Date().toISOString() });
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+        });
+    }
+
+    async getFromVault(vaultId: string): Promise<any> {
+        const db = await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(CLOUD_STORE_NAME, 'readonly');
+            const store = transaction.objectStore(CLOUD_STORE_NAME);
+            const request = store.get(vaultId);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+}
+
+export const cloudSimDB = new CloudSimulatorDB();
+
+// --- LOCAL PRODUCT DATABASE ---
 class ProductDB {
     private db: IDBDatabase | null = null;
 
@@ -79,7 +128,6 @@ class ProductDB {
             const request = store.openCursor();
 
             request.onsuccess = (event) => {
-                // Fix: Access cursor via request.result instead of incorrect cast on event.target
                 const cursor = request.result;
                 if (cursor && results.length < 50) {
                     const p = cursor.value as Product;
