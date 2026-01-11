@@ -7,7 +7,7 @@ import {
     CreditCard as CardIcon, Info, ChevronDown, PackagePlus, Save, DollarSign,
     ShieldCheck, FileText, ArrowRight, ClipboardList, Sparkles, Zap,
     ArrowLeftRight, Banknote, Smartphone as ECheqIcon,
-    History, PackageCheck, Wallet
+    History, PackageCheck, Wallet, Edit3
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, TreasuryMovement, CashRegister } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -118,6 +118,19 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         });
         setProductSearch('');
         setShowProductResults(false);
+    };
+
+    const updatePrice = (productId: string, newPrice: number) => {
+        setCart(prev => prev.map(item => {
+            if (item.product.id === productId) {
+                return {
+                    ...item,
+                    appliedPrice: newPrice,
+                    subtotal: item.quantity * newPrice
+                };
+            }
+            return item;
+        }));
     };
 
     const handleCheckout = async (isFiscal: boolean = false) => {
@@ -248,6 +261,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         <tr>
                                             <th className="px-8 py-5">Descripción de Mercadería</th>
                                             <th className="px-8 py-5 text-center">Cant.</th>
+                                            <th className="px-8 py-5 text-right">Precio Unit.</th>
                                             <th className="px-8 py-5 text-right">Subtotal</th>
                                             <th className="px-8 py-5 text-center w-16"></th>
                                         </tr>
@@ -266,6 +280,17 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                         <button onClick={() => setCart(cart.map(i => i.product.id === item.product.id ? {...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.appliedPrice} : i))} className="p-1 text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                                     </div>
                                                 </td>
+                                                <td className="px-8 py-4">
+                                                    <div className="flex items-center justify-end gap-2 group">
+                                                        <DollarSign size={14} className="text-slate-300 group-focus-within:text-indigo-600"/>
+                                                        <input 
+                                                            type="number"
+                                                            className="w-28 p-2 bg-slate-50 border-2 border-slate-100 rounded-xl text-right font-black text-slate-950 text-base focus:bg-white focus:border-indigo-600 outline-none transition-all"
+                                                            value={item.appliedPrice}
+                                                            onChange={(e) => updatePrice(item.product.id, parseFloat(e.target.value) || 0)}
+                                                        />
+                                                    </div>
+                                                </td>
                                                 <td className="px-8 py-4 text-right font-black text-slate-950 text-base font-mono">${item.subtotal.toLocaleString()}</td>
                                                 <td className="px-8 py-4 text-center">
                                                     <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
@@ -273,7 +298,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                             </tr>
                                         ))}
                                         {cart.length === 0 && (
-                                            <tr><td colSpan={4} className="py-32 text-center text-slate-300 uppercase font-black text-xs tracking-widest">Esperando ingreso de artículos...</td></tr>
+                                            <tr><td colSpan={5} className="py-32 text-center text-slate-300 uppercase font-black text-xs tracking-widest">Esperando ingreso de artículos...</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -358,7 +383,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
 
             {showSuccessModal && lastSale && (
                 <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 animate-fade-in">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-sm overflow-hidden flex flex-col border border-slate-400">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-sm overflow-hidden flex flex-col border border-slate-400">
                         <div className="p-10 text-center space-y-6">
                             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto border-4 border-green-50 shadow-lg">
                                 <CheckCircle size={40}/>
