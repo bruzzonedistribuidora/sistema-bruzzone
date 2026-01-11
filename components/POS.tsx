@@ -73,6 +73,22 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         };
     }, []);
 
+    // LOGICA DE ESCANEO AUTOMATICO (SIN ENTER)
+    useEffect(() => {
+        const term = productSearch.trim().toUpperCase();
+        if (term.length >= 3) {
+            const exactMatch = products.find(p => 
+                p.internalCodes.some(c => c.toUpperCase() === term) || 
+                (p.barcodes && p.barcodes.some(b => b.toUpperCase() === term))
+            );
+            if (exactMatch) {
+                addToCart(exactMatch);
+                setProductSearch('');
+                setShowProductResults(false);
+            }
+        }
+    }, [productSearch, products]);
+
     const companyConfig: CompanyConfig = useMemo(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { paymentMethods: ['EFECTIVO', 'TARJETA', 'TRANSFERENCIA'], paymentSystems: [] };
@@ -116,8 +132,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             }
             return [...prev, { product, quantity: 1, appliedPrice: product.priceFinal, subtotal: product.priceFinal }];
         });
-        setProductSearch('');
-        setShowProductResults(false);
     };
 
     const updatePrice = (productId: string, newPrice: number) => {
@@ -131,6 +145,13 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             }
             return item;
         }));
+    };
+
+    const handlePedir = (e: React.MouseEvent, p: Product) => {
+        e.stopPropagation();
+        if (addToReplenishmentQueue(p)) {
+            alert(`✅ ${p.name} agregado a la lista de faltantes.`);
+        }
     };
 
     const handleCheckout = async (isFiscal: boolean = false) => {
@@ -227,7 +248,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             <div className="md:col-span-8 relative">
                                 <div className="flex items-center bg-white border-2 border-slate-300 rounded-2xl px-5 py-3 shadow-md focus-within:border-indigo-600 focus-within:ring-8 focus-within:ring-indigo-100 transition-all">
                                     <Search className="text-slate-400 mr-4" size={22} />
-                                    <input type="text" placeholder="Escanear Código o Escribir Producto..." className="flex-1 bg-transparent outline-none font-black text-slate-950 uppercase text-sm tracking-tight placeholder:text-slate-300" value={productSearch} onFocus={() => setShowProductResults(true)} onChange={(e) => setProductSearch(e.target.value)} />
+                                    <input type="text" placeholder="Escanear Código (Auto-Carga) o Escribir Nombre..." className="flex-1 bg-transparent outline-none font-black text-slate-950 uppercase text-sm tracking-tight placeholder:text-slate-300" value={productSearch} onFocus={() => setShowProductResults(true)} onChange={(e) => setProductSearch(e.target.value)} />
                                 </div>
                                 {showProductResults && productSearch.length > 2 && (
                                     <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-[2rem] shadow-2xl border border-slate-300 z-[100] overflow-hidden animate-fade-in max-h-[450px] overflow-y-auto custom-scrollbar p-2">
@@ -240,7 +261,14 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                         <span className={p.stock > 0 ? 'text-emerald-600' : 'text-red-500'}>Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
-                                                <p className="font-black text-indigo-700 text-lg whitespace-nowrap ml-4">${p.priceFinal.toLocaleString()}</p>
+                                                <div className="flex items-center gap-3">
+                                                    <button 
+                                                        onClick={(e) => handlePedir(e, p)}
+                                                        className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100 uppercase text-[9px] font-black tracking-widest flex items-center gap-2">
+                                                        <Truck size={14}/> Pedir
+                                                    </button>
+                                                    <p className="font-black text-indigo-700 text-lg whitespace-nowrap ml-4">${p.priceFinal.toLocaleString()}</p>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
