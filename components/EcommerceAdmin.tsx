@@ -13,6 +13,45 @@ import {
 import { Product } from '../types';
 import { productDB } from '../services/storageService';
 
+// --- SUBCOMPONENTES AUXILIARES (Definidos antes para evitar errores de hoisting) ---
+
+function PlatformBtn({ active, label, color, onClick }: { active?: boolean, label: string, color: string, onClick: () => void }) {
+    return (
+        <button onClick={onClick} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all border-2 ${active ? `${color} border-white shadow-md scale-110` : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}>{label}</button>
+    );
+}
+
+function BulkPlatformBtn({ onClick, icon: Icon, label, color, textColor }: { onClick: () => void, icon: any, label: string, color: string, textColor: string }) {
+    return (
+        <button onClick={onClick} className={`${color} ${textColor} px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg`}><Icon size={14}/> {label}</button>
+    );
+}
+
+function FolderBtn({ active, onClick, icon: Icon, label, count, color }: { active: boolean, onClick: () => void, icon: any, label: string, count: number, color: string }) {
+    return (
+        <button onClick={onClick} className={`w-full flex items-center justify-between p-4 rounded-[1.5rem] transition-all group ${active ? 'bg-slate-900 text-white shadow-2xl scale-[1.02]' : 'hover:bg-slate-50 text-slate-500'}`}>
+            <div className="flex items-center gap-4">
+                <div className={`p-2.5 rounded-xl ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-white'} transition-colors`}><Icon size={18}/></div>
+                <span className={`text-[11px] font-black uppercase tracking-tight ${active ? 'text-white' : 'text-slate-600'}`}>{label}</span>
+            </div>
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${active ? 'bg-white/10 border-white/20 text-indigo-300' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>{count.toLocaleString()}</span>
+        </button>
+    );
+}
+
+function QuickBadge({ active, onClick, label, icon: Icon, color }: { active?: boolean, onClick: () => void, label: string, icon: any, color: 'indigo' | 'orange' | 'yellow' }) {
+    const colors = {
+        indigo: active ? 'bg-indigo-600 text-white border-indigo-400' : 'text-slate-300 border-slate-100',
+        orange: active ? 'bg-orange-500 text-white border-orange-400' : 'text-slate-300 border-slate-100',
+        yellow: active ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'text-slate-300 border-slate-100'
+    };
+    return (
+        <button onClick={onClick} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} hover:border-slate-300`}>
+            <Icon size={10} className={active && color === 'yellow' ? 'fill-slate-900' : ''}/> {label} {active && <Check size={8} strokeWidth={4}/>}
+        </button>
+    );
+}
+
 type EcommerceFolder = 'ALL' | 'PUBLISHED' | 'OFFERS' | 'FEATURED';
 
 const EcommerceAdmin: React.FC = () => {
@@ -159,14 +198,12 @@ const EcommerceAdmin: React.FC = () => {
     };
 
     const openStore = () => {
-        // En una app real esto navegaría a la ruta /shop o abriría una nueva pestaña
         window.open(window.location.origin + '/shop', '_blank');
     };
 
     return (
         <div className="flex h-full bg-slate-100 font-sans overflow-hidden animate-fade-in relative">
             
-            {/* SIDEBAR DE CARPETAS */}
             <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
                 <div className="p-6 border-b border-slate-100 bg-slate-900 text-white">
                     <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3">
@@ -201,7 +238,6 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
             </aside>
 
-            {/* CONTENIDO PRINCIPAL */}
             <main className="flex-1 flex flex-col min-w-0 bg-slate-50 overflow-hidden">
                 <div className="p-6 bg-white border-b border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 shrink-0">
                     <div className="relative flex-1 group w-full max-w-xl">
@@ -214,11 +250,6 @@ const EcommerceAdmin: React.FC = () => {
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    {isApplying && (
-                        <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest animate-pulse">
-                            <RefreshCw size={14} className="animate-spin"/> Aplicando cambios masivos...
-                        </div>
-                    )}
                 </div>
 
                 <div className="flex-1 overflow-hidden p-6 pb-24">
@@ -290,7 +321,6 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
             </main>
 
-            {/* BARRA DE ACCIONES MASIVAS (FLOTANTE) */}
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-10 left-1/2 -translate-x-1/2 w-[90%] max-w-5xl bg-slate-900 rounded-[2.5rem] shadow-2xl p-6 border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 animate-fade-in z-[250]">
                     <div className="flex items-center gap-6">
@@ -322,39 +352,6 @@ const EcommerceAdmin: React.FC = () => {
                 </div>
             )}
         </div>
-    );
-};
-
-// --- COMPONENTES ATÓMICOS ---
-
-const PlatformBtn: React.FC<{ active?: boolean, label: string, color: string, onClick: () => void }> = ({ active, label, color, onClick }) => (
-    <button onClick={onClick} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all border-2 ${active ? `${color} border-white shadow-md scale-110` : 'bg-slate-50 text-slate-300 border-slate-100 hover:border-slate-200'}`}>{label}</button>
-);
-
-const BulkPlatformBtn: React.FC<{ onClick: () => void, icon: any, label: string, color: string, textColor: string }> = ({ onClick, icon: Icon, label, color, textColor }) => (
-    <button onClick={onClick} className={`${color} ${textColor} px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg`}><Icon size={14}/> {label}</button>
-);
-
-const FolderBtn: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string, count: number, color: string }> = ({ active, onClick, icon: Icon, label, count, color }) => (
-    <button onClick={onClick} className={`w-full flex items-center justify-between p-4 rounded-[1.5rem] transition-all group ${active ? 'bg-slate-900 text-white shadow-2xl scale-[1.02]' : 'hover:bg-slate-50 text-slate-500'}`}>
-        <div className="flex items-center gap-4">
-            <div className={`p-2.5 rounded-xl ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-white'} transition-colors`}><Icon size={18}/></div>
-            <span className={`text-[11px] font-black uppercase tracking-tight ${active ? 'text-white' : 'text-slate-600'}`}>{label}</span>
-        </div>
-        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${active ? 'bg-white/10 border-white/20 text-indigo-300' : 'bg-slate-100 border-slate-200 text-slate-400'}`}>{count.toLocaleString()}</span>
-    </button>
-);
-
-const QuickBadge: React.FC<{ active?: boolean, onClick: () => void, label: string, icon: any, color: 'indigo' | 'orange' | 'yellow' }> = ({ active, onClick, label, icon: Icon, color }) => {
-    const colors = {
-        indigo: active ? 'bg-indigo-600 text-white border-indigo-400' : 'text-slate-300 border-slate-100',
-        orange: active ? 'bg-orange-500 text-white border-orange-400' : 'text-slate-300 border-slate-100',
-        yellow: active ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'text-slate-300 border-slate-100'
-    };
-    return (
-        <button onClick={onClick} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border font-black text-[8px] uppercase tracking-widest transition-all ${colors[color]} hover:border-slate-300`}>
-            <Icon size={10} className={active && color === 'yellow' ? 'fill-slate-900' : ''}/> {label} {active && <Check size={8} strokeWidth={4}/>}
-        </button>
     );
 };
 
