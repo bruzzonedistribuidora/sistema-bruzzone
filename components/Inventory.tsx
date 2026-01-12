@@ -24,9 +24,10 @@ const Inventory: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const [brands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
-  const [categories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
-  const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
+  // Listas maestras con estados para actualización en caliente
+  const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
+  const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
+  const [providers, setProviders] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
@@ -63,34 +64,56 @@ const Inventory: React.FC = () => {
     return sortableItems;
   }, [products, sortConfig]);
 
-  // LÓGICA DE CÁLCULO DE PRECIOS COMPLETA
+  // Funciones de creación rápida
+  const handleQuickAddBrand = () => {
+      const name = window.prompt("Ingrese el nombre de la nueva MARCA:");
+      if (name && name.trim()) {
+          const newBrand = { id: `brand-${Date.now()}`, name: name.toUpperCase().trim() };
+          const updated = [...brands, newBrand];
+          setBrands(updated);
+          localStorage.setItem('ferrecloud_brands', JSON.stringify(updated));
+          setFormData(prev => ({ ...prev, brand: newBrand.name }));
+      }
+  };
+
+  const handleQuickAddCategory = () => {
+      const name = window.prompt("Ingrese el nombre del nuevo RUBRO / CATEGORÍA:");
+      if (name && name.trim()) {
+          const newCat = { id: `cat-${Date.now()}`, name: name.toUpperCase().trim() };
+          const updated = [...categories, newCat];
+          setCategories(updated);
+          localStorage.setItem('ferrecloud_categories', JSON.stringify(updated));
+          setFormData(prev => ({ ...prev, category: newCat.name }));
+      }
+  };
+
+  const handleQuickAddProvider = () => {
+      const name = window.prompt("Ingrese la Razón Social del nuevo PROVEEDOR:");
+      if (name && name.trim()) {
+          const newProv = { id: `prov-${Date.now()}`, name: name.toUpperCase().trim(), cuit: '00-00000000-0', balance: 0, defaultDiscounts: [0,0,0], contact: '' } as Provider;
+          const updated = [...providers, newProv];
+          setProviders(updated);
+          localStorage.setItem('ferrecloud_providers', JSON.stringify(updated));
+          setFormData(prev => ({ ...prev, provider: newProv.name }));
+      }
+  };
+
   const updatePricing = (updates: Partial<Product>) => {
       setFormData(prev => {
           const next = { ...prev, ...updates };
-          
-          // 1. Costo de Lista Base
           const listCost = next.listCost || 0;
-          
-          // 2. Bonificaciones en cascada (D1 * D2 * D3 * D4)
           const ds = next.discounts || [0, 0, 0, 0];
           const coef = ds.reduce((acc, d) => acc * (1 - (d / 100)), 1);
-          const costAfterDiscounts = listCost * coef;
-          
-          // 3. Factor de Conversión (Ej: Compra por Caja 100u, vende x unidad -> factor 0.01)
           const factor = next.conversionFactor || 1;
-          const unitCostBase = costAfterDiscounts * factor;
-          
-          // 4. Margen de Utilidad
+          const unitCostBase = (listCost * coef) * factor;
           const margin = next.profitMargin || 30;
           const priceNeto = unitCostBase * (1 + (margin / 100));
-          
-          // 5. IVA
           const vat = next.vatRate || 21;
           const priceFinal = priceNeto * (1 + (vat / 100));
 
           return {
               ...next,
-              costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(4)),
+              costAfterDiscounts: parseFloat((listCost * coef).toFixed(4)),
               priceNeto: parseFloat(priceNeto.toFixed(2)),
               priceFinal: parseFloat(priceFinal.toFixed(2))
           };
@@ -163,29 +186,14 @@ const Inventory: React.FC = () => {
 
   const openNewProduct = () => {
       setFormData({
-          name: '', 
-          brand: '', 
-          category: '', 
-          provider: '', 
-          internalCodes: [''], 
-          barcodes: [], 
-          providerCodes: [], 
-          vatRate: 21, 
-          profitMargin: 30, 
-          discounts: [0,0,0,0], 
-          purchaseCurrency: 'ARS', 
-          saleCurrency: 'ARS', 
-          measureUnitPurchase: 'UNIDAD', 
-          measureUnitSale: 'UNIDAD', 
-          conversionFactor: 1, 
-          purchasePackageQuantity: 1, 
-          stockPrincipal: 0, 
-          stockDeposito: 0, 
-          stockSucursal: 0,
-          costAfterDiscounts: 0,
-          priceNeto: 0,
-          priceFinal: 0,
-          listCost: 0
+          name: '', brand: '', category: '', provider: '', 
+          internalCodes: [''], barcodes: [], providerCodes: [], 
+          vatRate: 21, profitMargin: 30, discounts: [0,0,0,0], 
+          purchaseCurrency: 'ARS', saleCurrency: 'ARS', 
+          measureUnitPurchase: 'UNIDAD', measureUnitSale: 'UNIDAD', 
+          conversionFactor: 1, purchasePackageQuantity: 1, 
+          stockPrincipal: 0, stockDeposito: 0, stockSucursal: 0,
+          costAfterDiscounts: 0, priceNeto: 0, priceFinal: 0, listCost: 0
       }); 
       setModalTab('GENERAL'); 
       setIsModalOpen(true);
@@ -193,7 +201,6 @@ const Inventory: React.FC = () => {
 
   return (
     <div className="p-4 h-full flex flex-col space-y-4 bg-slate-200 overflow-hidden font-sans">
-      {/* HEADER DE INVENTARIO */}
       <div className="bg-white p-5 rounded-[2.5rem] border border-slate-300 shadow-xl shrink-0">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-4">
@@ -266,14 +273,7 @@ const Inventory: React.FC = () => {
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr>
-                                        <td colSpan={6} className="py-32 text-center">
-                                            <div className="flex flex-col items-center gap-4 text-slate-300">
-                                                <Database size={64} strokeWidth={1} />
-                                                <p className="font-black uppercase text-xs tracking-[0.3em]">{searchTerm ? 'No hay artículos para esa búsqueda' : 'Base de datos vacía'}</p>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <tr><td colSpan={6} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">Base de datos vacía o buscando...</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -285,7 +285,6 @@ const Inventory: React.FC = () => {
         {inventoryTab === 'PROVIDERS' && <Providers />}
       </div>
 
-      {/* MODAL MAESTRO DE ALTA/EDICIÓN */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -310,28 +309,62 @@ const Inventory: React.FC = () => {
 
                   <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar space-y-8">
                       {modalTab === 'GENERAL' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-fade-in">
-                              <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-10 animate-fade-in">
+                              <div className="md:col-span-8 space-y-6">
                                   <div>
                                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Nombre del Producto (Descripción Larga)</label>
                                       <input className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-black text-slate-800 uppercase focus:border-indigo-500 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="EJ: PINZA UNIVERSAL 8 AISLADA..." />
                                   </div>
-                                  <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Marca</label>
-                                          <input list="brands-list" className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value.toUpperCase()})} />
-                                          <datalist id="brands-list">{brands.map(b => <option key={b.id} value={b.name}/>)}</datalist>
+                                  
+                                  <div className="grid grid-cols-2 gap-6">
+                                      <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Marca</label>
+                                          <div className="flex gap-2">
+                                              <select className="flex-1 p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})}>
+                                                  <option value="">GENÉRICO / SIN MARCA</option>
+                                                  {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                              </select>
+                                              <button onClick={handleQuickAddBrand} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-indigo-600 transition-all shadow-md"><Plus size={20}/></button>
+                                          </div>
                                       </div>
-                                      <div>
-                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Rubro / Categoría</label>
-                                          <input list="cats-list" className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value.toUpperCase()})} />
-                                          <datalist id="cats-list">{categories.map(c => <option key={c.id} value={c.name}/>)}</datalist>
+                                      <div className="space-y-2">
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Rubro / Categoría</label>
+                                          <div className="flex gap-2">
+                                              <select className="flex-1 p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                                  <option value="">GENERAL</option>
+                                                  {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                              </select>
+                                              <button onClick={handleQuickAddCategory} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-indigo-600 transition-all shadow-md"><Plus size={20}/></button>
+                                          </div>
                                       </div>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-4">
+
+                                  <div className="space-y-2">
+                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 block">Proveedor Designado</label>
+                                      <div className="flex gap-2">
+                                          <select className="flex-1 p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
+                                              <option value="">SIN PROVEEDOR</option>
+                                              {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                          </select>
+                                          <button onClick={handleQuickAddProvider} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-indigo-600 transition-all shadow-md"><Plus size={20}/></button>
+                                      </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-3 gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200">
+                                      <div>
+                                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Unidad Compra</label>
+                                          <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs" value={formData.measureUnitPurchase} onChange={e => setFormData({...formData, measureUnitPurchase: e.target.value})}>
+                                              <option value="UNIDAD">UNIDAD</option>
+                                              <option value="CAJA">CAJA</option>
+                                              <option value="BOLSA">BOLSA</option>
+                                              <option value="PACK">PACK</option>
+                                              <option value="KILO">KILO</option>
+                                              <option value="METRO">METRO</option>
+                                          </select>
+                                      </div>
                                       <div>
                                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Unidad Venta</label>
-                                          <select className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.measureUnitSale} onChange={e => setFormData({...formData, measureUnitSale: e.target.value})}>
+                                          <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs" value={formData.measureUnitSale} onChange={e => setFormData({...formData, measureUnitSale: e.target.value})}>
                                               <option value="UNIDAD">UNIDAD</option>
                                               <option value="KILO">KILO</option>
                                               <option value="METRO">METRO</option>
@@ -340,28 +373,20 @@ const Inventory: React.FC = () => {
                                       </div>
                                       <div>
                                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Factor Conversión</label>
-                                          <input type="number" step="0.0001" className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-black text-indigo-600 outline-none focus:border-indigo-500" value={formData.conversionFactor} onChange={e => updatePricing({conversionFactor: parseFloat(e.target.value) || 1})} />
+                                          <div className="relative">
+                                              <Scaling className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14}/>
+                                              <input type="number" step="0.0001" className="w-full pl-9 p-4 bg-slate-50 border border-slate-200 rounded-xl font-black text-indigo-600 outline-none" value={formData.conversionFactor} onChange={e => updatePricing({conversionFactor: parseFloat(e.target.value) || 1})} />
+                                          </div>
                                       </div>
                                   </div>
-                                  <div>
-                                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Proveedor Designado</label>
-                                      <select className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl font-bold uppercase outline-none focus:border-indigo-500" value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}>
-                                          <option value="">SIN PROVEEDOR</option>
-                                          {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                                      </select>
-                                  </div>
                               </div>
-                              <div className="bg-slate-900 p-10 rounded-[3rem] text-white flex flex-col justify-center items-center text-center space-y-6">
+                              <div className="md:col-span-4 bg-slate-900 p-10 rounded-[3rem] text-white flex flex-col justify-center items-center text-center space-y-6 shadow-2xl border border-white/5">
                                   <div className="w-40 h-40 bg-white/5 border-4 border-dashed border-white/10 rounded-[3rem] flex items-center justify-center text-white/10 group hover:border-indigo-500 transition-all cursor-pointer">
-                                      {formData.ecommerce?.imageUrl ? (
-                                          <img src={formData.ecommerce.imageUrl} className="w-full h-full object-contain p-4" />
-                                      ) : (
-                                          <ImageIcon size={64}/>
-                                      )}
+                                      <ImageIcon size={64}/>
                                   </div>
                                   <div>
-                                      <h4 className="font-black uppercase tracking-widest text-xs">Imagen de Catálogo</h4>
-                                      <p className="text-[10px] text-white/30 uppercase mt-2">Visible en Tienda Online y App Móvil</p>
+                                      <h4 className="font-black uppercase tracking-widest text-xs">Foto de Catálogo</h4>
+                                      <p className="text-[10px] text-white/30 uppercase mt-2">Sincronizado con Tienda Nube y ML</p>
                                   </div>
                               </div>
                           </div>
