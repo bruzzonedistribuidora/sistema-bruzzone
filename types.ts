@@ -49,6 +49,15 @@ export enum ViewState {
   LICENSE_MANAGER = 'LICENSE_MANAGER'
 }
 
+export interface SyncLogEntry {
+    id: string;
+    timestamp: string;
+    terminalName: string;
+    type: 'SALE' | 'STOCK_ADJUST' | 'PRICE_CHANGE' | 'CLIENT_NEW';
+    description: string;
+    payload: any; 
+}
+
 export interface SystemLicense {
   status: 'ACTIVE' | 'EXPIRED' | 'TRIAL' | 'LOCKED';
   expiryDate: string;
@@ -85,6 +94,7 @@ export interface Product {
   description: string; 
   listCost: number; 
   purchasePackageQuantity: number; 
+  salePackageQuantity: number;
   costAfterDiscounts: number; 
   discounts: number[]; 
   profitMargin: number; 
