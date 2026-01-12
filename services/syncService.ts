@@ -1,6 +1,6 @@
 
 import { productDB, cloudSimDB } from './storageService';
-import { SyncLogEntry } from '../types';
+import { SyncLogEntry, RestApiConfig } from '../types';
 
 const ARRAY_SYNC_KEYS = [
     'ferrecloud_remitos',
@@ -15,27 +15,39 @@ const ARRAY_SYNC_KEYS = [
 
 class SyncService {
     private vaultId: string | null = null;
+    private apiConfig: RestApiConfig = { baseUrl: '', apiKey: '', enabled: false, lastSyncStatus: 'IDLE' };
     private isProcessing: boolean = false;
     private pollingInterval: number | null = null;
     private channel: BroadcastChannel;
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
+        this.loadApiConfig();
         this.channel = new BroadcastChannel('ferrecloud_sync_relay');
         
-        // Al recibir un aviso de otra terminal, forzamos la descarga inmediata
         this.channel.onmessage = async (event) => {
-            console.log(`[SyncRelay] Mensaje recibido de otra terminal: ${event.data}`);
             if (event.data === 'FORCE_PULL' || event.data.includes('_UPDATED')) {
-                await this.syncLoop(true); // Forzar pull
+                await this.syncLoop(true);
             }
         };
 
-        if (this.vaultId) this.startAutoSync();
+        if (this.vaultId || this.apiConfig.enabled) this.startAutoSync();
     }
 
+    private loadApiConfig() {
+        const saved = localStorage.getItem('ferrecloud_rest_config');
+        if (saved) this.apiConfig = JSON.parse(saved);
+    }
+
+    setApiConfig(config: RestApiConfig) {
+        this.apiConfig = config;
+        localStorage.setItem('ferrecloud_rest_config', JSON.stringify(config));
+        this.startAutoSync();
+    }
+
+    getApiConfig() { return this.apiConfig; }
+
     async syncFromRemote(): Promise<boolean> {
-        if (!this.vaultId) return false;
         await this.syncLoop(true);
         return true;
     }
@@ -51,14 +63,34 @@ class SyncService {
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        // Revisión de fondo cada 10 segundos por si falla el broadcast
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 10000);
+        // Sincronización proactiva cada 30 segundos
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 30000);
     }
 
     /**
-     * mergeData: Fusión inteligente. Los objetos con ID duplicado se resuelven
-     * manteniendo el que tenga mayor contenido o sea más reciente si tuviera timestamp.
+     * Comunicación con la API REST Real
      */
+    private async callRestApi(endpoint: string, method: string, data?: any) {
+        if (!this.apiConfig.enabled || !this.apiConfig.baseUrl) return null;
+        
+        try {
+            const response = await fetch(`${this.apiConfig.baseUrl}${endpoint}`, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiConfig.apiKey}`
+                },
+                body: data ? JSON.stringify(data) : undefined
+            });
+            
+            if (!response.ok) throw new Error('API Error');
+            return await response.json();
+        } catch (e) {
+            console.error("[REST API] Error de conexión:", e);
+            return null;
+        }
+    }
+
     private mergeData(localStr: string | null, remoteStr: string | null): { merged: any[], hasChanges: boolean } {
         const local = JSON.parse(localStr || '[]');
         const remote = JSON.parse(remoteStr || '[]');
@@ -72,21 +104,18 @@ class SyncService {
         let localWasUpdated = false;
         let remoteNeedsUpdate = false;
 
-        // 1. Verificar qué tiene la nube que yo no tengo localmente
         remote.forEach(remoteItem => {
             if (!localMap.has(remoteItem.id)) {
                 localWasUpdated = true;
             }
         });
 
-        // 2. Verificar qué tengo yo que no está en la nube
         local.forEach(localItem => {
             if (!remoteMap.has(localItem.id)) {
                 remoteNeedsUpdate = true;
             }
         });
 
-        // La unión de ambos sets por ID único
         const combinedMap = new Map();
         remote.forEach(item => combinedMap.set(item.id, item));
         local.forEach(item => combinedMap.set(item.id, item));
@@ -100,35 +129,43 @@ class SyncService {
     }
 
     private async syncLoop(forcePull = false) {
-        if (!this.vaultId || this.isProcessing) return;
+        if (this.isProcessing) return;
         this.isProcessing = true;
         
         try {
-            // Obtener estado actual de la "Nube" (IndexedDB compartido)
-            const cloudData = await cloudSimDB.getFromVault(this.vaultId) || { logs: [], sharedStorage: {} };
-            const remoteStorage = cloudData.sharedStorage || {};
+            let remoteStorage: any = {};
+            let cloudLogs: any[] = [];
+
+            // INTENTAR OBTENER DATOS DE LA API REST SI ESTÁ HABILITADA
+            if (this.apiConfig.enabled) {
+                const apiData = await this.callRestApi('/pull', 'GET');
+                if (apiData) {
+                    remoteStorage = apiData.sharedStorage || {};
+                    cloudLogs = apiData.logs || [];
+                }
+            } else if (this.vaultId) {
+                // FALLBACK AL SIMULADOR CLOUD
+                const cloudData = await cloudSimDB.getFromVault(this.vaultId) || { logs: [], sharedStorage: {} };
+                remoteStorage = cloudData.sharedStorage || {};
+                cloudLogs = cloudData.logs || [];
+            }
+
             const newSharedStorage = { ...remoteStorage };
             let localUpdated = false;
             let cloudNeedsUpdate = false;
 
-            // 1. Procesar Tablas de Documentos (Remitos, Ventas, etc.)
+            // 1. Sincronizar Tablas (Clientes, Remitos, etc.)
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
                 const remoteVal = remoteStorage[key] || null;
-                
                 const { merged, hasChanges } = this.mergeData(localVal, remoteVal);
                 
                 if (hasChanges) {
                     const mergedStr = JSON.stringify(merged);
-                    
-                    // Si el resultado combinado es distinto a lo que tengo local, actualizo local
                     if (mergedStr !== localVal) {
                         localStorage.setItem(key, mergedStr);
                         localUpdated = true;
-                        console.log(`[Sync] Tabla ${key} actualizada desde nube.`);
                     }
-                    
-                    // Si el resultado combinado tiene cosas locales que no están en nube, marcamos para subir
                     if (mergedStr !== remoteVal) {
                         newSharedStorage[key] = mergedStr;
                         cloudNeedsUpdate = true;
@@ -136,51 +173,40 @@ class SyncService {
                 }
             });
 
-            // 2. Procesar Logs de Productos (Stock y Precios de los 140k items)
-            let currentCloudLogs = cloudData.logs || [];
+            // 2. Sincronizar Logs de Productos (Deltas de Stock de 140k items)
             let pendingLogs: SyncLogEntry[] = [];
-            
             try {
-                if (typeof productDB.getPendingLogs === 'function') {
-                    pendingLogs = await productDB.getPendingLogs();
-                }
-            } catch (e) { console.warn("DB Busy", e); }
+                pendingLogs = await productDB.getPendingLogs();
+            } catch (e) {}
 
             if (pendingLogs.length > 0) {
-                currentCloudLogs = [...currentCloudLogs, ...pendingLogs].slice(-2000);
+                cloudLogs = [...cloudLogs, ...pendingLogs].slice(-5000);
                 cloudNeedsUpdate = true;
             }
 
-            // 3. Persistir en la Nube si hubo cambios originados aquí
+            // 3. Subir Cambios a la Nube (API REST o Simulador)
             if (cloudNeedsUpdate) {
-                await cloudSimDB.saveToVault(this.vaultId, { 
-                    logs: currentCloudLogs, 
+                const payload = { 
+                    logs: cloudLogs, 
                     sharedStorage: newSharedStorage,
                     lastUpdate: new Date().toISOString()
-                });
-                
-                if (pendingLogs.length > 0 && typeof productDB.clearLogs === 'function') {
-                    await productDB.clearLogs();
+                };
+
+                if (this.apiConfig.enabled) {
+                    await this.callRestApi('/push', 'POST', payload);
+                } else if (this.vaultId) {
+                    await cloudSimDB.saveToVault(this.vaultId, payload);
                 }
                 
-                // Avisar a otras terminales para que hagan pull inmediato
+                if (pendingLogs.length > 0) await productDB.clearLogs();
                 this.channel.postMessage('FORCE_PULL');
             }
 
-            // 4. Notificar a la Interfaz de esta terminal que los datos cambiaron
-            if (localUpdated || forcePull) {
-                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                    detail: { timestamp: Date.now() } 
-                }));
-                // Evento estándar para componentes que escuchan storage
-                window.dispatchEvent(new Event('storage'));
-            }
-
-            // 5. Aplicar cambios granulares de Stock/Precios de otras terminales
+            // 4. Aplicar cambios de otros terminales a IndexedDB local
             const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
             const myTerminal = localStorage.getItem('ferrecloud_terminal_name');
             
-            const remoteLogs = currentCloudLogs.filter((l: any) => 
+            const remoteLogs = cloudLogs.filter((l: any) => 
                 new Date(l.timestamp).getTime() > lastSyncTs && 
                 l.terminalName !== myTerminal
             );
@@ -193,7 +219,11 @@ class SyncService {
                     }
                 }
                 localStorage.setItem('ferrecloud_last_sync_ts', Date.now().toString());
+            }
+
+            if (localUpdated || remoteLogs.length > 0 || forcePull) {
                 window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
+                window.dispatchEvent(new Event('storage'));
             }
 
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
@@ -207,8 +237,6 @@ class SyncService {
 
     async pushToCloud() {
         await this.syncLoop();
-        // Notificación redundante para asegurar visibilidad inmediata
-        this.channel.postMessage('FORCE_PULL');
     }
 }
 
