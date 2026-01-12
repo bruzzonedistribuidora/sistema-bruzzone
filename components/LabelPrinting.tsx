@@ -116,7 +116,10 @@ const LabelPrinting: React.FC = () => {
                                     >
                                         <div className="text-left">
                                             <p className="font-black text-slate-800 text-[10px] uppercase truncate leading-none mb-1">{p.name}</p>
-                                            <p className="text-[8px] text-gray-400 font-mono font-bold uppercase">{p.internalCodes[0]}</p>
+                                            <div className="flex gap-2 text-[8px] font-bold uppercase">
+                                                <span className="text-gray-400">{p.internalCodes[0]}</span>
+                                                <span className="text-indigo-600">{p.brand || 'GENÉRICO'}</span>
+                                            </div>
                                         </div>
                                         <Plus size={16} className="text-indigo-400"/>
                                     </button>
