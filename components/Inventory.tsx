@@ -83,6 +83,21 @@ const Inventory: React.FC = () => {
     };
   }, [searchTerm]);
 
+  const handleDeleteProduct = async (id: string, name: string) => {
+      if (window.confirm(`¿ESTÁ SEGURO? Se eliminará permanentemente: ${name.toUpperCase()}\nEsta acción no se puede deshacer.`)) {
+          await productDB.delete(id);
+          await loadProducts();
+      }
+  };
+
+  const handleAddToReplenishment = (p: Product) => {
+      if (addToReplenishmentQueue(p)) {
+          alert(`✅ ${p.name} añadido a la cola de reposición.`);
+      } else {
+          alert(`⚠️ Este artículo ya está en la lista de pedidos pendientes.`);
+      }
+  };
+
   const calculatePrices = (data: Partial<Product>) => {
       const list = parseFloat(data.listCost as any) || 0;
       const d = data.discounts || [0, 0, 0, 0];
@@ -256,9 +271,11 @@ const Inventory: React.FC = () => {
                                               ${p.priceFinal?.toLocaleString()}
                                           </td>
                                           <td className="px-8 py-4 text-center">
-                                              <div className="flex justify-center gap-2">
-                                                  <button onClick={() => { window.dispatchEvent(new CustomEvent('ferrecloud_add_to_pos', { detail: { product: p } })); }} className="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><ShoppingCart size={16}/></button>
-                                                  <button onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-2 text-slate-400 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all"><Pen size={16}/></button>
+                                              <div className="flex justify-center gap-1">
+                                                  <button title="Vender ahora" onClick={() => { window.dispatchEvent(new CustomEvent('ferrecloud_add_to_pos', { detail: { product: p } })); }} className="p-2 text-indigo-600 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><ShoppingCart size={15}/></button>
+                                                  <button title="Añadir a Reposición" onClick={() => handleAddToReplenishment(p)} className="p-2 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Truck size={15}/></button>
+                                                  <button title="Editar Ficha" onClick={() => { setFormData(p); setIsModalOpen(true); }} className="p-2 text-slate-400 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Pen size={15}/></button>
+                                                  <button title="Eliminar Definitivamente" onClick={() => handleDeleteProduct(p.id, p.name)} className="p-2 text-red-400 bg-red-50 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={15}/></button>
                                               </div>
                                           </td>
                                       </tr>
@@ -272,7 +289,154 @@ const Inventory: React.FC = () => {
               <InitialImport onComplete={() => setInventoryTab('PRODUCTS')} />
           )}
       </div>
-      {/* ... (Modal de ficha tecnica se mantiene igual) */}
+
+      {/* MODAL FICHA TÉCNICA (Se mantiene la estructura existente con los campos mapeados) */}
+      {isModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh]">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-5">
+                          <div className="p-4 bg-indigo-600 rounded-2xl shadow-lg"><PackagePlus size={28}/></div>
+                          <div>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{formData.id ? 'Editar Artículo Maestro' : 'Nuevo Artículo'}</h3>
+                              <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Gestión Técnica de Inventario</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={32}/></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-10 bg-slate-50/50 custom-scrollbar">
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                          {/* COLUMNA IDENTIDAD */}
+                          <div className="lg:col-span-8 space-y-6">
+                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+                                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Tag size={14}/> Datos Identificatorios</h4>
+                                  <div className="space-y-4">
+                                      <div>
+                                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Nombre Comercial / Descripción del Producto</label>
+                                          <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-lg focus:bg-white focus:border-indigo-500 uppercase transition-all" value={formData.name} onChange={e => updateField('name', e.target.value)} />
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                          <div>
+                                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Marca</label>
+                                              <input type="text" className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold uppercase" value={formData.brand} onChange={e => updateField('brand', e.target.value)} />
+                                          </div>
+                                          <div>
+                                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Categoría / Rubro</label>
+                                              <input type="text" className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold uppercase" value={formData.category} onChange={e => updateField('category', e.target.value)} />
+                                          </div>
+                                          <div>
+                                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Proveedor Principal</label>
+                                              <input type="text" className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl font-bold uppercase" value={formData.provider} onChange={e => updateField('provider', e.target.value)} />
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              {/* PANEL CODIGOS */}
+                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                  <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><Barcode size={14}/> Codificación y Trazabilidad</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                                      <div className="space-y-3">
+                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Códigos Propios (SKU)</p>
+                                          {formData.internalCodes?.map((c, i) => (
+                                              <div key={i} className="flex gap-1">
+                                                  <input className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-mono font-bold" value={c} onChange={e => updateArrayField('internalCodes', i, e.target.value)} />
+                                                  <button onClick={() => removeArrayItem('internalCodes', i)} className="p-1 text-red-300 hover:text-red-500"><X size={14}/></button>
+                                              </div>
+                                          ))}
+                                          <button onClick={() => addArrayItem('internalCodes')} className="text-[8px] font-black text-indigo-500 uppercase hover:underline">+ Agregar SKU</button>
+                                      </div>
+                                      <div className="space-y-3">
+                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Códigos de Barras (EAN)</p>
+                                          {formData.barcodes?.map((c, i) => (
+                                              <div key={i} className="flex gap-1">
+                                                  <input className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-mono font-bold" value={c} onChange={e => updateArrayField('barcodes', i, e.target.value)} />
+                                                  <button onClick={() => removeArrayItem('barcodes', i)} className="p-1 text-red-300 hover:text-red-500"><X size={14}/></button>
+                                              </div>
+                                          ))}
+                                          <button onClick={() => addArrayItem('barcodes')} className="text-[8px] font-black text-indigo-500 uppercase hover:underline">+ Agregar EAN</button>
+                                      </div>
+                                      <div className="space-y-3">
+                                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Códigos Proveedor</p>
+                                          {formData.providerCodes?.map((c, i) => (
+                                              <div key={i} className="flex gap-1">
+                                                  <input className="w-full p-2 bg-slate-50 border rounded-lg text-xs font-mono font-bold" value={c} onChange={e => updateArrayField('providerCodes', i, e.target.value)} />
+                                                  <button onClick={() => removeArrayItem('providerCodes', i)} className="p-1 text-red-300 hover:text-red-500"><X size={14}/></button>
+                                              </div>
+                                          ))}
+                                          <button onClick={() => addArrayItem('providerCodes')} className="text-[8px] font-black text-indigo-500 uppercase hover:underline">+ Agregar Cód. Prov.</button>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+
+                          {/* COLUMNA ECONOMICA Y STOCK */}
+                          <div className="lg:col-span-4 space-y-6">
+                              <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl space-y-8">
+                                  <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/10 pb-4">Costos y Precios</h4>
+                                  <div className="space-y-6">
+                                      <div>
+                                          <label className="text-[9px] font-black text-slate-500 uppercase ml-2 block mb-1">Costo de Lista ($)</label>
+                                          <input type="number" className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-black text-2xl text-white outline-none focus:ring-2 focus:ring-indigo-600" value={formData.listCost || ''} onChange={e => updateField('listCost', e.target.value)} />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                              <label className="text-[9px] font-black text-slate-500 uppercase ml-2 block mb-1">Margen (%)</label>
+                                              <input type="number" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl font-black text-white" value={formData.profitMargin || ''} onChange={e => updateField('profitMargin', e.target.value)} />
+                                          </div>
+                                          <div>
+                                              <label className="text-[9px] font-black text-slate-500 uppercase ml-2 block mb-1">IVA (%)</label>
+                                              <select className="w-full p-3 bg-white/5 border border-white/10 rounded-xl font-black text-white" value={formData.vatRate} onChange={e => updateField('vatRate', e.target.value)}>
+                                                  <option value="21">21%</option>
+                                                  <option value="10.5">10.5%</option>
+                                                  <option value="0">0% (Exento)</option>
+                                              </select>
+                                          </div>
+                                      </div>
+                                      <div className="pt-6 border-t border-white/10">
+                                          <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1 text-center">Precio de Venta Final</p>
+                                          <p className="text-5xl font-black text-center tracking-tighter text-white leading-none">${formData.priceFinal?.toLocaleString()}</p>
+                                      </div>
+                                  </div>
+                              </div>
+
+                              <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b pb-4 flex items-center gap-2"><RefreshCw size={14}/> Existencias</h4>
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                          <label className="text-[8px] font-black text-slate-400 uppercase ml-1 block mb-1">Mostrador</label>
+                                          <input type="number" className="w-full p-2.5 bg-slate-50 border rounded-xl font-black text-slate-800" value={formData.stockPrincipal || ''} onChange={e => updateField('stockPrincipal', e.target.value)} />
+                                      </div>
+                                      <div>
+                                          <label className="text-[8px] font-black text-slate-400 uppercase ml-1 block mb-1">Depósito</label>
+                                          <input type="number" className="w-full p-2.5 bg-slate-50 border rounded-xl font-black text-slate-800" value={formData.stockDeposito || ''} onChange={e => updateField('stockDeposito', e.target.value)} />
+                                      </div>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                          <label className="text-[8px] font-black text-red-400 uppercase ml-1 block mb-1">Mínimo (Alerta)</label>
+                                          <input type="number" className="w-full p-2.5 bg-red-50/50 border border-red-100 rounded-xl font-black text-red-600" value={formData.stockMinimo || ''} onChange={e => updateField('stockMinimo', e.target.value)} />
+                                      </div>
+                                      <div>
+                                          <label className="text-[8px] font-black text-indigo-400 uppercase ml-1 block mb-1">Pto. Pedido</label>
+                                          <input type="number" className="w-full p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl font-black text-indigo-600" value={formData.reorderPoint || ''} onChange={e => updateField('reorderPoint', e.target.value)} />
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="p-8 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
+                      <button onClick={() => setIsModalOpen(false)} className="px-8 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-colors">Cancelar</button>
+                      <button onClick={handleSaveProduct} disabled={isLoading} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-2xl flex items-center gap-3 hover:bg-indigo-600 transition-all active:scale-95">
+                          {isLoading ? <RefreshCw className="animate-spin" size={18}/> : <Save size={18}/>} Guardar Ficha Maestra
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
