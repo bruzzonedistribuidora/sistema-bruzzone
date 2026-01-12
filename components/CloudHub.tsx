@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Cloud, RefreshCw, Save, Zap, CloudDownload, Smartphone,
     Network, Wifi, ShieldCheck, FileUp, Monitor, 
     ArrowRight, Info, AlertTriangle, CheckCircle2, History,
     Terminal, User, Activity, Clock, Link, Copy, PlusCircle,
     Server, Key, Database, Lock, Globe, HardDriveDownload, 
-    HardDriveUpload, Link2, WifiOff, MonitorSmartphone
+    HardDriveUpload, Link2, WifiOff, MonitorSmartphone, FileDown,
+    X
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { productDB, cloudSimDB } from '../services/storageService';
@@ -20,6 +21,7 @@ const CloudHub: React.FC = () => {
     const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'Nunca');
     const [terminals, setTerminals] = useState<string[]>([]);
     
+    const importFileRef = useRef<HTMLInputElement>(null);
     const [restConfig, setRestConfig] = useState<RestApiConfig>(syncService.getApiConfig());
 
     const loadCloudStatus = async () => {
@@ -56,7 +58,7 @@ const CloudHub: React.FC = () => {
         if (!confirm("Esto generará un archivo con los 140.000 artículos para instalar en otra PC. ¿Continuar?")) return;
         setIsProcessing(true);
         try {
-            const allProducts = await productDB.getAll(150000); // Forzar carga total
+            const allProducts = await productDB.getAll(150000); 
             const fullData = {
                 vaultId: syncService.getVaultId(),
                 products: allProducts,
@@ -74,6 +76,47 @@ const CloudHub: React.FC = () => {
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const importFullState = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!confirm("¡ATENCIÓN! Esto borrará los datos actuales de esta PC y los reemplazará por los del paquete. ¿Continuar?")) {
+            e.target.value = '';
+            return;
+        }
+
+        setIsProcessing(true);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+                if (!data.products || !data.vaultId) throw new Error("Archivo no válido");
+
+                // 1. Limpiar base de datos
+                await productDB.clearAll();
+                
+                // 2. Cargar productos masivos
+                await productDB.saveBulk(data.products);
+                
+                // 3. Vincular con la red del paquete
+                syncService.setVaultId(data.vaultId);
+                
+                // 4. Restaurar configuración de empresa
+                if (data.config) {
+                    localStorage.setItem('company_config', JSON.stringify(data.config));
+                }
+
+                alert(`✅ ÉXITO: Se han importado ${data.products.length} artículos y se ha vinculado la PC a la red: ${data.vaultId}`);
+                window.location.reload(); // Recargar para aplicar ID de bóveda y config
+            } catch (err) {
+                alert("❌ Error al procesar el paquete .ferre. El archivo podría estar dañado.");
+            } finally {
+                setIsProcessing(false);
+            }
+        };
+        reader.readAsText(file);
     };
 
     return (
@@ -126,7 +169,7 @@ const CloudHub: React.FC = () => {
                                             <input type="password" className="w-full p-4 bg-white/10 border-2 border-transparent rounded-2xl font-mono text-white outline-none focus:border-indigo-500" value={restConfig.apiKey} onChange={e => setRestConfig({...restConfig, apiKey: e.target.value})} placeholder="Secret Key..."/>
                                         </div>
                                         <div className="flex items-end">
-                                            <button onClick={handleSaveREST} className="w-full bg-indigo-600 hover:bg-indigo-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Establecer Conexión</button>
+                                            <button onClick={handleSaveREST} className="w-full bg-indigo-600 hover:bg-indigo-50 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Establecer Conexión</button>
                                         </div>
                                     </div>
                                 </div>
@@ -162,14 +205,22 @@ const CloudHub: React.FC = () => {
                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Carga rápida para terminales nuevas</p>
                         </div>
                     </div>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed italic">Para no saturar tu internet sincronizando 140.000 artículos, genera un paquete de instalación en la PC principal y cárgalo manualmente en las demás.</p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed italic">Para no saturar tu internet sincronizando 140.000 artículos, genera un paquete en la PC principal y cárgalo aquí en las demás.</p>
                     <div className="pt-4 flex gap-3">
                         <button 
                             onClick={exportFullState}
                             disabled={isProcessing}
                             className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
                             {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <HardDriveUpload size={18}/>}
-                            Preparar Paquete (.ferre)
+                            1. Preparar Paquete
+                        </button>
+                        <input type="file" ref={importFileRef} className="hidden" accept=".ferre" onChange={importFullState} />
+                        <button 
+                            onClick={() => importFileRef.current?.click()}
+                            disabled={isProcessing}
+                            className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50">
+                            {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <HardDriveDownload size={18}/>}
+                            2. Cargar Paquete
                         </button>
                     </div>
                 </div>
