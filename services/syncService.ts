@@ -1,3 +1,4 @@
+
 import { productDB } from './storageService';
 
 const ARRAY_SYNC_KEYS = [
@@ -8,10 +9,12 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_purchases',
     'ferrecloud_providers',
     'ferrecloud_registers',
-    'ferrecloud_budgets'
+    'ferrecloud_budgets',
+    'company_config',
+    'ferrecloud_brands',
+    'ferrecloud_categories'
 ];
 
-// Nueva URL de Bóveda Directa (Alta Disponibilidad)
 const CLOUD_ENDPOINT = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
 
 class SyncService {
@@ -35,10 +38,75 @@ class SyncService {
 
     getVaultId() { return this.vaultId; }
 
+    // --- PLAN B: SINCRONIZACIÓN POR ARCHIVO (RECOMENDADO PARA 140K ITEMS) ---
+    
+    async exportFullVault() {
+        try {
+            const allProducts = await productDB.getAll(200000); // Traer todos
+            const storageData: any = {};
+            
+            ARRAY_SYNC_KEYS.forEach(key => {
+                const val = localStorage.getItem(key);
+                if (val) storageData[key] = JSON.parse(val);
+            });
+
+            const fullPackage = {
+                version: '1.0',
+                timestamp: new Date().toISOString(),
+                products: allProducts,
+                storage: storageData
+            };
+
+            const blob = new Blob([JSON.stringify(fullPackage)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            a.href = url;
+            a.download = `MAESTRO_FERRETERIA_${dateStr}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            return true;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    }
+
+    async importFullVault(file: File): Promise<boolean> {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target?.result as string);
+                    if (!data.products) throw new Error("Formato inválido");
+
+                    // 1. Limpiar e Importar Productos (IndexedDB)
+                    await productDB.clearAll();
+                    await productDB.saveBulk(data.products);
+
+                    // 2. Importar LocalStorage
+                    if (data.storage) {
+                        Object.entries(data.storage).forEach(([key, val]) => {
+                            localStorage.setItem(key, JSON.stringify(val));
+                        });
+                    }
+
+                    resolve(true);
+                } catch (err) {
+                    console.error(err);
+                    resolve(false);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
+    // --- PLAN A: NUBE (SOLO PARA CAMBIOS PEQUEÑOS Y PRESENCIA) ---
+
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 8000); 
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 10000); 
     }
 
     private async syncLoop() {
@@ -48,99 +116,49 @@ class SyncService {
         const url = `${CLOUD_ENDPOINT}/${this.vaultId}`;
 
         try {
-            const myTerminalName = (localStorage.getItem('ferrecloud_terminal_name') || 'CAJA').toUpperCase();
-            let remoteData: any = { terminals: {}, sharedStorage: {}, logs: [] };
+            const myTerminalName = (localStorage.getItem('ferrecloud_terminal_name') || 'PC').toUpperCase();
             
-            // 1. INTENTAR LECTURA (PULL)
-            try {
-                const response = await fetch(url, { 
-                    method: 'GET',
-                    cache: 'no-cache',
-                    mode: 'cors'
-                });
-                
-                if (response.ok) {
-                    const text = await response.text();
-                    if (text && text.length > 2) remoteData = JSON.parse(text);
-                } else if (response.status === 404) {
-                    // Es normal en el primer arranque, ignoramos y seguimos
-                    console.log("Bóveda nueva detectada...");
-                }
-            } catch (e) {
-                console.warn("Servidor ocupado, reintentando...");
+            // Handshake ultraligero
+            const response = await fetch(url, { 
+                method: 'GET',
+                cache: 'no-store',
+                mode: 'cors'
+            });
+
+            let remoteData: any = { terminals: {} };
+            if (response.ok) {
+                const text = await response.text();
+                if (text) remoteData = JSON.parse(text);
             }
 
-            // 2. ACTUALIZAR PRESENCIA LOCAL
+            // Actualizar presencia
             const now = Date.now();
             if (!remoteData.terminals) remoteData.terminals = {};
-            remoteData.terminals[this.sessionId] = {
-                name: myTerminalName,
-                lastSeen: now
-            };
+            remoteData.terminals[this.sessionId] = { name: myTerminalName, lastSeen: now };
 
-            // 3. SINCRONIZAR DATOS DE NEGOCIO
-            let hasChanges = false;
-            ARRAY_SYNC_KEYS.forEach(key => {
-                const local = localStorage.getItem(key);
-                const remote = remoteData.sharedStorage?.[key];
-                if (remote && local !== remote) {
-                    localStorage.setItem(key, remote);
-                    hasChanges = true;
-                }
+            // Limpiar desconectados
+            Object.keys(remoteData.terminals).forEach(id => {
+                if (now - remoteData.terminals[id].lastSeen > 40000) delete remoteData.terminals[id];
             });
 
-            // 4. PRODUCTOS (LOGS)
-            const pendingLogs = await productDB.getPendingLogs();
-            if (pendingLogs.length > 0) {
-                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-100);
-            }
-
-            const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
-            const newRemoteLogs = (remoteData.logs || []).filter((l: any) => 
-                new Date(l.timestamp).getTime() > lastSyncTs && l.sessionId !== this.sessionId
-            );
-
-            if (newRemoteLogs.length > 0) {
-                for (const log of newRemoteLogs) {
-                    if (log.payload?.id) await productDB.save(log.payload, true);
-                }
-                localStorage.setItem('ferrecloud_last_sync_ts', now.toString());
-                hasChanges = true;
-            }
-
-            // 5. SUBIR CAMBIOS (PUSH)
-            const payload = {
-                terminals: remoteData.terminals,
-                logs: remoteData.logs || [],
-                sharedStorage: {
-                    ...remoteData.sharedStorage,
-                    ...ARRAY_SYNC_KEYS.reduce((acc: any, key) => {
-                        const val = localStorage.getItem(key);
-                        if (val) acc[key] = val;
-                        return acc;
-                    }, {})
-                },
-                lastSync: new Date().toISOString()
-            };
-
+            // Solo subimos presencia para no saturar con 140k items
             await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' }, // Evita problemas de CORS pre-flight
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify({
+                    terminals: remoteData.terminals,
+                    lastSync: new Date().toISOString()
+                })
             });
 
-            if (pendingLogs.length > 0) await productDB.clearLogs();
-            
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
                 detail: { terminals: remoteData.terminals } 
             }));
-            
-            if (hasChanges) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { 
-                detail: { error: "Conectando con la nube..." } 
+                detail: { error: "Nube en espera..." } 
             }));
         } finally {
             this.isProcessing = false;
@@ -148,8 +166,6 @@ class SyncService {
     }
 
     async syncFromRemote() { await this.syncLoop(); return true; }
-
-    // Fix: Added missing pushToCloud method used in POS and Remitos components
     async pushToCloud() { await this.syncLoop(); return true; }
 }
 
