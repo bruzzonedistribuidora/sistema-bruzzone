@@ -73,12 +73,14 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
 
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
+  
+  // SEÑAL DE REFRESCO: Cada vez que cambia, todos los componentes se actualizan
+  const [renderKey, setRenderKey] = useState(0);
 
   useEffect(() => {
     const savedSession = sessionStorage.getItem('ferrecloud_session');
@@ -90,9 +92,11 @@ const App: React.FC = () => {
     };
     loadLicense();
 
-    // Listener de sincronización
+    // Listener de sincronización: Forzar actualización de UI
     const handleSyncPulse = () => {
+        console.log("[App] Sincronización detectada. Refrescando vistas...");
         setCloudStatus('SYNCING');
+        setRenderKey(prev => prev + 1); // <--- ESTO FUERZA EL RE-RENDER DE TODO EL APP
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1000);
     };
     window.addEventListener('ferrecloud_sync_pulse', handleSyncPulse);
@@ -134,25 +138,26 @@ const App: React.FC = () => {
   };
 
   const renderViewContent = (view: ViewState) => {
+    // Al usar renderKey aquí, nos aseguramos que los componentes reciban una señal de cambio
     switch (view) {
-      case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
-      case ViewState.ANALYTICS: return <AnalyticsDashboard onNavigate={handleNavigate} />;
-      case ViewState.INVENTORY: return <Inventory />;
-      case ViewState.POS: return <POS initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
-      case ViewState.PURCHASES: return <Purchases />;
-      case ViewState.TREASURY: return <Treasury />;
-      case ViewState.CLIENTS: return <Clients />;
-      case ViewState.CLIENT_BALANCES: return <ClientBalances />;
-      case ViewState.PROVIDER_BALANCES: return <ProviderBalances />;
-      case ViewState.REMITOS: return <Remitos />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos />;
-      case ViewState.CLOUD_HUB: return <CloudHub />;
-      case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
-      case ViewState.ACCOUNTING: return <Accounting />;
-      case ViewState.REPLENISHMENT: return <Replenishment />;
+      case ViewState.DASHBOARD: return <Dashboard key={renderKey} onNavigate={handleNavigate} />;
+      case ViewState.ANALYTICS: return <AnalyticsDashboard key={renderKey} onNavigate={handleNavigate} />;
+      case ViewState.INVENTORY: return <Inventory key={renderKey} />;
+      case ViewState.POS: return <POS key={renderKey} initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.PURCHASES: return <Purchases key={renderKey} />;
+      case ViewState.TREASURY: return <Treasury key={renderKey} />;
+      case ViewState.CLIENTS: return <Clients key={renderKey} />;
+      case ViewState.CLIENT_BALANCES: return <ClientBalances key={renderKey} />;
+      case ViewState.PROVIDER_BALANCES: return <ProviderBalances key={renderKey} />;
+      case ViewState.REMITOS: return <Remitos key={renderKey} initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos key={renderKey} />;
+      case ViewState.CLOUD_HUB: return <CloudHub key={renderKey} />;
+      case ViewState.CONFIG_PANEL: return <ConfigPanel key={renderKey} onNavigate={handleNavigate} />;
+      case ViewState.ACCOUNTING: return <Accounting key={renderKey} />;
+      case ViewState.REPLENISHMENT: return <Replenishment key={renderKey} />;
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
-      case ViewState.LABEL_PRINTING: return <LabelPrinting />;
-      case ViewState.LICENSE_MANAGER: return <LicenseConsole />;
+      case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
+      case ViewState.LICENSE_MANAGER: return <LicenseConsole key={renderKey} />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
@@ -189,8 +194,8 @@ const App: React.FC = () => {
             
             <div className="flex items-center gap-4 px-4 h-full border-l border-white/10">
                 <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black text-slate-500 uppercase">{localStorage.getItem('ferrecloud_terminal_name') || 'TERM-01'}</span>
-                    <div className={`w-2 h-2 rounded-full ${cloudStatus === 'UP_TO_DATE' ? 'bg-green-500 animate-pulse' : 'bg-slate-700'}`}></div>
+                    <span className="text-[9px] font-black text-slate-500 uppercase">{localStorage.getItem('ferrecloud_terminal_name') || 'PC'}</span>
+                    <div className={`w-2 h-2 rounded-full ${cloudStatus === 'UP_TO_DATE' ? 'bg-green-500 animate-pulse' : cloudStatus === 'SYNCING' ? 'bg-indigo-500 animate-bounce' : 'bg-slate-700'}`}></div>
                 </div>
                 <button onClick={() => handleNavigate(ViewState.CLOUD_HUB)} className="p-2 text-indigo-400 hover:text-white transition-colors">
                     <Network size={18}/>
