@@ -18,6 +18,7 @@ const openDB = (): Promise<IDBDatabase> => {
         const productStore = db.createObjectStore(PRODUCT_STORE, { keyPath: 'id' });
         productStore.createIndex('name', 'name', { unique: false });
         productStore.createIndex('internalCodes', 'internalCodes', { unique: false, multiEntry: true });
+        productStore.createIndex('brand', 'brand', { unique: false });
       }
       if (!db.objectStoreNames.contains(LOG_STORE)) {
         db.createObjectStore(LOG_STORE, { keyPath: 'id' });
@@ -35,7 +36,8 @@ export const productDB = {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(PRODUCT_STORE, 'readonly');
       const store = transaction.objectStore(PRODUCT_STORE);
-      const request = limit ? store.getAll(null, limit) : store.getAll();
+      // Si hay 140k, limitamos siempre para no romper el navegador
+      const request = store.getAll(null, limit || 100);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -95,15 +97,39 @@ export const productDB = {
     });
   },
 
+  /**
+   * BUSQUEDA OPTIMIZADA CON CURSOR
+   * No carga todo el array, recorre el disco y se detiene en 50 coincidencias.
+   */
   async search(term: string): Promise<Product[]> {
-    const all = await this.getAll();
-    const upperTerm = term.toUpperCase();
-    return all.filter(p => 
-      (p.name && p.name.toUpperCase().includes(upperTerm)) || 
-      (p.internalCodes && p.internalCodes.some(c => c.toUpperCase().includes(upperTerm))) ||
-      (p.barcodes && p.barcodes.some(b => b.toUpperCase().includes(upperTerm))) ||
-      (p.brand && p.brand.toUpperCase().includes(upperTerm))
-    ).slice(0, 50);
+    const db = await openDB();
+    const upperTerm = term.toUpperCase().trim();
+    if (upperTerm.length < 2) return [];
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRODUCT_STORE, 'readonly');
+      const store = transaction.objectStore(PRODUCT_STORE);
+      const results: Product[] = [];
+      const request = store.openCursor();
+
+      request.onsuccess = (event: any) => {
+        const cursor = event.target.result;
+        if (cursor && results.length < 50) {
+          const product = cursor.value as Product;
+          const match = 
+            (product.name && product.name.toUpperCase().includes(upperTerm)) || 
+            (product.internalCodes && product.internalCodes.some(c => c.toUpperCase().includes(upperTerm))) ||
+            (product.barcodes && product.barcodes.some(b => b.toUpperCase().includes(upperTerm))) ||
+            (product.brand && product.brand.toUpperCase().includes(upperTerm));
+
+          if (match) results.push(product);
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
   },
 
   async getStats(): Promise<{ count: number }> {
@@ -118,8 +144,24 @@ export const productDB = {
   },
 
   async getPublished(): Promise<Product[]> {
-    const all = await this.getAll();
-    return all.filter(p => p.ecommerce?.isPublished);
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(PRODUCT_STORE, 'readonly');
+        const store = transaction.objectStore(PRODUCT_STORE);
+        const results: Product[] = [];
+        const request = store.openCursor();
+        
+        request.onsuccess = (event: any) => {
+            const cursor = event.target.result;
+            if (cursor && results.length < 100) {
+                if (cursor.value.ecommerce?.isPublished) results.push(cursor.value);
+                cursor.continue();
+            } else {
+                resolve(results);
+            }
+        };
+        request.onerror = () => reject(request.error);
+    });
   },
 
   async getPendingLogs(): Promise<SyncLogEntry[]> {
