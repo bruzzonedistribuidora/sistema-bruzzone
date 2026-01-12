@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Globe, RefreshCw, Zap, WifiOff, Signal, Activity, 
-    ShieldCheck, Search, Wifi, Info, Trash2, Smartphone
+    Search, Wifi, FileJson, Download, Upload, ShieldCheck,
+    AlertTriangle, Server, HardDrive, MonitorSmartphone
 } from 'lucide-react';
 import { syncService } from '../services/syncService';
 
@@ -10,10 +11,11 @@ const CloudHub: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [vaultId, setVaultId] = useState(syncService.getVaultId() || '');
     const [terminalName, setTerminalName] = useState(localStorage.getItem('ferrecloud_terminal_name') || '');
-    const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'Sin Vincular');
+    const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'No vinculado');
     const [terminals, setTerminals] = useState<{name: string, isLocal: boolean}[]>([]);
     const [isOnline, setIsOnline] = useState(false);
-    const [syncMessage, setSyncMessage] = useState('Listo para conectar');
+    const [syncMessage, setSyncMessage] = useState('Nube lista');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         const handlePulse = (e: any) => {
@@ -23,8 +25,7 @@ const CloudHub: React.FC = () => {
                 isLocal: info.name === terminalName.toUpperCase()
             }));
             setTerminals(list);
-            setLastSync(localStorage.getItem('ferrecloud_last_sync') || 'Ahora');
-            setSyncMessage('Puente de datos activo');
+            setSyncMessage('Señal de nube activa');
         };
 
         const handleError = (e: any) => {
@@ -41,31 +42,41 @@ const CloudHub: React.FC = () => {
         };
     }, [terminalName]);
 
-    const handleSave = async () => {
-        if (!vaultId || vaultId.length < 3) return alert("ID demasiado corto.");
-        if (!terminalName) return alert("El nombre de la PC es necesario.");
-        
-        setIsProcessing(true);
-        setSyncMessage('Conectando...');
-        
+    const handleSaveVault = () => {
+        if (!vaultId || !terminalName) return alert("Completa los datos.");
         localStorage.setItem('ferrecloud_terminal_name', terminalName.toUpperCase().trim());
         syncService.setVaultId(vaultId);
-        
-        await syncService.syncFromRemote();
+        alert("ID de nube configurado.");
+    };
+
+    const handleExport = async () => {
+        setIsProcessing(true);
+        const success = await syncService.exportFullVault();
+        if (success) alert("Paquete Maestro generado con éxito.\nGuárdalo en tu carpeta compartida.");
         setIsProcessing(false);
     };
 
-    const resetConnection = () => {
-        if (confirm("¿Reiniciar parámetros de red?")) {
-            localStorage.removeItem('ferrecloud_vault_id');
-            localStorage.removeItem('ferrecloud_last_sync');
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        if (!confirm("Esto borrará los datos actuales de esta PC y los reemplazará por los del archivo. ¿Continuar?")) return;
+        
+        setIsProcessing(true);
+        const success = await syncService.importFullVault(file);
+        if (success) {
+            alert("✅ Sincronización Completa.\nEl sistema se reiniciará para cargar los 140,000 artículos.");
             window.location.reload();
+        } else {
+            alert("❌ Error al procesar el archivo.");
         }
+        setIsProcessing(false);
     };
 
     return (
         <div className="p-8 max-w-7xl mx-auto h-full space-y-8 animate-fade-in bg-slate-50 overflow-y-auto pb-32">
             
+            {/* PANEL DE NUBE (SOLO PRESENCIA) */}
             <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none"><Globe size={280}/></div>
                 <div className="relative z-10 space-y-10">
@@ -75,66 +86,39 @@ const CloudHub: React.FC = () => {
                                 {isOnline ? <Signal size={36} className="animate-pulse text-indigo-200"/> : <WifiOff size={36} className="text-slate-500"/>}
                             </div>
                             <div>
-                                <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Red FerreCloud</h2>
+                                <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Canal de Presencia</h2>
                                 <p className={`font-bold text-[10px] uppercase tracking-widest mt-2 flex items-center gap-2 ${isOnline ? 'text-indigo-400' : 'text-slate-500'}`}>
                                     <Activity size={12} className={isOnline ? 'animate-bounce' : ''}/> {syncMessage}
                                 </p>
                             </div>
                         </div>
-                        <div className="text-right">
-                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Último Latido</p>
-                             <p className="font-mono text-indigo-400 text-sm font-bold">{lastSync}</p>
-                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <div className="lg:col-span-8 space-y-8">
-                            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-8 shadow-inner">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-indigo-400 uppercase ml-2 tracking-widest">ID de Bóveda Global</label>
-                                        <input 
-                                            className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-indigo-400 outline-none focus:border-indigo-500 uppercase text-2xl text-center shadow-lg" 
-                                            value={vaultId} 
-                                            onChange={e => setVaultId(e.target.value)} 
-                                            placeholder="BRUZZONE_2026"
-                                        />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Identidad de esta PC</label>
-                                        <input 
-                                            className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-white outline-none focus:border-indigo-500 uppercase text-2xl text-center shadow-lg" 
-                                            value={terminalName} 
-                                            onChange={e => setTerminalName(e.target.value)} 
-                                            placeholder="CAJA_A"
-                                        />
-                                    </div>
+                        <div className="lg:col-span-8 bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-indigo-400 uppercase ml-2 tracking-widest">Bóveda</label>
+                                    <input className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-black text-white outline-none focus:border-indigo-500 uppercase text-center" value={vaultId} onChange={e => setVaultId(e.target.value)} placeholder="BRUZZONE2026" />
                                 </div>
-                                <button 
-                                    onClick={handleSave} 
-                                    disabled={isProcessing}
-                                    className={`w-full py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-xl transition-all flex items-center justify-center gap-4 text-sm ${isOnline ? 'bg-indigo-600' : 'bg-slate-700 hover:bg-indigo-500'}`}>
-                                    {isProcessing ? <RefreshCw className="animate-spin" size={24}/> : <Zap size={24}/>}
-                                    {isProcessing ? 'Sincronizando...' : 'CONECTAR AHORA'}
-                                </button>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Identidad PC</label>
+                                    <input className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-black text-white outline-none focus:border-indigo-500 uppercase text-center" value={terminalName} onChange={e => setTerminalName(e.target.value)} placeholder="CAJA-1" />
+                                </div>
                             </div>
+                            <button onClick={handleSaveVault} className="w-full py-4 bg-slate-700 hover:bg-indigo-600 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all">Configurar Canal</button>
                         </div>
 
-                        <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-[3rem] p-8 flex flex-col space-y-6 shadow-2xl min-h-[350px]">
-                            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/10 pb-4">PCs Detectadas</h3>
-                            <div className="space-y-3 flex-1 overflow-y-auto max-h-[350px] custom-scrollbar pr-2">
-                                {terminals.length === 0 ? (
-                                    <div className="py-20 text-center opacity-30 italic text-xs flex flex-col items-center gap-4">
-                                        <Search size={40} strokeWidth={1} className="animate-pulse"/>
-                                        Esperando señal...
-                                    </div>
-                                ) : terminals.map((t, idx) => (
-                                    <div key={idx} className={`flex items-center justify-between p-4 bg-white/5 rounded-2xl border-l-4 ${t.isLocal ? 'border-l-indigo-500' : 'border-l-green-500'}`}>
+                        <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-[3rem] p-8 flex flex-col space-y-4 shadow-2xl min-h-[250px]">
+                            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/10 pb-4 flex items-center gap-2"><MonitorSmartphone size={14}/> PCs en Red</h3>
+                            <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar">
+                                {terminals.map((t, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl">
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-2 h-2 rounded-full animate-pulse ${t.isLocal ? 'bg-indigo-500' : 'bg-green-500'}`}></div>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
                                             <span className="text-xs font-black uppercase text-white">{t.name}</span>
                                         </div>
-                                        <span className="text-[8px] font-black uppercase text-slate-500">{t.isLocal ? 'Local' : 'En Red'}</span>
+                                        <span className="text-[8px] font-black uppercase text-slate-500">{t.isLocal ? 'Esta PC' : 'En Red'}</span>
                                     </div>
                                 ))}
                             </div>
@@ -143,12 +127,59 @@ const CloudHub: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex justify-center pt-10">
-                <button 
-                    onClick={resetConnection}
-                    className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-red-500 transition-colors">
-                    <Trash2 size={14}/> Limpiar Bóveda y Reintentar desde cero
-                </button>
+            {/* PLAN B: SINCRONIZACIÓN LOCAL MASIVA */}
+            <div className="bg-white p-10 rounded-[3.5rem] border border-slate-200 shadow-xl space-y-10 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-10 opacity-5 pointer-events-none text-indigo-600"><Server size={280}/></div>
+                
+                <div className="flex items-start gap-6 border-b border-slate-100 pb-8">
+                    <div className="p-4 bg-indigo-600 text-white rounded-3xl shadow-lg"><HardDrive size={32}/></div>
+                    <div>
+                        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Sincronización Local (Plan B)</h3>
+                        <p className="text-slate-400 text-sm font-medium mt-1">Usa este método para mover los 140,000 artículos entre PCs sin pasar por internet.</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                    {/* EXPORTAR */}
+                    <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 space-y-6 group hover:border-indigo-300 transition-all">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm text-indigo-600"><Download size={24}/></div>
+                            <h4 className="font-black text-slate-800 uppercase text-sm">Paso 1: Generar Paquete</h4>
+                        </div>
+                        <p className="text-xs text-slate-500 leading-relaxed font-medium">Haz esto en la PC que tiene los artículos cargados. Se creará un archivo único con todo el stock, clientes y configuración.</p>
+                        <button 
+                            onClick={handleExport}
+                            disabled={isProcessing}
+                            className="w-full bg-slate-900 hover:bg-indigo-600 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all flex items-center justify-center gap-3">
+                            {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <FileJson size={18}/>}
+                            Generar Paquete Maestro
+                        </button>
+                    </div>
+
+                    {/* IMPORTAR */}
+                    <div className="bg-indigo-50/50 p-8 rounded-[2.5rem] border border-indigo-100 space-y-6 group hover:border-indigo-300 transition-all">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-white rounded-2xl shadow-sm text-indigo-600"><Upload size={24}/></div>
+                            <h4 className="font-black text-slate-800 uppercase text-sm">Paso 2: Cargar en otra PC</h4>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed font-medium italic">En las otras computadoras, busca el archivo generado y cárgalo. Esto sincronizará el 100% de la ferretería en segundos.</p>
+                        <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImport} />
+                        <button 
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isProcessing}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all flex items-center justify-center gap-3">
+                            {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <HardDrive size={18}/>}
+                            Seleccionar y Cargar
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
+                    <AlertTriangle className="text-amber-600 shrink-0 mt-1" size={24}/>
+                    <p className="text-[10px] text-amber-800 font-bold uppercase leading-relaxed">
+                        Recomendación Profesional: Para 140,000 artículos, genera un paquete maestro cada vez que hagas cambios grandes de precios. Las ventas diarias se seguirán viendo en el historial una vez que la nube estabilice la señal.
+                    </p>
+                </div>
             </div>
         </div>
     );
