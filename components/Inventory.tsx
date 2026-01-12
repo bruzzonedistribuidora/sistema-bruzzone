@@ -39,7 +39,6 @@ const Inventory: React.FC = () => {
               const results = await productDB.search(searchTerm);
               setProducts(results);
           } else {
-              // Cargar primeros 150 para asegurar visibilidad inmediata
               const initial = await productDB.getAll(150);
               setProducts(initial);
           }
@@ -182,7 +181,6 @@ const Inventory: React.FC = () => {
 
           await productDB.save(productToSave);
           
-          // Trigger de sincronización automática a la red
           window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { 
             detail: { type: 'STOCK_ADJUST', data: productToSave } 
           }));
@@ -211,6 +209,14 @@ const Inventory: React.FC = () => {
       }); 
       setModalTab('GENERAL'); 
       setIsModalOpen(true);
+  };
+
+  const handleQuickReplenishment = (p: Product) => {
+      if (addToReplenishmentQueue(p)) {
+          alert(`✅ ${p.name} agregado a la cola de reposición.`);
+      } else {
+          alert(`ℹ️ El artículo ya se encuentra en la cola de reposición.`);
+      }
   };
 
   return (
@@ -256,11 +262,11 @@ const Inventory: React.FC = () => {
                             <thead className="bg-slate-900 text-white sticky top-0 z-20 text-[11px] uppercase font-black tracking-widest">
                                 <tr>
                                     <th className="w-[15%] px-6 py-5 border-r border-slate-800">SKU / Ref</th>
-                                    <th className="w-[30%] px-6 py-5 border-r border-slate-800">Descripción Comercial</th>
+                                    <th className="w-[25%] px-6 py-5 border-r border-slate-800">Descripción Comercial</th>
                                     <th className="w-[15%] px-6 py-5 border-r border-slate-800">Marca / Rubro</th>
                                     <th className="w-[10%] px-6 py-5 text-center border-r border-slate-800">Stock</th>
                                     <th className="w-[10%] px-6 py-5 text-right border-r border-slate-800">PVP Final</th>
-                                    <th className="w-[20%] px-6 py-5 text-center">Acciones</th>
+                                    <th className="w-[25%] px-6 py-5 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
@@ -280,8 +286,14 @@ const Inventory: React.FC = () => {
                                             <td className="px-6 py-4 text-right font-black text-slate-950 text-lg tracking-tighter bg-slate-50/50">${p.priceFinal?.toLocaleString()}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex justify-center gap-1.5">
-                                                    <button onClick={() => { setFormData(p); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-2.5 text-indigo-700 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"><Pen size={14}/></button>
-                                                    <button onClick={async () => { if(confirm('¿Eliminar definitivamente?')) { await productDB.delete(p.id); loadProducts(); } }} className="p-2.5 text-red-300 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-50"><Trash2 size={14}/></button>
+                                                    <button 
+                                                        onClick={() => handleQuickReplenishment(p)}
+                                                        title="Agregar a pedido de reposición"
+                                                        className="p-2.5 text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100">
+                                                        <PackagePlus size={16}/>
+                                                    </button>
+                                                    <button onClick={() => { setFormData(p); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-2.5 text-indigo-700 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"><Pen size={16}/></button>
+                                                    <button onClick={async () => { if(confirm('¿Eliminar definitivamente?')) { await productDB.delete(p.id); loadProducts(); } }} className="p-2.5 text-red-300 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-50"><Trash2 size={16}/></button>
                                                 </div>
                                             </td>
                                         </tr>
