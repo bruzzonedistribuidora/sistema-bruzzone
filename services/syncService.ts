@@ -1,5 +1,5 @@
 
-import { productDB, cloudSimDB } from './storageService';
+import { productDB } from './storageService';
 import { SyncLogEntry, RestApiConfig } from '../types';
 
 const ARRAY_SYNC_KEYS = [
@@ -13,26 +13,20 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_budgets'
 ];
 
-// Servicio de Sincronización Robusto para múltiples PCs
+// URL de relevo público para que las PCs se encuentren en internet
+// Usamos un servicio de Key-Value store anónimo para el descubrimiento
+const PUBLIC_RELAY_BASE = 'https://api.keyvalue.xyz';
+
 class SyncService {
     private vaultId: string | null = null;
     private apiConfig: RestApiConfig = { baseUrl: '', apiKey: '', enabled: false, lastSyncStatus: 'IDLE' };
     private isProcessing: boolean = false;
     private pollingInterval: number | null = null;
-    private channel: BroadcastChannel;
-    private lastCloudData: any = null;
+    private lastRemoteTimestamp: string = '';
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
         this.loadApiConfig();
-        this.channel = new BroadcastChannel('ferrecloud_sync_relay');
-        
-        this.channel.onmessage = async (event) => {
-            if (event.data === 'FORCE_PULL') {
-                await this.syncLoop(true);
-            }
-        };
-
         if (this.vaultId || this.apiConfig.enabled) this.startAutoSync();
     }
 
@@ -50,9 +44,8 @@ class SyncService {
     getApiConfig() { return this.apiConfig; }
 
     setVaultId(id: string) {
-        this.vaultId = id.toUpperCase().trim();
+        this.vaultId = id.toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
         localStorage.setItem('ferrecloud_vault_id', this.vaultId);
-        // Si hay un ID de bóveda, activamos el modo Cloud Bridge por defecto
         this.startAutoSync();
     }
 
@@ -60,79 +53,67 @@ class SyncService {
 
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
-        this.syncLoop(true);
-        // Polling agresivo cada 20 segundos para terminales activas
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 20000);
+        this.syncLoop();
+        // Polling cada 15 segundos para detectar cambios de otras PCs
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 15000);
     }
 
-    // Punto de encuentro para PCs sin servidor propio (Relay Público)
-    private async callCloudBridge(id: string, method: 'GET' | 'POST', data?: any) {
-        // Usamos un servicio de persistencia JSON gratuito para la interconexión
-        const url = `https://api.jsonbin.io/v3/b/${id}`;
-        // Nota: En producción real, aquí iría la URL de tu API propia.
-        // Simulamos la llamada para mantener la arquitectura.
-        return null; 
-    }
-
-    private async syncLoop(forcePull = false) {
-        if (this.isProcessing) return;
+    private async syncLoop() {
+        if (this.isProcessing || !this.vaultId) return;
         this.isProcessing = true;
         
         try {
-            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'PC-MOSTRADOR';
-            let remoteData: any = null;
+            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'PC-LOCAL';
+            const relayUrl = `${PUBLIC_RELAY_BASE}/${this.vaultId}`;
 
-            // 1. OBTENER DATOS DE LA NUBE
-            if (this.apiConfig.enabled && this.apiConfig.baseUrl) {
-                const response = await fetch(`${this.apiConfig.baseUrl}/sync?vault=${this.vaultId}`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${this.apiConfig.apiKey}` }
-                });
-                if (response.ok) remoteData = await response.json();
-            } else if (this.vaultId) {
-                // Modo Bóveda: Intenta recuperar de la persistencia compartida
-                remoteData = await cloudSimDB.getFromVault(this.vaultId);
+            // 1. OBTENER ESTADO ACTUAL DE LA NUBE
+            const response = await fetch(relayUrl);
+            let remoteData: any = null;
+            
+            if (response.ok) {
+                const text = await response.text();
+                try { remoteData = JSON.parse(text); } catch(e) { remoteData = null; }
             }
 
             if (!remoteData) {
-                remoteData = { logs: [], sharedStorage: {}, terminals: [], lastUpdate: new Date().toISOString() };
+                remoteData = { terminals: {}, sharedStorage: {}, logs: [], lastGlobalUpdate: '' };
             }
 
-            // 2. ACTUALIZAR LISTA DE TERMINALES (Heartbeat)
-            let terminals: string[] = Array.isArray(remoteData.terminals) ? remoteData.terminals : [];
+            // 2. ACTUALIZAR MI LATIDO (Heartbeat)
             const now = new Date().toISOString();
-            
-            // Limpiar terminales viejas (más de 1 min sin señal) y agregar la actual
-            if (!terminals.includes(myTerminal)) {
-                terminals.push(myTerminal);
-            }
+            remoteData.terminals = remoteData.terminals || {};
+            remoteData.terminals[myTerminal] = now;
 
-            let localNeedsPush = forcePull;
+            // Limpiar terminales que no dan señal hace más de 1 minuto
+            Object.keys(remoteData.terminals).forEach(t => {
+                const lastSeen = new Date(remoteData.terminals[t]).getTime();
+                if (Date.now() - lastSeen > 60000) delete remoteData.terminals[t];
+            });
+
             let localUpdated = false;
+            let needsPush = false;
 
             // 3. SINCRONIZAR ARRAYS (CLIENTES, VENTAS, ETC)
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
-                const remoteVal = remoteData.sharedStorage[key] || null;
-                
+                const remoteVal = remoteData.sharedStorage[key];
+
                 if (remoteVal && localVal !== remoteVal) {
-                    // Si el remoto es más nuevo o diferente, actualizar local
                     localStorage.setItem(key, remoteVal);
                     localUpdated = true;
                 } else if (localVal && !remoteVal) {
-                    // Si tenemos datos locales que la nube no tiene, preparar push
-                    localNeedsPush = true;
+                    needsPush = true; // Tenemos datos que la nube no tiene
                 }
             });
 
-            // 4. SINCRONIZAR PRODUCTOS (LOGS DE CAMBIOS)
+            // 4. SINCRONIZAR PRODUCTOS (LOGS)
             const pendingLogs = await productDB.getPendingLogs();
             if (pendingLogs.length > 0) {
-                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-1000);
-                localNeedsPush = true;
+                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-500);
+                needsPush = true;
             }
 
-            // Aplicar logs remotos a la base local
+            // Aplicar logs de otros
             const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
             const newRemoteLogs = (remoteData.logs || []).filter((l: any) => 
                 new Date(l.timestamp).getTime() > lastSyncTs && l.terminalName !== myTerminal
@@ -140,63 +121,56 @@ class SyncService {
 
             if (newRemoteLogs.length > 0) {
                 for (const log of newRemoteLogs) {
-                    if (log.payload?.productId) {
-                        const p = await productDB.getById(log.payload.productId);
-                        if (p) await productDB.save({ ...p, ...log.payload }, true);
+                    if (log.payload?.id) {
+                        await productDB.save(log.payload, true);
                     }
                 }
                 localStorage.setItem('ferrecloud_last_sync_ts', Date.now().toString());
                 localUpdated = true;
             }
 
-            // 5. PUSH A LA NUBE SI HAY CAMBIOS
-            if (localNeedsPush || localUpdated) {
-                const payload = {
-                    terminals,
-                    logs: remoteData.logs,
-                    sharedStorage: {
-                        ...remoteData.sharedStorage,
-                        ...ARRAY_SYNC_KEYS.reduce((acc: any, key) => {
-                            acc[key] = localStorage.getItem(key);
-                            return acc;
-                        }, {})
-                    },
-                    lastUpdate: now
-                };
+            // 5. SUBIR CAMBIOS SI ES NECESARIO O SIMPLEMENTE MI LATIDO
+            // Siempre subimos para actualizar el timestamp de "Terminal Online"
+            const payload = {
+                terminals: remoteData.terminals,
+                logs: remoteData.logs,
+                sharedStorage: {
+                    ...remoteData.sharedStorage,
+                    ...ARRAY_SYNC_KEYS.reduce((acc: any, key) => {
+                        acc[key] = localStorage.getItem(key);
+                        return acc;
+                    }, {})
+                },
+                lastGlobalUpdate: now
+            };
 
-                if (this.apiConfig.enabled) {
-                    await fetch(`${this.apiConfig.baseUrl}/sync`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.apiConfig.apiKey}` },
-                        body: JSON.stringify(payload)
-                    });
-                } else if (this.vaultId) {
-                    await cloudSimDB.saveToVault(this.vaultId, payload);
-                }
+            await fetch(relayUrl, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
 
-                if (pendingLogs.length > 0) await productDB.clearLogs();
-                localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
-            }
-
+            if (pendingLogs.length > 0) await productDB.clearLogs();
+            
+            localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleString());
             if (localUpdated) {
                 window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
                 window.dispatchEvent(new Event('storage'));
             }
 
         } catch (e) {
-            console.error("Sync Pulse Error:", e);
+            console.error("Sync Error:", e);
         } finally {
             this.isProcessing = false;
         }
     }
 
     async syncFromRemote() {
-        await this.syncLoop(true);
+        await this.syncLoop();
         return true;
     }
 
     async pushToCloud() {
-        await this.syncLoop(true);
+        await this.syncLoop();
     }
 }
 
