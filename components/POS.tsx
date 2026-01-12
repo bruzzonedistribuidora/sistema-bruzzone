@@ -9,7 +9,7 @@ import {
     ArrowLeftRight, Banknote, Smartphone as ECheqIcon,
     History, PackageCheck, Wallet, Edit3
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, TreasuryMovement, CashRegister } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, TreasuryMovement, CashRegister, Check } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 const DEFAULT_CLIENT: Client = {
@@ -65,7 +65,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                     const results = await productDB.search(term);
                     setSearchResults(results);
                     
-                    // Si es un código exacto (EAN o SKU), agregar automáticamente
                     const exactMatch = results.find(p => 
                         p.internalCodes.some(c => c.toUpperCase() === term) || 
                         (p.barcodes && p.barcodes.some(b => b.toUpperCase() === term))
@@ -156,6 +155,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         if (cart.length === 0) return;
         const savedRegisters: CashRegister[] = JSON.parse(localStorage.getItem('ferrecloud_registers') || '[]');
         const activeRegister = savedRegisters.find(r => r.isOpen);
+        
         if (!activeRegister && !['CTACTE', 'CHEQUE', 'E-CHEQ'].includes(paymentMethod)) {
             alert("⚠️ No hay ninguna CAJA ABIERTA.");
             return;
@@ -172,13 +172,29 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             items: cart.map(i => ({ sku: i.product.internalCodes[0], name: i.product.name, qty: i.quantity, price: i.appliedPrice })) 
         };
         
+        // Si es pago con cheque, registrar en cartera
+        if (paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') {
+            const checks: Check[] = JSON.parse(localStorage.getItem('ferrecloud_checks') || '[]');
+            const newCheck: Check = {
+                id: `C-${Date.now()}`,
+                number: 'PENDIENTE',
+                bank: 'MOSTRADOR',
+                issuer: selectedClient.name,
+                amount: totals.total,
+                dueDate: new Date().toISOString().split('T')[0],
+                status: 'PENDING',
+                type: paymentMethod === 'E-CHEQ' ? 'ECHEQ' : 'FISICO'
+            };
+            localStorage.setItem('ferrecloud_checks', JSON.stringify([newCheck, ...checks]));
+        }
+
         const newHistory = [sale, ...salesHistory];
         setSalesHistory(newHistory);
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(newHistory));
 
         const productsToUpdate: Product[] = [];
         for (const item of cart) {
-            const prod = await productDB.getAll(); // fallback o busqueda puntual
+            const prod = await productDB.getAll();
             const p = prod.find(x => x.id === item.product.id);
             if (p) {
                 const updatedProd = { ...p, stockPrincipal: Math.max(0, (p.stockPrincipal || 0) - item.quantity), stock: Math.max(0, (p.stock || 0) - item.quantity) };
@@ -209,9 +225,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                         </button>
                     ))}
                 </div>
-                <div className="flex items-center gap-4">
-                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest bg-white/10 px-3 py-1 rounded-lg">Caja: <span className="text-green-400">Activa</span></span>
-                </div>
             </div>
 
             {activeTab === 'SALES' ? (
@@ -235,7 +248,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                         <span className={p.stock > 0 ? 'text-emerald-600' : 'text-red-500'}>Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
-                                                <p className="font-black text-indigo-700 text-lg whitespace-nowrap ml-4">${p.priceFinal.toLocaleString()}</p>
+                                                <p className="font-black text-indigo-700 text-lg whitespace-nowrap ml-4">${(p.priceFinal || 0).toLocaleString()}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -281,18 +294,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                                         <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="p-1 text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-4">
-                                                    <div className="flex items-center justify-end gap-2 group">
-                                                        <DollarSign size={14} className="text-slate-300"/>
-                                                        <input 
-                                                            type="number"
-                                                            className="w-28 p-2 bg-slate-50 border-2 border-slate-100 rounded-xl text-right font-black text-slate-950 text-base outline-none"
-                                                            value={item.appliedPrice}
-                                                            onChange={(e) => updatePrice(item.product.id, parseFloat(e.target.value.replace(',', '.')) || 0)}
-                                                        />
-                                                    </div>
+                                                <td className="px-8 py-4 text-right">
+                                                    <input 
+                                                        type="number"
+                                                        step="0.01"
+                                                        className="w-28 p-2 bg-slate-50 border border-slate-100 rounded-xl text-right font-black text-slate-950 text-sm outline-none"
+                                                        value={item.appliedPrice}
+                                                        onChange={(e) => updatePrice(item.product.id, parseFloat(e.target.value.replace(',', '.')) || 0)}
+                                                    />
                                                 </td>
-                                                <td className="px-8 py-4 text-right font-black text-slate-950 text-base font-mono">${item.subtotal.toLocaleString()}</td>
+                                                <td className="px-8 py-4 text-right font-black text-slate-950 text-base font-mono">${(item.subtotal || 0).toLocaleString()}</td>
                                                 <td className="px-8 py-4 text-center">
                                                     <button onClick={() => setCart(cart.filter(i => i.product.id !== item.product.id))} className="text-slate-300 hover:text-red-500"><Trash2 size={18}/></button>
                                                 </td>
@@ -307,23 +318,22 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                     <div className="w-[400px] flex flex-col gap-4 shrink-0 overflow-y-auto custom-scrollbar">
                         <div className="bg-slate-950 rounded-[2.5rem] p-8 text-white shadow-2xl flex flex-col relative overflow-hidden shrink-0 border-t-4 border-indigo-600">
                             <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-6 border-b border-white/10 pb-4">Liquidación Final</h3>
-                            <div className="space-y-6 relative z-10">
-                                <div className="grid grid-cols-2 gap-3">
-                                    {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'].map(m => (
+                            <div className="space-y-4 relative z-10">
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE', 'CHEQUE', 'E-CHEQ'].map(m => (
                                         <button 
                                             key={m} 
                                             onClick={() => setPaymentMethod(m)} 
-                                            className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${paymentMethod === m ? 'border-indigo-500 bg-indigo-600 text-white shadow-xl' : 'border-white/5 bg-white/5 text-slate-400'}`}>
-                                            {m}
+                                            className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${paymentMethod === m ? 'border-indigo-500 bg-indigo-600 text-white shadow-xl' : 'border-white/5 bg-white/5 text-slate-400'}`}>
+                                            {m.replace('_', ' ')}
                                         </button>
                                     ))}
                                 </div>
-                                <div className="pt-6 border-t border-white/10">
-                                    <div className="flex justify-between items-end mb-2">
+                                <div className="pt-4 border-t border-white/10">
+                                    <div className="flex justify-between items-end mb-1">
                                         <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total a Pagar</span>
-                                        <p className="text-slate-500 font-black text-xs line-through">${totals.gross.toLocaleString()}</p>
                                     </div>
-                                    <p className="text-6xl font-black tracking-tighter text-white leading-none">${totals.total.toLocaleString('es-AR')}</p>
+                                    <p className="text-5xl font-black tracking-tighter text-white leading-none">${totals.total.toLocaleString('es-AR')}</p>
                                 </div>
                             </div>
                         </div>
@@ -352,7 +362,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                     <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-8 py-5 text-indigo-700 font-mono">{sale.id}</td>
                                         <td className="px-8 py-5 text-slate-950">{sale.client}</td>
-                                        <td className="px-8 py-5 text-right text-slate-950 text-base font-black">${sale.total.toLocaleString()}</td>
+                                        <td className="px-8 py-5 text-right text-slate-950 text-base font-black">${(sale.total || 0).toLocaleString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
