@@ -112,7 +112,13 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
                             <div className="absolute top-full left-0 w-full bg-white border rounded-2xl shadow-2xl mt-1 max-h-80 overflow-y-auto z-50 p-1">
                                 {searchResults.map(p => (
                                     <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left px-4 py-3 hover:bg-indigo-50 rounded-lg flex justify-between items-center group">
-                                        <div><p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p><p className="text-[8px] text-gray-400 font-bold uppercase">SKU: {p.internalCodes[0]}</p></div>
+                                        <div>
+                                            <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
+                                            <div className="flex gap-2 text-[8px] font-bold uppercase">
+                                                <span className="text-gray-400">SKU: {p.internalCodes[0]}</span>
+                                                <span className="text-indigo-600">MARCA: {p.brand || 'GENÉRICO'}</span>
+                                            </div>
+                                        </div>
                                         <p className="font-black text-indigo-600 text-[11px]">${p.priceFinal.toLocaleString()}</p>
                                     </button>
                                 ))}
@@ -172,7 +178,6 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
             </div>
         </div>
       )}
-      {/* Modales y vista de historial se mantienen igual pero heredan la lógica de decimales */}
     </div>
   );
 };
