@@ -5,7 +5,7 @@ import {
     Barcode, Pen, Trash2, Tag, Layers, RefreshCw, 
     Truck, PlusCircle, CheckCircle, Hash,
     Boxes as BoxesIcon, PackagePlus, ShoppingCart, AlertCircle, Database,
-    Calculator, MapPin, Percent, DollarSign, TrendingUp, Zap, List
+    Calculator, MapPin, Percent, DollarSign, TrendingUp, Zap, List, PlusSquare
 } from 'lucide-react';
 import { Product, Provider, Brand, Category } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -19,7 +19,11 @@ const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // ESTADO DEL FORMULARIO PROFESIONAL COMPLETO
+  // Listas de referencia para Marcas y Proveedores
+  const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
+  const [providers, setProviders] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
+
+  // ESTADO DEL FORMULARIO PROFESIONAL
   const initialFormState: Partial<Product> = {
       name: '',
       brand: '',
@@ -29,10 +33,6 @@ const Inventory: React.FC = () => {
       internalCodes: [''],
       barcodes: [''],
       providerCodes: [''],
-      otrosCodigos1: '',
-      otrosCodigos2: '',
-      otrosCodigos3: '',
-      otrosCodigos4: '',
       listCost: 0,
       discounts: [0, 0, 0, 0],
       profitMargin: 30,
@@ -43,11 +43,6 @@ const Inventory: React.FC = () => {
       stockMinimo: 0,
       stockMaximo: 0,
       priceFinal: 0,
-      description: '',
-      purchasePackageQuantity: 1,
-      measureUnitSale: 'UNIDAD',
-      measureUnitPurchase: 'UNIDAD',
-      conversionFactor: 1,
       ecommerce: { isPublished: false }
   };
 
@@ -84,12 +79,9 @@ const Inventory: React.FC = () => {
     };
   }, [searchTerm]);
 
-  // CÁLCULO PROFESIONAL DE COSTOS (CADENA DE BONIFICACIONES)
   const calculatePrices = (data: Partial<Product>) => {
       const list = parseFloat(data.listCost as any) || 0;
       const d = data.discounts || [0, 0, 0, 0];
-      
-      // Aplicar cadena de descuentos: Costo * (1-d1) * (1-d2) * (1-d3) * (1-d4)
       const coef = (1 - (parseFloat(d[0] as any) || 0)/100) * 
                    (1 - (parseFloat(d[1] as any) || 0)/100) * 
                    (1 - (parseFloat(d[2] as any) || 0)/100) * 
@@ -111,76 +103,76 @@ const Inventory: React.FC = () => {
   const updateField = (field: string, value: any) => {
       setFormData(prev => {
           let next = { ...prev };
-          
           if (field.startsWith('d_')) {
               const idx = parseInt(field.split('_')[1]);
               const newDiscounts = [...(prev.discounts || [0,0,0,0])];
               newDiscounts[idx] = parseFloat(value) || 0;
               next.discounts = newDiscounts;
-          } else if (field === 'internalCodes' || field === 'barcodes' || field === 'providerCodes') {
-              (next as any)[field] = [value];
           } else {
               (next as any)[field] = value;
           }
-
           const updates = calculatePrices(next);
           return { ...next, ...updates };
       });
   };
 
+  // Manejo de arrays de códigos
+  const updateArrayField = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number, value: string) => {
+      setFormData(prev => {
+          const arr = [...(prev[field] || [''])];
+          arr[index] = value;
+          return { ...prev, [field]: arr };
+      });
+  };
+
+  const addArrayItem = (field: 'internalCodes' | 'barcodes' | 'providerCodes') => {
+      setFormData(prev => ({ ...prev, [field]: [...(prev[field] || []), ''] }));
+  };
+
+  const removeArrayItem = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number) => {
+      setFormData(prev => {
+          const arr = (prev[field] || ['']).filter((_, i) => i !== index);
+          return { ...prev, [field]: arr.length ? arr : [''] };
+      });
+  };
+
   const handleSaveProduct = async () => {
       if (!formData.name || !formData.internalCodes?.[0]) {
-          alert("El nombre y el código interno son obligatorios.");
+          alert("El nombre y al menos un código interno son obligatorios.");
           return;
       }
       setIsLoading(true);
       
-      // Mapeo exhaustivo campo por campo para evitar "desacomodar" datos
+      // ALTA AUTOMATICA DE MARCA SI NO EXISTE
+      const brandUpper = (formData.brand || 'GENERICO').toUpperCase();
+      if (brandUpper !== 'GENERICO' && !brands.some(b => b.name === brandUpper)) {
+          const newBrand = { id: `brand-${Date.now()}`, name: brandUpper };
+          const updatedBrands = [...brands, newBrand];
+          setBrands(updatedBrands);
+          localStorage.setItem('ferrecloud_brands', JSON.stringify(updatedBrands));
+      }
+
+      // ALTA AUTOMATICA DE PROVEEDOR SI NO EXISTE
+      const providerUpper = (formData.provider || 'S/D').toUpperCase();
+      if (providerUpper !== 'S/D' && !providers.some(p => p.name === providerUpper)) {
+          const newProvider = { id: `prov-${Date.now()}`, name: providerUpper, balance: 0, cuit: '', contact: '', defaultDiscounts: [0,0,0] } as Provider;
+          const updatedProviders = [...providers, newProvider];
+          setProviders(updatedProviders);
+          localStorage.setItem('ferrecloud_providers', JSON.stringify(updatedProviders));
+      }
+
       const productToSave: Product = {
+          ...formData,
           id: formData.id || `PROD-${Date.now()}`,
           name: formData.name.toUpperCase(),
-          brand: (formData.brand || 'GENERICO').toUpperCase(),
+          brand: brandUpper,
           category: (formData.category || 'GENERAL').toUpperCase(),
-          provider: (formData.provider || 'S/D').toUpperCase(),
-          location: (formData.location || '').toUpperCase(),
-          
-          internalCodes: formData.internalCodes || [''],
-          barcodes: formData.barcodes || [''],
-          providerCodes: formData.providerCodes || [''],
-          otrosCodigos1: formData.otrosCodigos1 || '',
-          otrosCodigos2: formData.otrosCodigos2 || '',
-          otrosCodigos3: formData.otrosCodigos3 || '',
-          otrosCodigos4: formData.otrosCodigos4 || '',
-          
-          listCost: parseFloat(formData.listCost as any) || 0,
-          discounts: formData.discounts || [0, 0, 0, 0],
-          costAfterDiscounts: parseFloat(formData.costAfterDiscounts as any) || 0,
-          profitMargin: parseFloat(formData.profitMargin as any) || 0,
-          priceNeto: parseFloat(formData.priceNeto as any) || 0,
-          priceFinal: parseFloat(formData.priceFinal as any) || 0,
-          vatRate: parseFloat(formData.vatRate as any) || 21,
-          
-          stockPrincipal: parseFloat(formData.stockPrincipal as any) || 0,
-          stockDeposito: parseFloat(formData.stockDeposito as any) || 0,
-          stockSucursal: parseFloat(formData.stockSucursal as any) || 0,
-          stock: (parseFloat(formData.stockPrincipal as any) || 0) + (parseFloat(formData.stockDeposito as any) || 0) + (parseFloat(formData.stockSucursal as any) || 0),
-          stockMinimo: parseFloat(formData.stockMinimo as any) || 0,
-          stockMaximo: parseFloat(formData.stockMaximo as any) || 0,
-          reorderPoint: parseFloat(formData.stockMinimo as any) || 0,
-          
-          description: formData.description || '',
-          purchasePackageQuantity: parseFloat(formData.purchasePackageQuantity as any) || 1,
-          measureUnitSale: formData.measureUnitSale || 'UNIDAD',
-          measureUnitPurchase: formData.measureUnitPurchase || 'UNIDAD',
-          conversionFactor: parseFloat(formData.conversionFactor as any) || 1,
-          
-          isCombo: formData.isCombo || false,
-          comboItems: formData.comboItems || [],
-          stockDetails: formData.stockDetails || [],
-          purchaseCurrency: 'ARS',
-          saleCurrency: 'ARS',
-          ecommerce: formData.ecommerce || { isPublished: false }
-      };
+          provider: providerUpper,
+          internalCodes: formData.internalCodes?.filter(c => c.trim() !== '') || [''],
+          barcodes: formData.barcodes?.filter(c => c.trim() !== '') || [],
+          providerCodes: formData.providerCodes?.filter(c => c.trim() !== '') || [],
+          stock: (parseFloat(formData.stockPrincipal as any) || 0) + (parseFloat(formData.stockDeposito as any) || 0) + (parseFloat(formData.stockSucursal as any) || 0)
+      } as Product;
 
       await productDB.save(productToSave);
       setIsModalOpen(false);
@@ -271,7 +263,7 @@ const Inventory: React.FC = () => {
           )}
       </div>
 
-      {/* MODAL FICHA TÉCNICA PROFESIONAL */}
+      {/* MODAL FICHA TÉCNICA PRO */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]">
@@ -279,8 +271,8 @@ const Inventory: React.FC = () => {
                       <div className="flex items-center gap-4">
                           <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg"><Package size={24}/></div>
                           <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Ficha Técnica de Artículo Maestro</h3>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">FerreCloud Business Engine</p>
+                              <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Ficha Maestra de Artículo</h3>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestión Técnica y Comercial</p>
                           </div>
                       </div>
                       <button onClick={() => setIsModalOpen(false)}><X size={28}/></button>
@@ -296,8 +288,11 @@ const Inventory: React.FC = () => {
                                   <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.name} onChange={e => updateField('name', e.target.value)} />
                               </div>
                               <div>
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Marca / Fabricante</label>
-                                  <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.brand} onChange={e => updateField('brand', e.target.value)} />
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Marca (Escriba para crear)</label>
+                                  <input list="brands-list" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.brand} onChange={e => updateField('brand', e.target.value)} />
+                                  <datalist id="brands-list">
+                                      {brands.map(b => <option key={b.id} value={b.name}/>)}
+                                  </datalist>
                               </div>
                               <div>
                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Rubro / Categoría</label>
@@ -306,11 +301,14 @@ const Inventory: React.FC = () => {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               <div>
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Proveedor Predeterminado</label>
-                                  <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.provider} onChange={e => updateField('provider', e.target.value)} />
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Proveedor (Escriba para crear)</label>
+                                  <input list="providers-list" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.provider} onChange={e => updateField('provider', e.target.value)} />
+                                  <datalist id="providers-list">
+                                      {providers.map(p => <option key={p.id} value={p.name}/>)}
+                                  </datalist>
                               </div>
                               <div className="md:col-span-2">
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Ubicación Física de Referencia</label>
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Ubicación Física</label>
                                   <div className="relative">
                                       <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
                                       <input className="w-full pl-12 p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.location} onChange={e => updateField('location', e.target.value)} />
@@ -319,50 +317,61 @@ const Inventory: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* SECCION 2: CODIGOS CRUZADOS (CRÍTICO) */}
-                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-                          <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><Hash size={14}/> Códigos Cruzados</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <div className="space-y-1">
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Código Interno (SKU)</label>
-                                  <input className="w-full p-4 bg-indigo-50 border-2 border-transparent rounded-2xl font-mono font-black text-indigo-700 text-sm focus:bg-white focus:border-indigo-500 outline-none" value={formData.internalCodes?.[0]} onChange={e => updateField('internalCodes', e.target.value)} />
-                              </div>
-                              <div className="space-y-1">
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Código de Barras (EAN)</label>
-                                  <div className="relative">
-                                      <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
-                                      <input className="w-full pl-12 p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-mono font-black text-sm focus:bg-white focus:border-indigo-500 outline-none" value={formData.barcodes?.[0]} onChange={e => updateField('barcodes', e.target.value)} />
-                                  </div>
-                              </div>
-                              <div className="space-y-1">
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Código Proveedor</label>
-                                  <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-mono font-black text-sm focus:bg-white focus:border-indigo-500 outline-none" value={formData.providerCodes?.[0]} onChange={e => updateField('providerCodes', e.target.value)} />
-                              </div>
+                      {/* SECCION 2: CODIGOS MULTIPLES */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          {/* CODIGOS PROPIOS */}
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2"><Hash size={14}/> Códigos Propios</h4>
+                                    <button onClick={() => addArrayItem('internalCodes')} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"><Plus size={14}/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    {formData.internalCodes?.map((code, i) => (
+                                        <div key={i} className="flex gap-1 group">
+                                            <input className="flex-1 p-3 bg-slate-50 border-2 border-transparent rounded-xl font-mono font-black text-indigo-700 text-xs focus:bg-white focus:border-indigo-500 outline-none" placeholder="SKU..." value={code} onChange={e => updateArrayField('internalCodes', i, e.target.value.toUpperCase())} />
+                                            {i > 0 && <button onClick={() => removeArrayItem('internalCodes', i)} className="p-2 text-red-300 hover:text-red-500"><Trash2 size={14}/></button>}
+                                        </div>
+                                    ))}
+                                </div>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div>
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Otro Código 1</label>
-                                  <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={formData.otrosCodigos1} onChange={e => updateField('otrosCodigos1', e.target.value)} />
-                              </div>
-                              <div>
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Otro Código 2</label>
-                                  <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={formData.otrosCodigos2} onChange={e => updateField('otrosCodigos2', e.target.value)} />
-                              </div>
-                              <div>
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Otro Código 3</label>
-                                  <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={formData.otrosCodigos3} onChange={e => updateField('otrosCodigos3', e.target.value)} />
-                              </div>
-                              <div>
-                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-2">Otro Código 4</label>
-                                  <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={formData.otrosCodigos4} onChange={e => updateField('otrosCodigos4', e.target.value)} />
-                              </div>
+
+                          {/* CODIGOS DE BARRA */}
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2"><Barcode size={14}/> Códigos de Barra</h4>
+                                    <button onClick={() => addArrayItem('barcodes')} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><Plus size={14}/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    {formData.barcodes?.map((code, i) => (
+                                        <div key={i} className="flex gap-1 group">
+                                            <input className="flex-1 p-3 bg-slate-50 border-2 border-transparent rounded-xl font-mono font-black text-xs focus:bg-white focus:border-emerald-500 outline-none" placeholder="EAN..." value={code} onChange={e => updateArrayField('barcodes', i, e.target.value.toUpperCase())} />
+                                            {i > 0 && <button onClick={() => removeArrayItem('barcodes', i)} className="p-2 text-red-300 hover:text-red-500"><Trash2 size={14}/></button>}
+                                        </div>
+                                    ))}
+                                </div>
+                          </div>
+
+                          {/* CODIGOS PROVEEDOR */}
+                          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2"><Truck size={14}/> Cód. Proveedor</h4>
+                                    <button onClick={() => addArrayItem('providerCodes')} className="p-1.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-600 hover:text-white transition-all"><Plus size={14}/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    {formData.providerCodes?.map((code, i) => (
+                                        <div key={i} className="flex gap-1 group">
+                                            <input className="flex-1 p-3 bg-slate-50 border-2 border-transparent rounded-xl font-mono font-black text-xs focus:bg-white focus:border-orange-500 outline-none" placeholder="REF PROV..." value={code} onChange={e => updateArrayField('providerCodes', i, e.target.value.toUpperCase())} />
+                                            {i > 0 && <button onClick={() => removeArrayItem('providerCodes', i)} className="p-2 text-red-300 hover:text-red-500"><Trash2 size={14}/></button>}
+                                        </div>
+                                    ))}
+                                </div>
                           </div>
                       </div>
 
-                      {/* SECCION 3: COSTOS Y PRECIOS (CRÍTICO) */}
+                      {/* SECCION 3: COSTOS Y PRECIOS */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                           <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl space-y-6">
-                              <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 pb-3 flex items-center gap-2"><Calculator size={14}/> Estructura de Costos de Compra</h4>
+                              <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 pb-3 flex items-center gap-2"><Calculator size={14}/> Estructura de Costos</h4>
                               <div className="space-y-6">
                                   <div>
                                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-2 block mb-2">Precio de Lista Bruto</label>
@@ -383,14 +392,14 @@ const Inventory: React.FC = () => {
                                       </div>
                                   </div>
                                   <div className="pt-6 border-t border-white/5 flex justify-between items-center">
-                                      <span className="text-[10px] font-black text-slate-500 uppercase">Costo Neto (Reposición):</span>
+                                      <span className="text-[10px] font-black text-slate-500 uppercase">Costo Neto:</span>
                                       <span className="text-2xl font-black text-indigo-400">${formData.costAfterDiscounts?.toLocaleString()}</span>
                                   </div>
                               </div>
                           </div>
 
                           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-                              <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><TrendingUp size={14}/> Configuración de Precios de Venta</h4>
+                              <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><TrendingUp size={14}/> Configuración de Venta</h4>
                               <div className="space-y-6">
                                   <div className="grid grid-cols-2 gap-6">
                                       <div>
@@ -412,7 +421,7 @@ const Inventory: React.FC = () => {
                                   </div>
                                   <div className="bg-indigo-600 p-8 rounded-[2rem] text-white shadow-2xl relative overflow-hidden">
                                       <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none"><Zap size={100}/></div>
-                                      <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-60">Precio Final Mostrador (PVP)</p>
+                                      <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-60">Precio Final (PVP)</p>
                                       <div className="flex items-center gap-3">
                                           <span className="text-4xl font-black tracking-tighter">$</span>
                                           <input 
@@ -433,7 +442,7 @@ const Inventory: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* SECCION 4: LOGÍSTICA Y STOCKS */}
+                      {/* SECCION 4: LOGÍSTICA */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
                           <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><BoxesIcon size={14}/> Existencias por Ubicación</h4>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -448,16 +457,6 @@ const Inventory: React.FC = () => {
                               <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-200 space-y-2">
                                   <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest block text-center">Sucursal / Otros</label>
                                   <input type="number" className="w-full p-4 bg-white border border-slate-300 rounded-2xl font-black text-center text-slate-900 text-2xl shadow-sm" value={formData.stockSucursal} onChange={e => updateField('stockSucursal', e.target.value)} />
-                              </div>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="bg-red-50/30 p-6 rounded-[2rem] border border-red-100 space-y-2">
-                                  <label className="text-[9px] font-black text-red-600 uppercase tracking-widest block text-center">Stock Mínimo (Pto. de Pedido)</label>
-                                  <input type="number" className="w-full p-4 bg-white border border-red-200 rounded-2xl font-black text-center text-red-600 text-xl shadow-sm" value={formData.stockMinimo} onChange={e => updateField('stockMinimo', e.target.value)} />
-                              </div>
-                              <div className="bg-blue-50/30 p-6 rounded-[2rem] border border-blue-100 space-y-2">
-                                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest block text-center">Stock Máximo (Deseado)</label>
-                                  <input type="number" className="w-full p-4 bg-white border border-blue-200 rounded-2xl font-black text-center text-blue-600 text-xl shadow-sm" value={formData.stockMaximo} onChange={e => updateField('stockMaximo', e.target.value)} />
                               </div>
                           </div>
                       </div>
