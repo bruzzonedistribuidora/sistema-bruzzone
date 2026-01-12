@@ -2,7 +2,7 @@
 import { productDB, cloudSimDB } from './storageService';
 import { SyncLogEntry } from '../types';
 
-// Tablas que requieren fusión inteligente (son arrays de objetos con ID)
+// Tablas críticas que se fusionan para ser visibles en toda la red
 const ARRAY_SYNC_KEYS = [
     'ferrecloud_remitos',
     'ferrecloud_sales_history',
@@ -10,16 +10,27 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_movements',
     'ferrecloud_purchases',
     'ferrecloud_providers',
-    'ferrecloud_registers'
+    'ferrecloud_registers',
+    'ferrecloud_budgets'
 ];
 
 class SyncService {
     private vaultId: string | null = null;
     private isProcessing: boolean = false;
     private pollingInterval: number | null = null;
+    private channel: BroadcastChannel;
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
+        // Canal de comunicación instantáneo entre pestañas/terminales
+        this.channel = new BroadcastChannel('ferrecloud_sync_relay');
+        
+        this.channel.onmessage = (event) => {
+            if (event.data === 'FORCE_PULL') {
+                this.syncLoop();
+            }
+        };
+
         if (this.vaultId) this.startAutoSync();
     }
 
@@ -40,44 +51,39 @@ class SyncService {
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        // Sincronización cada 5 segundos para alta disponibilidad en mostrador
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 5000);
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 15000); // Cada 15s revisión de fondo
     }
 
     /**
-     * Lógica de Fusión Inteligente (Smart Merge)
-     * Evita que una terminal borre los datos de otra al sincronizar.
+     * Fusiona datos locales y remotos asegurando que nada se borre.
      */
     private mergeData(localStr: string | null, remoteStr: string | null): { merged: any[], hasChanges: boolean } {
         const local = JSON.parse(localStr || '[]');
         const remote = JSON.parse(remoteStr || '[]');
         
-        if (!Array.isArray(local)) return { merged: remote, hasChanges: true };
-        if (!Array.isArray(remote)) return { merged: local, hasChanges: false };
+        if (!Array.isArray(local) || local.length === 0) return { merged: remote, hasChanges: remote.length > 0 };
+        if (!Array.isArray(remote) || remote.length === 0) return { merged: local, hasChanges: false };
 
         const localMap = new Map(local.map(item => [item.id, item]));
         const remoteMap = new Map(remote.map(item => [item.id, item]));
         
         let hasChanges = false;
+        
+        // Empezamos con los datos remotos (la "verdad" de la nube)
         const combined = [...remote];
 
-        // Añadir lo que tengo local que no está en la nube
+        // Añadimos lo que tenemos local que aún no llegó a la nube
         local.forEach(item => {
             if (!remoteMap.has(item.id)) {
                 combined.push(item);
-                hasChanges = true;
+                hasChanges = true; // Tenemos algo nuevo para subir
             }
         });
 
-        // Verificar si la nube tiene cosas que yo no tengo
-        remote.forEach(item => {
-            if (!localMap.has(item.id)) {
-                hasChanges = true;
-            }
-        });
+        // Verificamos si la nube tiene algo que nosotros no (para avisar a la UI)
+        const needsUIUpdate = remote.some(item => !localMap.has(item.id));
 
-        // Ordenar por ID o fecha si estuviera disponible, aquí usamos el orden original
-        return { merged: combined, hasChanges };
+        return { merged: combined, hasChanges: hasChanges || needsUIUpdate };
     }
 
     private async syncLoop() {
@@ -85,14 +91,14 @@ class SyncService {
         this.isProcessing = true;
         
         try {
-            // 1. Obtener estado actual de la Nube
+            // 1. Obtener estado actual del "Servidor"
             const cloudData = await cloudSimDB.getFromVault(this.vaultId) || { logs: [], sharedStorage: {} };
             const remoteStorage = cloudData.sharedStorage || {};
             const newSharedStorage = { ...remoteStorage };
-            let anyLocalChangeToPush = false;
-            let anyRemoteChangeToPull = false;
+            let localUpdated = false;
+            let cloudNeedsUpdate = false;
 
-            // 2. Sincronizar Tablas (Remitos, Ventas, Clientes...)
+            // 2. Procesar cada tabla con lógica de fusión
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
                 const remoteVal = remoteStorage[key] || null;
@@ -101,41 +107,45 @@ class SyncService {
                 
                 if (hasChanges) {
                     const mergedStr = JSON.stringify(merged);
+                    
                     // Si el resultado de la fusión es distinto a lo que tengo localmente, actualizo local
                     if (mergedStr !== localVal) {
                         localStorage.setItem(key, mergedStr);
-                        anyRemoteChangeToPull = true;
+                        localUpdated = true;
                     }
-                    // Si el resultado de la fusión es distinto a lo que hay en la nube, marco para subir
+                    
+                    // Si el resultado de la fusión tiene datos locales que no están en la nube, marcamos para subir
                     if (mergedStr !== remoteVal) {
                         newSharedStorage[key] = mergedStr;
-                        anyLocalChangeToPush = true;
+                        cloudNeedsUpdate = true;
                     }
                 }
             });
 
             // 3. Sincronizar Logs de Productos (Stock y Precios)
             const pendingLogs = await productDB.getPendingLogs();
-            if (pendingLogs.length > 0) anyLocalChangeToPush = true;
-
             const updatedLogs = [...(cloudData.logs || []), ...pendingLogs].slice(-2000);
+            if (pendingLogs.length > 0) cloudNeedsUpdate = true;
 
-            // 4. Subir si hubo cambios locales o fusiones
-            if (anyLocalChangeToPush) {
+            // 4. Subir cambios a la "Nube" si hay novedades
+            if (cloudNeedsUpdate) {
                 await cloudSimDB.saveToVault(this.vaultId, { 
                     logs: updatedLogs, 
                     sharedStorage: newSharedStorage,
                     lastUpdate: new Date().toISOString()
                 });
                 await productDB.clearLogs();
+                // Notificar a otras terminales que hay datos nuevos en la nube
+                this.channel.postMessage('FORCE_PULL');
             }
 
-            // 5. Notificar a la UI si bajaron datos nuevos
-            if (anyRemoteChangeToPull) {
+            // 5. Notificar a la Interfaz Local si bajaron datos
+            if (localUpdated) {
                 window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
+                window.dispatchEvent(new Event('storage')); // Compatibilidad con listeners de storage
             }
 
-            // 6. Procesar cambios de Stock/Precios de otras terminales
+            // 6. Procesar cambios individuales de productos (Stock/Precios)
             const lastSync = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
             const newLogs = (cloudData.logs || []).filter((l: any) => 
                 new Date(l.timestamp).getTime() > lastSync && 
@@ -163,14 +173,9 @@ class SyncService {
     }
 
     async pushToCloud() {
-        // Forzar ejecución del loop inmediatamente
         await this.syncLoop();
-    }
-
-    async initializeBootstrap() {
-        if (!this.vaultId) return 'OFFLINE';
-        await this.syncLoop();
-        return 'UP_TO_DATE';
+        // Notificamos inmediatamente después de una acción del usuario (ej: crear remito)
+        this.channel.postMessage('FORCE_PULL');
     }
 }
 
