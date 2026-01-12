@@ -166,7 +166,6 @@ const App: React.FC = () => {
       case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin key={renderKey} />;
       case ViewState.SHOP: return <Shop key={renderKey} />;
       
-      // CASOS DE CONFIGURACIÓN FALTANTES
       case ViewState.COMPANY_SETTINGS: return <CompanySettings key={renderKey} />;
       case ViewState.AFIP_CONFIG: return <AfipConfig key={renderKey} />;
       case ViewState.USERS: return <UsersComponent key={renderKey} />;
@@ -213,9 +212,13 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4 px-4 h-full border-l border-white/10">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 cursor-help group relative">
                     <span className="text-[9px] font-black text-slate-500 uppercase">{localStorage.getItem('ferrecloud_terminal_name') || 'PC'}</span>
                     <div className={`w-2 h-2 rounded-full ${cloudStatus === 'UP_TO_DATE' ? 'bg-green-500 animate-pulse' : cloudStatus === 'SYNCING' ? 'bg-indigo-500 animate-bounce' : 'bg-slate-700'}`}></div>
+                    <div className="absolute top-full right-0 mt-2 p-3 bg-slate-800 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 border border-white/10 z-[100]">
+                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Estado de Red</p>
+                        <p className="text-[10px] text-white font-medium">{cloudStatus === 'UP_TO_DATE' ? 'Sincronización Perfecta' : 'Actualizando datos...'}</p>
+                    </div>
                 </div>
                 <button onClick={() => handleNavigate(ViewState.CLOUD_HUB)} className="p-2 text-indigo-400 hover:text-white transition-colors">
                     <Network size={18}/>
