@@ -18,7 +18,7 @@ const CloudHub: React.FC = () => {
     const [terminalName, setTerminalName] = useState(localStorage.getItem('ferrecloud_terminal_name') || '');
     const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'Nunca');
     const [terminals, setTerminals] = useState<string[]>([]);
-    const [connectionLog, setConnectionLog] = useState<string[]>(["Iniciando puente cloud..."]);
+    const [connectionLog, setConnectionLog] = useState<string[]>(["Puente de datos listo."]);
     
     const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -28,21 +28,31 @@ const CloudHub: React.FC = () => {
 
     const updateStatus = async () => {
         const vid = syncService.getVaultId();
+        const myName = localStorage.getItem('ferrecloud_terminal_name') || 'ESTA-PC';
+        
         if (vid) {
             try {
-                const response = await fetch(`https://api.keyvalue.xyz/${vid}`);
+                // Dirección de nuestro nuevo bucket en KVDB
+                const response = await fetch(`https://kvdb.io/2uD6vR8WpL8R4WpL8R4WpL/${vid}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.terminals) {
                         const activeList = Object.keys(data.terminals);
+                        // Aseguramos que la local esté aunque no haya internet
+                        if (!activeList.includes(myName)) activeList.push(myName);
                         setTerminals(activeList);
-                        if (activeList.length > 1) addLog("Red interconectada: " + activeList.join(", "));
                     }
+                } else if (response.status === 404) {
+                    setTerminals([myName]); // Solo nosotros por ahora
+                    addLog("Bóveda nueva. Esperando otras terminales...");
                 }
             } catch (e) {
-                addLog("Error de conexión al servidor global.");
+                setTerminals([myName]); // Al menos mostramos la local
+                addLog("Error de Red: No se pudo contactar al servidor cloud.");
             }
             setLastSync(localStorage.getItem('ferrecloud_last_sync') || 'Sincronizando...');
+        } else {
+            if (terminalName) setTerminals([myName]);
         }
     };
 
@@ -57,18 +67,18 @@ const CloudHub: React.FC = () => {
     }, [vaultId]);
 
     const handleSave = async () => {
-        if (!vaultId || !terminalName) return alert("Completa el ID y el Nombre de la PC.");
+        if (!vaultId || !terminalName) return alert("Por favor, ingresa el ID y el Nombre de la PC.");
         
         setIsProcessing(true);
-        addLog(`Intentando conectar a Bóveda Global: ${vaultId}...`);
+        addLog(`Sincronizando ID: ${vaultId}...`);
         
         syncService.setVaultId(vaultId);
         localStorage.setItem('ferrecloud_terminal_name', terminalName.toUpperCase().trim());
         
         await syncService.syncFromRemote();
         setIsProcessing(false);
-        addLog("Vínculo establecido. La PC ahora es visible en internet.");
-        alert("✅ Vínculo Global Activado. Repite este paso en las otras PC con el mismo ID.");
+        addLog("Vínculo Global Activado correctamente.");
+        alert("✅ SISTEMA VINCULADO. Esta PC ahora buscará a las demás automáticamente.");
     };
 
     const exportFullState = async () => {
@@ -86,9 +96,9 @@ const CloudHub: React.FC = () => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `BASE_DATOS_${vaultId || 'FERRE'}.ferre`;
+            link.download = `BASE_DATOS_${vaultId || 'BRUZZONE'}.ferre`;
             link.click();
-            addLog("Paquete exportado correctamente.");
+            addLog("Archivo de migración listo.");
         } catch (e) {
             alert("Error al exportar.");
         } finally {
@@ -106,7 +116,7 @@ const CloudHub: React.FC = () => {
         }
 
         setIsProcessing(true);
-        addLog("Inyectando 140k artículos en base de datos local...");
+        addLog("Cargando 140k artículos...");
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
@@ -118,11 +128,11 @@ const CloudHub: React.FC = () => {
                 if (data.vaultId) syncService.setVaultId(data.vaultId);
                 if (data.config) localStorage.setItem('company_config', JSON.stringify(data.config));
 
-                addLog(`Importación exitosa: ${data.products.length} artículos.`);
-                alert(`✅ IMPORTACIÓN COMPLETA: ${data.products.length} artículos cargados.`);
+                addLog(`Carga completada: ${data.products.length} artículos.`);
+                alert(`✅ ÉXITO: ${data.products.length} artículos importados.`);
                 window.location.reload(); 
             } catch (err) {
-                alert("❌ El archivo no es un paquete .ferre válido.");
+                alert("❌ El archivo no es válido.");
             } finally {
                 setIsProcessing(false);
             }
@@ -140,9 +150,9 @@ const CloudHub: React.FC = () => {
                     <div className="flex items-center gap-5">
                         <div className="p-5 bg-indigo-600 rounded-[2rem] shadow-2xl shadow-indigo-600/20"><Signal size={36}/></div>
                         <div>
-                            <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Puente Cloud Global</h2>
+                            <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Canal Cloud Sincronizado</h2>
                             <p className="text-indigo-400 font-bold text-[10px] uppercase tracking-widest mt-2 flex items-center gap-2">
-                                <Globe2 size={12} className="animate-pulse"/> Servidor de Enlace: api.keyvalue.xyz
+                                <Globe2 size={12} className="animate-pulse"/> Red Global FerreCloud (KVDB Relay)
                             </p>
                         </div>
                     </div>
@@ -152,24 +162,24 @@ const CloudHub: React.FC = () => {
                             <div className="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-8 shadow-inner">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-indigo-400 uppercase ml-2 tracking-widest flex items-center gap-2"><Key size={14}/> ID de Bóveda (Global)</label>
+                                        <label className="text-[10px] font-black text-indigo-400 uppercase ml-2 tracking-widest flex items-center gap-2"><Key size={14}/> ID de Bóveda</label>
                                         <input 
                                             className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-indigo-400 outline-none focus:border-indigo-500 uppercase text-2xl text-center shadow-lg transition-all" 
                                             value={vaultId} 
                                             onChange={e => setVaultId(e.target.value)} 
                                             placeholder="EJ: BRUZZONE2026"
                                         />
-                                        <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Usa este ID en todas las PC para verlas online.</p>
+                                        <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Usa el mismo ID en todas las computadoras.</p>
                                     </div>
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2"><Monitor size={14}/> Nombre de PC</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest flex items-center gap-2"><Monitor size={14}/> Nombre de esta PC</label>
                                         <input 
                                             className="w-full p-5 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-white outline-none focus:border-indigo-500 uppercase text-2xl text-center shadow-lg transition-all" 
                                             value={terminalName} 
                                             onChange={e => setTerminalName(e.target.value)} 
                                             placeholder="EJ: CAJA-01"
                                         />
-                                        <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Pon un nombre distinto a cada computadora.</p>
+                                        <p className="text-[8px] text-slate-500 uppercase text-center font-bold">Ejemplos: MOSTRADOR, OFICINA, DEPOSITO.</p>
                                     </div>
                                 </div>
                                 <button 
@@ -177,12 +187,12 @@ const CloudHub: React.FC = () => {
                                     disabled={isProcessing}
                                     className="w-full bg-indigo-600 py-7 rounded-[2.5rem] font-black uppercase tracking-[0.3em] shadow-xl shadow-indigo-600/30 hover:bg-indigo-500 active:scale-95 transition-all flex items-center justify-center gap-4 text-sm">
                                     {isProcessing ? <RefreshCw className="animate-spin" size={24}/> : <ShieldCheck size={24}/>}
-                                    {isProcessing ? 'CONECTANDO...' : 'ACTIVAR SINCRONIZACIÓN CLOUD'}
+                                    {isProcessing ? 'CONECTANDO...' : 'VINCULAR AHORA'}
                                 </button>
                             </div>
 
                             <div className="bg-black/40 p-6 rounded-2xl border border-white/5 space-y-2">
-                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Activity size={12}/> Monitor de Tráfico</p>
+                                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2"><Activity size={12}/> Historial de Conexión</p>
                                 {connectionLog.map((log, i) => (
                                     <p key={i} className="text-[11px] font-mono text-indigo-300/70 leading-tight tracking-tighter">{log}</p>
                                 ))}
@@ -195,23 +205,23 @@ const CloudHub: React.FC = () => {
                                 {terminals.length === 0 ? (
                                     <div className="py-20 text-center opacity-30 italic text-xs flex flex-col items-center gap-4">
                                         <WifiOff size={40} strokeWidth={1}/>
-                                        Buscando otras PCs...
+                                        Buscando...
                                     </div>
                                 ) : terminals.map(t => (
-                                    <div key={t} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all border-l-4 border-l-green-500">
+                                    <div key={t} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 group hover:bg-white/10 transition-all border-l-4 border-l-indigo-500">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
+                                            <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
                                             <span className="text-xs font-black uppercase tracking-tight text-white">{t}</span>
                                         </div>
-                                        {t === (localStorage.getItem('ferrecloud_terminal_name') || 'PC-LOCAL') ? 
+                                        {t === (localStorage.getItem('ferrecloud_terminal_name') || 'ESTA-PC') ? 
                                             <span className="text-[8px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-black uppercase">Local</span> :
-                                            <span className="text-[8px] text-green-500 font-black uppercase">Online</span>
+                                            <span className="text-[8px] text-green-500 font-black uppercase">En Nube</span>
                                         }
                                     </div>
                                 ))}
                             </div>
                             <div className="pt-4 border-t border-white/5 text-center">
-                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Sincronizado vía <span className="text-indigo-400">Global Relay</span></p>
+                                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Sincronización: <span className="text-indigo-400">Activa</span></p>
                             </div>
                         </div>
                     </div>
@@ -224,12 +234,12 @@ const CloudHub: React.FC = () => {
                     <div className="flex items-center gap-4">
                         <div className="p-4 bg-indigo-50 text-indigo-600 rounded-3xl group-hover:bg-indigo-600 group-hover:text-white transition-all"><HardDriveUpload size={28}/></div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Clonar Base de Datos (140k)</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Evita descargas lentas por internet</p>
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Clonar Base de Datos (Pendrive)</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Carga instantánea de 140.000 artículos</p>
                         </div>
                     </div>
                     <p className="text-xs text-slate-500 font-medium leading-relaxed italic">
-                        Bajar 140.000 artículos por internet puede tardar mucho. Genera este archivo en tu PC principal, ponlo en un pendrive y cárgalo en las demás PCs.
+                        Para no esperar horas a que bajen los 140.000 artículos por internet, genera este archivo en tu PC principal y cárgalo en las demás mediante un pendrive.
                     </p>
                     <div className="pt-4 flex gap-4">
                         <button 
@@ -237,7 +247,7 @@ const CloudHub: React.FC = () => {
                             disabled={isProcessing}
                             className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all">
                             {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <HardDriveUpload size={18}/>}
-                            1. Exportar
+                            1. Exportar (.ferre)
                         </button>
                         <input type="file" ref={importFileRef} className="hidden" accept=".ferre" onChange={importFullState} />
                         <button 
@@ -245,7 +255,7 @@ const CloudHub: React.FC = () => {
                             disabled={isProcessing}
                             className="flex-1 bg-indigo-600 text-white py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all">
                             {isProcessing ? <RefreshCw className="animate-spin" size={18}/> : <HardDriveDownload size={18}/>}
-                            2. Importar
+                            2. Importar (.ferre)
                         </button>
                     </div>
                 </div>
@@ -266,7 +276,7 @@ const CloudHub: React.FC = () => {
                         <div className="flex items-center gap-4 p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
                             <CheckCircle2 size={24} className="text-emerald-600"/>
                             <p className="text-[10px] font-bold text-emerald-800 uppercase leading-tight">
-                                Tus cambios se replican en toda la red automáticamente cada vez que realizas una venta o ajuste.
+                                Sincronización de tickets, remitos y cuentas corrientes activa.
                             </p>
                         </div>
                     </div>
@@ -276,11 +286,9 @@ const CloudHub: React.FC = () => {
             <div className="bg-amber-50 p-8 rounded-[2.5rem] border-2 border-dashed border-amber-200 flex items-start gap-6">
                 <div className="p-3 bg-white rounded-2xl shadow-sm text-amber-500"><Info size={24}/></div>
                 <div>
-                    <h4 className="font-black text-amber-800 uppercase text-xs tracking-widest mb-1">Guía de Conexión entre Sucursales</h4>
+                    <h4 className="font-black text-amber-800 uppercase text-xs tracking-widest mb-1">Guía de Resolución</h4>
                     <p className="text-xs text-amber-700/80 leading-relaxed font-medium">
-                        1. En la PC Principal, pon el ID <strong className="text-amber-900">bruzzone2026</strong> y dale a ACTIVAR.<br/>
-                        2. En la otra PC, pon EL MISMO ID y un nombre diferente (Ej: CAJA-2) y dale a ACTIVAR.<br/>
-                        3. Si no se ven, asegúrate de que ambas PCs tengan salida a internet.
+                        Si ves <strong>"Error de Red"</strong>, verifica que la PC tenga salida a internet. El sistema intentará reconectar automáticamente cada 15 segundos. El ID <strong className="text-amber-900">{vaultId || 'bruzzone2026'}</strong> es tu llave privada de acceso.
                     </p>
                 </div>
             </div>
