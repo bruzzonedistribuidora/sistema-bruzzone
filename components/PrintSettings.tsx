@@ -9,7 +9,6 @@ import {
     RotateCcw, Maximize2, Settings2, Trash2, Eye as EyeIcon, 
     ToggleLeft, ToggleRight, DollarSign, List, PencilLine
 } from 'lucide-react';
-/* Fix: Removed TableColumnConfig from imports as it is not exported from types.ts */
 import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig } from '../types';
 
 const REPORT_LIST: { type: DocumentType, name: string, size: PaperSize, cat: string }[] = [
@@ -40,7 +39,6 @@ const PrintSettings: React.FC = () => {
     return saved ? JSON.parse(saved) : {};
   }, []);
 
-  // Use the PrintTemplate type for the templates state to resolve 'any' usage and ensure consistency
   const [templates, setTemplates] = useState<Record<string, PrintTemplate>>(() => {
       const saved = localStorage.getItem('ferrecloud_print_templates_v6');
       if (saved) return JSON.parse(saved);
@@ -94,7 +92,6 @@ const PrintSettings: React.FC = () => {
     return currentTemplate.orientation === 'HORIZONTAL' ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
   }, [currentTemplate.paperSize, currentTemplate.orientation]);
 
-  // Updated to use Partial<PrintTemplate> for safer updates
   const updateTemplate = (updates: Partial<PrintTemplate>) => {
     setTemplates(prev => ({
         ...prev,
@@ -133,7 +130,6 @@ const PrintSettings: React.FC = () => {
       updatePosition(activeElement, newX, newY);
   };
 
-  // Renderizador dinámico de campos para el sidebar según el elemento activo
   const renderElementEditor = () => {
       if (!activeElement) return null;
 
@@ -203,7 +199,7 @@ const PrintSettings: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full bg-slate-100 overflow-hidden" onMouseUp={() => setIsDragging(false)} onMouseMove={handleMouseMove}>
+    <div className="flex h-full bg-slate-100 overflow-hidden animate-fade-in" onMouseUp={() => setIsDragging(false)} onMouseMove={handleMouseMove}>
         
         {/* PANEL DE CONTROL IZQUIERDO */}
         <div className="w-80 md:w-96 bg-white border-r border-slate-200 flex flex-col shadow-2xl z-30">
@@ -218,7 +214,6 @@ const PrintSettings: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar pb-20">
-                {/* SELECTOR TIPO */}
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Documento a editar</label>
                     <select 
@@ -230,7 +225,6 @@ const PrintSettings: React.FC = () => {
                     </select>
                 </div>
 
-                {/* PROPIEDADES DEL ELEMENTO SELECCIONADO */}
                 <div className={`p-5 rounded-[2rem] transition-all border ${activeElement ? 'bg-indigo-50 border-indigo-200 shadow-lg' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
                     <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-4">
                         <PencilLine size={14}/> {activeElement ? `Editando: ${activeElement.toUpperCase()}` : 'Seleccione un elemento'}
@@ -238,7 +232,6 @@ const PrintSettings: React.FC = () => {
                     {renderElementEditor()}
                 </div>
 
-                {/* TABLA: CONFIGURACIÓN DE COLUMNAS */}
                 <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white space-y-4 shadow-xl">
                     <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><TableIcon size={14}/> Columnas de Tabla</h3>
                     <div className="grid grid-cols-1 gap-2">
@@ -261,7 +254,6 @@ const PrintSettings: React.FC = () => {
                     </div>
                 </div>
 
-                {/* GESTIÓN DE CAPAS (VISIBILIDAD) */}
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
                     <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={14}/> Capas del Lienzo</h3>
                     <div className="grid grid-cols-1 gap-1">
@@ -280,24 +272,6 @@ const PrintSettings: React.FC = () => {
                         ))}
                     </div>
                 </div>
-
-                {/* FORMATO HOJA */}
-                <div className="bg-slate-100 p-6 rounded-[2.5rem] space-y-4">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> Hoja y Papel</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                        {Object.keys(PAPER_DIMENSIONS).filter(k => k !== 'CUSTOM').map(size => (
-                            <button 
-                                key={size}
-                                onClick={() => updateTemplate({paperSize: size as PaperSize})}
-                                className={`py-2 rounded-xl text-[9px] font-black border transition-all ${currentTemplate.paperSize === size ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200'}`}>
-                                {size.replace('_', ' ')}
-                            </button>
-                        ))}
-                    </div>
-                    <button onClick={() => updateTemplate({orientation: currentTemplate.orientation === 'VERTICAL' ? 'HORIZONTAL' : 'VERTICAL'})} className="w-full mt-2 py-3 bg-white text-indigo-600 rounded-xl font-black text-[9px] uppercase tracking-widest border border-indigo-100 shadow-sm flex items-center justify-center gap-2">
-                        <RotateCcw size={14}/> Cambiar Orientación
-                    </button>
-                </div>
             </div>
         </div>
 
@@ -307,8 +281,6 @@ const PrintSettings: React.FC = () => {
                 <span className="text-indigo-400">{selectedType}</span>
                 <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
                 <span>{dims.w}mm x {dims.h}mm</span>
-                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
-                <span>{currentTemplate.orientation}</span>
             </div>
             
             <div 
@@ -316,12 +288,7 @@ const PrintSettings: React.FC = () => {
                 className="bg-white shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] relative flex-shrink-0 border border-slate-300 transition-all duration-500 overflow-hidden"
                 style={{ width: `${dims.w}mm`, height: `${dims.h}mm` }}
             >
-                {/* GUÍAS DE CORTE VISUALES */}
-                <div className="absolute top-[32mm] left-0 w-full h-px bg-slate-100"></div>
-                <div className="absolute top-0 left-1/2 w-px h-[32mm] bg-slate-100 -translate-x-1/2"></div>
-
-                {/* LOGO DE EMPRESA (Configuración de Mi Empresa) */}
-                {currentTemplate.positions.logo.visible && (
+                {currentTemplate.positions.logo?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'logo')}
                         className={`absolute cursor-move transition-all flex items-center justify-center ${activeElement === 'logo' ? 'ring-2 ring-indigo-500 bg-indigo-50/20' : ''}`}
@@ -332,14 +299,13 @@ const PrintSettings: React.FC = () => {
                         ) : (
                             <div className="w-full h-full bg-slate-100 border border-slate-200 flex flex-col items-center justify-center p-4">
                                 <ImageIcon size={24} className="text-slate-300 mb-1"/>
-                                <span className="text-[7px] font-black uppercase text-slate-400">Sin Logo Configurador</span>
+                                <span className="text-[7px] font-black uppercase text-slate-400">Sin Logo</span>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* LETRA COMPROBANTE CENTRAL */}
-                {currentTemplate.positions.docLetter.visible && (
+                {currentTemplate.positions.docLetter?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'docLetter')}
                         className={`absolute cursor-move bg-white border-2 border-slate-900 w-12 h-14 flex flex-col items-center justify-center shadow-md ${activeElement === 'docLetter' ? 'ring-2 ring-indigo-500' : ''}`}
@@ -350,8 +316,7 @@ const PrintSettings: React.FC = () => {
                     </div>
                 )}
 
-                {/* DATOS CABECERA DERECHA (VOUCHER INFO) */}
-                {currentTemplate.positions.voucherInfo.visible && (
+                {currentTemplate.positions.voucherInfo?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'voucherInfo')}
                         className={`absolute cursor-move w-[65mm] ${activeElement === 'voucherInfo' ? 'ring-2 ring-indigo-500' : ''}`}
@@ -360,15 +325,13 @@ const PrintSettings: React.FC = () => {
                         <h2 className="text-xl font-black text-slate-800 uppercase text-center mb-3 tracking-[0.2em]">{currentTemplate.titleText}</h2>
                         <div className="space-y-1.5 text-[9px] font-bold text-slate-600">
                             <p>Nº {currentTemplate.voucherPointOfSale} - {currentTemplate.voucherNumber}</p>
-                            <p>Fecha de Emisión: {new Date().toLocaleDateString()}</p>
+                            <p>Fecha: {new Date().toLocaleDateString()}</p>
                             <p>C.U.I.T.: {currentTemplate.voucherCuitEmisor}</p>
-                            <p>Ingresos Brutos: {currentTemplate.voucherIIBBEmisor}</p>
                         </div>
                     </div>
                 )}
 
-                {/* CABECERA IZQUIERDA (IDENTIDAD) */}
-                {currentTemplate.positions.header.visible && (
+                {currentTemplate.positions.header?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'header')}
                         className={`absolute cursor-move max-w-[85mm] ${activeElement === 'header' ? 'ring-2 ring-indigo-500' : ''}`}
@@ -381,27 +344,23 @@ const PrintSettings: React.FC = () => {
                     </div>
                 )}
 
-                {/* CLIENTE */}
-                {currentTemplate.positions.client.visible && (
+                {currentTemplate.positions.client?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'client')}
                         className={`absolute cursor-move w-[190mm] border border-slate-300 p-4 grid grid-cols-2 gap-6 rounded-sm ${activeElement === 'client' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.client.x}mm`, top: `${currentTemplate.positions.client.y}mm` }}
                     >
                         <div className="text-[9px] space-y-1.5 font-medium">
-                            <p><strong>Sr/es:</strong> CLIENTE DE PRUEBA S.R.L.</p>
-                            <p><strong>Dirección:</strong> CALLE EJEMPLO 456 - CORDOBA</p>
-                            <p><strong>IVA:</strong> Responsable Inscripto</p>
+                            <p><strong>Sr/es:</strong> CLIENTE EJEMPLO S.A.</p>
+                            <p><strong>CUIT:</strong> 30-11223344-5</p>
                         </div>
                         <div className="text-[9px] space-y-1.5 font-medium">
-                            <p><strong>CUIT:</strong> 30-00000000-0</p>
                             <p><strong>Cond. Venta:</strong> Cuenta Corriente</p>
                         </div>
                     </div>
                 )}
 
-                {/* TABLA DE ITEMS */}
-                {currentTemplate.positions.table.visible && (
+                {currentTemplate.positions.table?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'table')}
                         className={`absolute cursor-move w-[190mm] ${activeElement === 'table' ? 'ring-2 ring-indigo-500' : ''}`}
@@ -410,51 +369,42 @@ const PrintSettings: React.FC = () => {
                         <table className="w-full text-left border-t border-b border-slate-800">
                             <thead className="text-[9px] font-black uppercase border-b border-slate-300 bg-slate-50">
                                 <tr>
-                                    {currentTemplate.showSkus && <th className="py-2 px-2">Código</th>}
-                                    <th className="py-2">Descripción del Artículo</th>
+                                    <th className="py-2 px-2">Código</th>
+                                    <th className="py-2">Descripción</th>
                                     <th className="py-2 text-center">Cant.</th>
-                                    {currentTemplate.showIvaColumn && <th className="py-2 text-center">IVA</th>}
-                                    {currentTemplate.showPrices && <th className="py-2 text-right">Unitario</th>}
-                                    {currentTemplate.showPrices && <th className="py-2 text-right pr-2">Subtotal</th>}
+                                    <th className="py-2 text-right">Unitario</th>
+                                    <th className="py-2 text-right pr-2">Subtotal</th>
                                 </tr>
                             </thead>
                             <tbody className="text-[9px] font-medium text-slate-700">
                                 <tr className="border-b border-slate-100">
-                                    {currentTemplate.showSkus && <td className="py-2 px-2 font-mono">SKU-9902</td>}
-                                    <td className="py-2 uppercase font-bold">
-                                        PINZA UNIVERSAL 8 AISLADA PRO
-                                        {currentTemplate.showBrands && <span className="block text-[7px] text-indigo-400">MARCA: STANLEY</span>}
-                                    </td>
-                                    <td className="py-2 text-center">2,00</td>
-                                    {currentTemplate.showIvaColumn && <td className="py-2 text-center">21,0</td>}
-                                    {currentTemplate.showPrices && <td className="py-2 text-right">$4.500,00</td>}
-                                    {currentTemplate.showPrices && <td className="py-2 text-right font-black pr-2">$9.000,00</td>}
+                                    <td className="py-2 px-2 font-mono">SKU-9902</td>
+                                    <td className="py-2 uppercase font-bold">HERRAMIENTA PROFESIONAL FERRETERA</td>
+                                    <td className="py-2 text-center">1,00</td>
+                                    <td className="py-2 text-right">$4.500,00</td>
+                                    <td className="py-2 text-right font-black pr-2">$4.500,00</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 )}
 
-                {/* TOTALES */}
-                {currentTemplate.positions.totals.visible && currentTemplate.showPrices && (
+                {currentTemplate.positions.totals?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'totals')}
                         className={`absolute cursor-move w-[65mm] border border-slate-900 shadow-sm ${activeElement === 'totals' ? 'ring-2 ring-indigo-500' : ''}`}
                         style={{ left: `${currentTemplate.positions.totals.x}mm`, top: `${currentTemplate.positions.totals.y}mm` }}
                     >
                         <div className="p-3 space-y-1 text-[9px] font-bold text-slate-700 bg-white">
-                            <div className="flex justify-between"><span>Gravado</span><span>$7.438,01</span></div>
-                            <div className="flex justify-between"><span>IVA 21%</span><span>$1.561,99</span></div>
                             <div className="flex justify-between text-base font-black bg-slate-900 text-white p-2 mt-2">
                                 <span className="text-[8px] uppercase tracking-widest leading-none pt-1">{currentTemplate.totalsLabel}</span>
-                                <span>$9.000,00</span>
+                                <span>$4.500,00</span>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* QR AREA */}
-                {currentTemplate.positions.qr.visible && (
+                {currentTemplate.positions.qr?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'qr')}
                         className={`absolute cursor-move flex items-center gap-4 ${activeElement === 'qr' ? 'ring-2 ring-indigo-500 bg-indigo-50/20' : ''}`}
@@ -464,21 +414,8 @@ const PrintSettings: React.FC = () => {
                             <QrIcon size="100%" className="opacity-40"/>
                         </div>
                         <div className="max-w-[100mm]">
-                            <p className="text-[7px] font-bold italic text-slate-400 leading-tight uppercase tracking-widest">Autorización ARCA - Validez Fiscal Digital mediante QR.</p>
+                            <p className="text-[7px] font-bold italic text-slate-400 leading-tight uppercase tracking-widest">Validación Fiscal Digital.</p>
                         </div>
-                    </div>
-                )}
-
-                {/* PIE DE PAGINA (FOOTER) */}
-                {currentTemplate.positions.footer.visible && (
-                    <div 
-                        onMouseDown={(e) => handleMouseDown(e, 'footer')}
-                        className={`absolute cursor-move w-[190mm] border-t border-slate-900 pt-3 text-center ${activeElement === 'footer' ? 'ring-2 ring-indigo-500' : ''}`}
-                        style={{ left: `${currentTemplate.positions.footer.x}mm`, top: `${currentTemplate.positions.footer.y}mm` }}
-                    >
-                        <p className="text-[7px] font-black uppercase text-slate-400 tracking-[0.4em] whitespace-pre-line leading-relaxed">
-                            {currentTemplate.footerText}
-                        </p>
                     </div>
                 )}
             </div>
