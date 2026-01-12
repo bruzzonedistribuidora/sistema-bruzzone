@@ -24,7 +24,6 @@ const Inventory: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Listas maestras con estados para actualización en caliente
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
   const [providers, setProviders] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
@@ -35,21 +34,31 @@ const Inventory: React.FC = () => {
 
   const loadProducts = async () => {
       setIsLoading(true);
-      if (searchTerm.trim().length > 2) {
-          const results = await productDB.search(searchTerm);
-          setProducts(results);
-      } else {
-          const initial = await productDB.getAll(100);
-          setProducts(initial);
+      try {
+          if (searchTerm.trim().length > 2) {
+              const results = await productDB.search(searchTerm);
+              setProducts(results);
+          } else {
+              // Cargar primeros 150 para asegurar visibilidad inmediata
+              const initial = await productDB.getAll(150);
+              setProducts(initial);
+          }
+      } catch (err) {
+          console.error("Error cargando productos:", err);
+      } finally {
+          setIsLoading(false);
       }
-      setIsLoading(false);
   };
 
   useEffect(() => {
     loadProducts();
     const handleSync = () => loadProducts();
     window.addEventListener('ferrecloud_products_updated', handleSync);
-    return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
+    window.addEventListener('ferrecloud_sync_pulse', handleSync);
+    return () => {
+        window.removeEventListener('ferrecloud_products_updated', handleSync);
+        window.removeEventListener('ferrecloud_sync_pulse', handleSync);
+    };
   }, [searchTerm]);
 
   const sortedProducts = useMemo(() => {
@@ -64,7 +73,6 @@ const Inventory: React.FC = () => {
     return sortableItems;
   }, [products, sortConfig]);
 
-  // Funciones de creación rápida
   const handleQuickAddBrand = () => {
       const name = window.prompt("Ingrese el nombre de la nueva MARCA:");
       if (name && name.trim()) {
@@ -173,6 +181,12 @@ const Inventory: React.FC = () => {
           } as Product;
 
           await productDB.save(productToSave);
+          
+          // Trigger de sincronización automática a la red
+          window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { 
+            detail: { type: 'STOCK_ADJUST', data: productToSave } 
+          }));
+
           setIsModalOpen(false);
           setFormData({});
           await loadProducts();
@@ -207,7 +221,7 @@ const Inventory: React.FC = () => {
                 <div className="p-3 bg-slate-900 text-indigo-400 rounded-2xl shadow-lg"><BoxesIcon size={28}/></div>
                 <div>
                     <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tighter leading-none">Maestro de Artículos</h2>
-                    <p className="text-slate-600 text-[11px] font-black uppercase tracking-[0.2em] mt-2">Base de Datos Centralizada (140k items)</p>
+                    <p className="text-slate-600 text-[11px] font-black uppercase tracking-[0.2em] mt-2">Inventario Local Sincronizado</p>
                 </div>
             </div>
 
@@ -231,7 +245,7 @@ const Inventory: React.FC = () => {
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         <input type="text" placeholder="Buscar por Nombre, Marca, SKU..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-[1.5rem] text-sm font-black outline-none focus:bg-white focus:border-indigo-500 transition-all uppercase" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
-                    <button onClick={loadProducts} className="bg-slate-900 text-white px-6 rounded-[1.5rem] hover:bg-slate-800 transition-all">
+                    <button onClick={loadProducts} className="bg-slate-900 text-white px-6 rounded-[1.5rem] hover:bg-slate-800 transition-all flex items-center gap-2">
                         <RefreshCw size={20} className={isLoading ? 'animate-spin' : ''} />
                     </button>
                 </div>
@@ -273,7 +287,14 @@ const Inventory: React.FC = () => {
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr><td colSpan={6} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest">Base de datos vacía o buscando...</td></tr>
+                                    <tr>
+                                        <td colSpan={6} className="py-40 text-center">
+                                            <div className="flex flex-col items-center gap-4 opacity-30">
+                                                <RefreshCw className={`text-slate-400 ${isLoading ? 'animate-spin' : ''}`} size={64} />
+                                                <p className="font-black uppercase text-xs tracking-widest">{isLoading ? 'Cargando Base de Datos...' : 'No se encontraron artículos'}</p>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>
