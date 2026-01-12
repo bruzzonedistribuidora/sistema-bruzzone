@@ -7,7 +7,8 @@ import {
     ArrowUp, ArrowDown, EyeOff, Eye, Hash, Calendar, Table as TableIcon,
     Scissors, QrCode as QrIcon, AlignCenter, TextCursorInput, MonitorSmartphone,
     RotateCcw, Maximize2, Settings2, Trash2, Eye as EyeIcon, 
-    ToggleLeft, ToggleRight, DollarSign, List, PencilLine
+    ToggleLeft, ToggleRight, DollarSign, List, PencilLine,
+    Columns, FileCode, Monitor, Smartphone, RefreshCcw
 } from 'lucide-react';
 import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig } from '../types';
 
@@ -87,6 +88,7 @@ const PrintSettings: React.FC = () => {
   }, [templates]);
 
   const currentTemplate = templates[selectedType] || templates['FACTURA'];
+  
   const dims = useMemo(() => {
     const base = PAPER_DIMENSIONS[currentTemplate.paperSize as PaperSize] || PAPER_DIMENSIONS['A4'];
     return currentTemplate.orientation === 'HORIZONTAL' ? { w: base.h, h: base.w } : { w: base.w, h: base.h };
@@ -214,15 +216,57 @@ const PrintSettings: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar pb-20">
+                {/* SECCIÓN 1: SELECCIÓN DE DOCUMENTO */}
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Documento a editar</label>
                     <select 
                         className="w-full p-2.5 bg-white border rounded-xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                         value={selectedType}
-                        onChange={(e) => setSelectedType(e.target.value as DocumentType)}
+                        onChange={(e) => { setSelectedType(e.target.value as DocumentType); setActiveElement(null); }}
                     >
                         {REPORT_LIST.map(r => <option key={r.type} value={r.type}>{r.name}</option>)}
                     </select>
+                </div>
+
+                {/* NUEVA SECCIÓN: CONFIGURACIÓN DE PÁGINA */}
+                <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                        <Maximize2 size={14} className="text-indigo-600"/> Configuración de Página
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Tamaño de Papel</label>
+                            <select 
+                                className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold text-xs uppercase outline-none"
+                                value={currentTemplate.paperSize}
+                                onChange={(e) => updateTemplate({ paperSize: e.target.value as PaperSize })}
+                            >
+                                <option value="A4">A4 (210x297 mm)</option>
+                                <option value="A5">A5 (148x210 mm)</option>
+                                <option value="TICKET_80MM">Ticket 80mm</option>
+                                <option value="ROLLO_62MM">Etiqueta 62mm</option>
+                                <option value="A4_QUARTER">Cuarto A4</option>
+                                <option value="CUSTOM">Personalizado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1 ml-1">Orientación</label>
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={() => updateTemplate({ orientation: 'VERTICAL' })}
+                                    className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-all border ${currentTemplate.orientation === 'VERTICAL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400'}`}
+                                >
+                                    <Smartphone size={14} /> Vertical
+                                </button>
+                                <button 
+                                    onClick={() => updateTemplate({ orientation: 'HORIZONTAL' })}
+                                    className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase transition-all border ${currentTemplate.orientation === 'HORIZONTAL' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400'}`}
+                                >
+                                    <Monitor size={14} /> Horizontal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div className={`p-5 rounded-[2rem] transition-all border ${activeElement ? 'bg-indigo-50 border-indigo-200 shadow-lg' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
@@ -275,12 +319,14 @@ const PrintSettings: React.FC = () => {
             </div>
         </div>
 
-        {/* ÁREA DE TRABAJO (LIENZO) */}
+        {/* ÁREA DE TRABAJO (LIENZO REDIMENSIONABLE) */}
         <div className="flex-1 bg-slate-200 flex flex-col items-center p-12 overflow-auto relative scroll-smooth custom-scrollbar">
-            <div className="mb-6 bg-slate-800 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 shadow-xl shrink-0">
+            <div className="mb-6 bg-slate-800 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-4 shadow-xl shrink-0 transition-all">
                 <span className="text-indigo-400">{selectedType}</span>
                 <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
                 <span>{dims.w}mm x {dims.h}mm</span>
+                <span className="w-1 h-1 bg-slate-600 rounded-full"></span>
+                <span className="text-slate-400">{currentTemplate.orientation}</span>
             </div>
             
             <div 
