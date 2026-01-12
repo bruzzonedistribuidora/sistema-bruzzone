@@ -56,7 +56,7 @@ import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
 import LicenseConsole from './components/LicenseConsole';
 import LabelPrinting from './components/LabelPrinting';
-import { ViewState, User, Client, InvoiceItem, SystemLicense } from './types';
+import { ViewState, User, Client, InvoiceItem, SystemLicense, Product } from './types';
 import { syncService } from './services/syncService';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -158,6 +158,20 @@ const App: React.FC = () => {
     };
     window.addEventListener('ferrecloud_sync_request', handleSyncRequest);
 
+    const handleQuickAddPOS = (e: any) => {
+        const product: Product = e.detail.product;
+        if (product) {
+            setItemsToBill([{ 
+                product, 
+                quantity: 1, 
+                appliedPrice: product.priceFinal, 
+                subtotal: product.priceFinal 
+            }]);
+            handleNavigate(ViewState.POS);
+        }
+    };
+    window.addEventListener('ferrecloud_add_to_pos', handleQuickAddPOS);
+
     const checkMobile = () => { setIsMobile(window.innerWidth < 1024); };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -167,6 +181,7 @@ const App: React.FC = () => {
         window.removeEventListener('license_updated', loadLicense);
         window.removeEventListener('ferrecloud_sync_request', handleSyncRequest);
         window.removeEventListener('ferrecloud_sync_pulse', handleRemotePulse);
+        window.removeEventListener('ferrecloud_add_to_pos', handleQuickAddPOS);
     };
   }, []);
 
