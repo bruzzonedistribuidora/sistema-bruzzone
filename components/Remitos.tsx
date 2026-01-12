@@ -157,7 +157,13 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                         <div className="absolute top-full left-0 w-full bg-white border rounded-2xl shadow-2xl mt-1 max-h-80 overflow-y-auto z-50 p-1">
                             {searchResults.map(p => (
                                 <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-3 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50">
-                                    <div><p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p><p className="text-[7px] font-bold text-gray-400 uppercase">REF: {p.internalCodes[0]}</p></div>
+                                    <div>
+                                        <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
+                                        <div className="flex gap-2 text-[7px] font-bold uppercase">
+                                            <span className="text-gray-400">REF: {p.internalCodes[0]}</span>
+                                            <span className="text-indigo-600">MARCA: {p.brand || 'GENÉRICO'}</span>
+                                        </div>
+                                    </div>
                                     <p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p>
                                 </button>
                             ))}
@@ -220,7 +226,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
           </div>
         </div>
       )}
-      {/* Historial y Modales omitidos pero se mantienen con lógica de step="0.001" en modales de impresión */}
     </div>
   );
 };
