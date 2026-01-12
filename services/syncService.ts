@@ -67,9 +67,6 @@ class SyncService {
         this.pollingInterval = window.setInterval(() => this.syncLoop(), 30000);
     }
 
-    /**
-     * Comunicación con la API REST Real
-     */
     private async callRestApi(endpoint: string, method: string, data?: any) {
         if (!this.apiConfig.enabled || !this.apiConfig.baseUrl) return null;
         
@@ -84,8 +81,10 @@ class SyncService {
             });
             
             if (!response.ok) throw new Error('API Error');
+            this.apiConfig.lastSyncStatus = 'SUCCESS';
             return await response.json();
         } catch (e) {
+            this.apiConfig.lastSyncStatus = 'ERROR';
             console.error("[REST API] Error de conexión:", e);
             return null;
         }
@@ -135,26 +134,31 @@ class SyncService {
         try {
             let remoteStorage: any = {};
             let cloudLogs: any[] = [];
+            let terminals: string[] = [];
 
-            // INTENTAR OBTENER DATOS DE LA API REST SI ESTÁ HABILITADA
             if (this.apiConfig.enabled) {
                 const apiData = await this.callRestApi('/pull', 'GET');
                 if (apiData) {
                     remoteStorage = apiData.sharedStorage || {};
                     cloudLogs = apiData.logs || [];
+                    terminals = apiData.terminals || [];
                 }
             } else if (this.vaultId) {
-                // FALLBACK AL SIMULADOR CLOUD
-                const cloudData = await cloudSimDB.getFromVault(this.vaultId) || { logs: [], sharedStorage: {} };
+                const cloudData = await cloudSimDB.getFromVault(this.vaultId) || { logs: [], sharedStorage: {}, terminals: [] };
                 remoteStorage = cloudData.sharedStorage || {};
                 cloudLogs = cloudData.logs || [];
+                terminals = cloudData.terminals || [];
+            }
+
+            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'PC-DESCONOCIDA';
+            if (!terminals.includes(myTerminal)) {
+                terminals.push(myTerminal);
             }
 
             const newSharedStorage = { ...remoteStorage };
             let localUpdated = false;
             let cloudNeedsUpdate = false;
 
-            // 1. Sincronizar Tablas (Clientes, Remitos, etc.)
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
                 const remoteVal = remoteStorage[key] || null;
@@ -173,7 +177,6 @@ class SyncService {
                 }
             });
 
-            // 2. Sincronizar Logs de Productos (Deltas de Stock de 140k items)
             let pendingLogs: SyncLogEntry[] = [];
             try {
                 pendingLogs = await productDB.getPendingLogs();
@@ -184,11 +187,11 @@ class SyncService {
                 cloudNeedsUpdate = true;
             }
 
-            // 3. Subir Cambios a la Nube (API REST o Simulador)
-            if (cloudNeedsUpdate) {
+            if (cloudNeedsUpdate || forcePull) {
                 const payload = { 
                     logs: cloudLogs, 
                     sharedStorage: newSharedStorage,
+                    terminals,
                     lastUpdate: new Date().toISOString()
                 };
 
@@ -202,10 +205,7 @@ class SyncService {
                 this.channel.postMessage('FORCE_PULL');
             }
 
-            // 4. Aplicar cambios de otros terminales a IndexedDB local
             const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
-            const myTerminal = localStorage.getItem('ferrecloud_terminal_name');
-            
             const remoteLogs = cloudLogs.filter((l: any) => 
                 new Date(l.timestamp).getTime() > lastSyncTs && 
                 l.terminalName !== myTerminal
@@ -219,9 +219,10 @@ class SyncService {
                     }
                 }
                 localStorage.setItem('ferrecloud_last_sync_ts', Date.now().toString());
+                localUpdated = true;
             }
 
-            if (localUpdated || remoteLogs.length > 0 || forcePull) {
+            if (localUpdated || forcePull) {
                 window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
                 window.dispatchEvent(new Event('storage'));
             }
