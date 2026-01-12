@@ -1,6 +1,5 @@
 
 import { productDB } from './storageService';
-import { SyncLogEntry } from '../types';
 
 const ARRAY_SYNC_KEYS = [
     'ferrecloud_remitos',
@@ -13,9 +12,8 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_budgets'
 ];
 
-// Usamos un proxy para saltar el error "Failed to fetch" (CORS)
-const PROXY_URL = 'https://corsproxy.io/?';
-const BASE_RELAY_URL = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
+// Servidor KV directo con soporte CORS nativo
+const CLOUD_ENDPOINT = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
 
 class SyncService {
     private vaultId: string | null = null;
@@ -41,62 +39,59 @@ class SyncService {
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        // Cada 12 segundos revisamos la red
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 12000);
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 7000); // Latido cada 7 seg
     }
 
     private async syncLoop() {
         if (this.isProcessing || !this.vaultId) return;
         this.isProcessing = true;
         
-        // La URL final pasa a través del proxy para que el navegador no la bloquee
-        const relayUrl = `${PROXY_URL}${encodeURIComponent(`${BASE_RELAY_URL}/${this.vaultId}`)}`;
+        const url = `${CLOUD_ENDPOINT}/${this.vaultId}`;
 
         try {
-            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'CAJA-LOCAL';
+            const myTerminalName = (localStorage.getItem('ferrecloud_terminal_name') || 'CAJA').toUpperCase();
             
-            // 1. OBTENER DATOS (PULL)
+            // FASE 1: LECTURA
             let remoteData: any = { terminals: {}, sharedStorage: {}, logs: [] };
             
             try {
-                const response = await fetch(relayUrl);
+                const response = await fetch(url, { cache: 'no-store' });
                 if (response.ok) {
                     const text = await response.text();
-                    if (text && text.length > 5) remoteData = JSON.parse(text);
+                    if (text && text.length > 2) remoteData = JSON.parse(text);
                 }
             } catch (e) {
-                console.log("Vault init...");
+                console.log("Iniciando bóveda nueva...");
             }
 
-            // 2. ACTUALIZAR PRESENCIA
+            // FASE 2: ACTUALIZAR PRESENCIA
             const now = Date.now();
             if (!remoteData.terminals) remoteData.terminals = {};
             remoteData.terminals[this.sessionId] = {
-                name: myTerminal.toUpperCase(),
+                name: myTerminalName,
                 lastSeen: now
             };
 
-            // Limpiar terminales que no responden hace mas de 40 seg
+            // Limpiar terminales desconectadas (más de 30 seg sin señal)
             Object.keys(remoteData.terminals).forEach(id => {
-                if (now - remoteData.terminals[id].lastSeen > 40000) {
+                if (now - remoteData.terminals[id].lastSeen > 30000) {
                     delete remoteData.terminals[id];
                 }
             });
 
-            let localUpdated = false;
+            let changed = false;
 
-            // 3. SINCRONIZAR ARRAYS (Clientes, Ventas, etc)
+            // FASE 3: SINCRONIZAR DATOS COMPARTIDOS
             ARRAY_SYNC_KEYS.forEach(key => {
-                const localVal = localStorage.getItem(key);
-                const remoteVal = remoteData.sharedStorage?.[key];
-                // Solo actualizamos si el dato remoto es más nuevo o diferente
-                if (remoteVal && localVal !== remoteVal) {
-                    localStorage.setItem(key, remoteVal);
-                    localUpdated = true;
+                const local = localStorage.getItem(key);
+                const remote = remoteData.sharedStorage?.[key];
+                if (remote && local !== remote) {
+                    localStorage.setItem(key, remote);
+                    changed = true;
                 }
             });
 
-            // 4. LOGS DE PRODUCTOS (Sincronización de 140k artículos)
+            // FASE 4: SINCRONIZAR PRODUCTOS (LOGS)
             const pendingLogs = await productDB.getPendingLogs();
             if (pendingLogs.length > 0) {
                 remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-100);
@@ -112,10 +107,10 @@ class SyncService {
                     if (log.payload?.id) await productDB.save(log.payload, true);
                 }
                 localStorage.setItem('ferrecloud_last_sync_ts', now.toString());
-                localUpdated = true;
+                changed = true;
             }
 
-            // 5. SUBIR CAMBIOS (PUSH)
+            // FASE 5: ESCRITURA (PUSH)
             const payload = {
                 terminals: remoteData.terminals,
                 logs: remoteData.logs || [],
@@ -127,26 +122,30 @@ class SyncService {
                         return acc;
                     }, {})
                 },
-                lastUpdate: new Date().toISOString()
+                lastSync: new Date().toISOString()
             };
 
-            await fetch(relayUrl, {
+            await fetch(url, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             if (pendingLogs.length > 0) await productDB.clearLogs();
             
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
+            
+            // Emitir evento de éxito
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
                 detail: { terminals: remoteData.terminals } 
             }));
             
-            if (localUpdated) window.dispatchEvent(new Event('storage'));
+            if (changed) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
+            console.error("Error de Red:", e);
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { 
-                detail: { error: "El servidor proxy está ocupado. Reintentando..." } 
+                detail: { error: "Buscando señal de internet..." } 
             }));
         } finally {
             this.isProcessing = false;
