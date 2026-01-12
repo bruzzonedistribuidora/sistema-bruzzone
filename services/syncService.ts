@@ -13,8 +13,10 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_budgets'
 ];
 
-// Relevo de datos de alta disponibilidad
-const CLOUD_RELAY_URL = 'https://kvdb.io/2uD6vR8WpL8R4WpL8R4WpL';
+// Usamos un servicio de intercambio de JSON más directo
+const CLOUD_RELAY_URL = 'https://api.keyvalue.xyz';
+// Generamos una clave única basada en el vaultId para este servicio específico
+const getVaultKey = (id: string) => `ferrecloud_${id.toLowerCase()}`;
 
 class SyncService {
     private vaultId: string | null = null;
@@ -35,19 +37,20 @@ class SyncService {
     }
 
     setVaultId(id: string) {
-        this.vaultId = id.toUpperCase().trim().replace(/[^A-Z0-9]/g, '');
-        localStorage.setItem('ferrecloud_vault_id', this.vaultId);
+        // Limpiamos espacios y caracteres raros
+        const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        this.vaultId = cleanId;
+        localStorage.setItem('ferrecloud_vault_id', cleanId);
         this.startAutoSync();
     }
 
     getVaultId() { return this.vaultId; }
-    getApiConfig() { return this.apiConfig; }
 
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        // Polling cada 12 segundos para mayor agilidad
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 12000);
+        // Polling cada 15 segundos para no saturar pero mantener vivo el sistema
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 15000);
     }
 
     private async syncLoop() {
@@ -56,30 +59,33 @@ class SyncService {
         
         try {
             const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'PC-SIN-NOMBRE';
-            const relayUrl = `${CLOUD_RELAY_URL}/${this.vaultId}`;
+            const vaultKey = getVaultKey(this.vaultId);
+            const relayUrl = `${CLOUD_RELAY_URL}/${vaultKey}`;
 
-            // 1. OBTENER ESTADO ACTUAL DE LA NUBE (PULL)
-            const response = await fetch(relayUrl);
+            // 1. INTENTAR OBTENER DATOS (PULL)
             let remoteData: any = { terminals: {}, sharedStorage: {}, logs: [] };
-            
-            if (response.ok) {
-                try {
+            try {
+                const response = await fetch(relayUrl);
+                if (response.ok) {
                     const text = await response.text();
-                    remoteData = JSON.parse(text);
-                } catch(e) { /* Data corrupta o vacía, usamos default */ }
+                    if (text && text.length > 5) {
+                        remoteData = JSON.parse(text);
+                    }
+                }
+            } catch (e) {
+                console.warn("Cloud pull error, using local data structure.");
             }
 
-            // 2. ACTUALIZAR PRESENCIA (Merge de terminales)
+            // 2. ACTUALIZAR MI PRESENCIA (Merge)
             const now = Date.now();
             if (!remoteData.terminals) remoteData.terminals = {};
             
-            // Registramos esta PC con su sesión única para evitar colisiones
             remoteData.terminals[this.sessionId] = {
-                name: myTerminal,
+                name: myTerminal.toUpperCase(),
                 lastSeen: now
             };
 
-            // Limpiar terminales que no dan señal hace más de 1 minuto
+            // Limpiar terminales inactivas (> 1 minuto)
             Object.keys(remoteData.terminals).forEach(id => {
                 if (now - remoteData.terminals[id].lastSeen > 60000) {
                     delete remoteData.terminals[id];
@@ -88,22 +94,21 @@ class SyncService {
 
             let localUpdated = false;
 
-            // 3. SINCRONIZAR ARRAYS (VENTAS, CLIENTES...)
+            // 3. SINCRONIZAR DATOS COMPARTIDOS
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
                 const remoteVal = remoteData.sharedStorage?.[key];
 
-                // Si la nube tiene algo nuevo que nosotros no, lo bajamos
                 if (remoteVal && localVal !== remoteVal) {
                     localStorage.setItem(key, remoteVal);
                     localUpdated = true;
                 }
             });
 
-            // 4. SINCRONIZAR LOGS DE PRODUCTOS
+            // 4. LOGS DE PRODUCTOS
             const pendingLogs = await productDB.getPendingLogs();
             if (pendingLogs.length > 0) {
-                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-300);
+                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-200);
             }
 
             const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
@@ -119,7 +124,7 @@ class SyncService {
                 localUpdated = true;
             }
 
-            // 5. SUBIR CAMBIOS (PUSH)
+            // 5. SUBIR ESTADO (PUSH)
             const payload = {
                 terminals: remoteData.terminals,
                 logs: remoteData.logs,
@@ -131,7 +136,7 @@ class SyncService {
                         return acc;
                     }, {})
                 },
-                lastGlobalUpdate: new Date().toISOString()
+                lastUpdate: new Date().toISOString()
             };
 
             await fetch(relayUrl, {
@@ -143,13 +148,12 @@ class SyncService {
             if (pendingLogs.length > 0) await productDB.clearLogs();
             
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
-            if (localUpdated) {
-                window.dispatchEvent(new Event('ferrecloud_sync_pulse'));
-                window.dispatchEvent(new Event('storage'));
-            }
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { terminals: remoteData.terminals } }));
+            if (localUpdated) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
-            console.error("Sync Pulse Failed:", e);
+            console.error("Sync Error:", e);
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { detail: { error: String(e) } }));
         } finally {
             this.isProcessing = false;
         }
