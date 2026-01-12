@@ -6,7 +6,7 @@ import {
     Minus, Package, Trash2, History, CheckCircle, 
     ChevronRight, DollarSign, UserSearch, Filter,
     TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download,
-    PackagePlus, Save, Truck
+    PackagePlus, Save, Truck, RefreshCw
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -24,6 +24,8 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [searchTerm, setSearchTerm] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
   
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('PENDING');
   const [selectedRemitoIds, setSelectedRemitoIds] = useState<string[]>([]);
@@ -33,9 +35,29 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualItemForm, setManualItemForm] = useState({ name: '', price: '' });
 
-  const [products] = useState<Product[]>(() => JSON.parse(localStorage.getItem('ferrecloud_products') || '[]'));
   const [allClients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
   const [existingRemitos, setExistingRemitos] = useState<Remito[]>(() => JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]'));
+
+  // Lógica de búsqueda optimizada para 140k artículos
+  useEffect(() => {
+    const performSearch = async () => {
+        if (searchTerm.trim().length > 2) {
+            setIsSearching(true);
+            try {
+                const results = await productDB.search(searchTerm);
+                setSearchResults(results);
+            } catch (err) {
+                console.error("Error buscando en remitos:", err);
+            } finally {
+                setIsSearching(false);
+            }
+        } else {
+            setSearchResults([]);
+        }
+    };
+    const timer = setTimeout(performSearch, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (initialItems && initialItems.length > 0) {
@@ -49,17 +71,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         onItemsConsumed?.();
     }
   }, [initialItems]);
-
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return [];
-    return products.filter(p => 
-        (p.name || '').toLowerCase().includes(term) || 
-        p.internalCodes.some(c => c.toLowerCase().includes(term)) ||
-        p.providerCodes.some(c => c.toLowerCase().includes(term)) ||
-        p.barcodes.some(c => c.toLowerCase().includes(term))
-    ).slice(0, 50);
-  }, [searchTerm, products]);
 
   useEffect(() => {
       localStorage.setItem('ferrecloud_remitos', JSON.stringify(existingRemitos));
@@ -88,7 +99,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     if (!manualItemForm.name || !manualItemForm.price) return;
     
     const priceNum = parseFloat(manualItemForm.price);
-    // Added missing required properties like purchasePackageQuantity for Product interface
     const mockProduct: Product = {
         id: `manual-rem-${Date.now()}`,
         internalCodes: ['VARIO'],
@@ -106,7 +116,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         saleCurrency: 'ARS',
         vatRate: 21.0,
         listCost: priceNum * 0.7,
-        // Added purchasePackageQuantity to fix property missing error
         purchasePackageQuantity: 1,
         discounts: [0,0,0,0],
         costAfterDiscounts: priceNum * 0.7,
@@ -173,10 +182,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     setSelectedClient('');
   };
 
-  const handlePrint = () => {
-      window.print();
-  };
-
   const convertRemitoToSale = (remito: Remito) => {
       const items: InvoiceItem[] = remito.items.map(item => ({
           product: item.product,
@@ -221,7 +226,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
   const toggleSelectAllVisible = () => {
       if (selectedRemitoIds.length === filteredRemitos.length && filteredRemitos.length > 0) {
-          // Fix: Corrected typo from setSelectedIds to setSelectedRemitoIds (defined on line 34)
           setSelectedRemitoIds([]);
       } else {
           setSelectedRemitoIds(filteredRemitos.map(r => r.id));
@@ -257,7 +261,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     <label className="text-[9px] font-black text-gray-400 uppercase">Añadir Artículos (SKU/Prov/EAN)</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
+                            {isSearching ? <RefreshCw className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin" size={14}/> : <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />}
                             <input type="text" placeholder="Buscar por código o nombre..." className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-100 rounded-xl font-bold text-xs outline-none focus:bg-white uppercase" value={searchTerm} onFocus={() => setShowSearchResults(true)} onChange={e => { setSearchTerm(e.target.value); setShowSearchResults(true); }} />
                         </div>
                         <button 
@@ -269,21 +273,25 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                     </div>
                     {showSearchResults && searchTerm.trim().length > 0 && (
                         <div className="absolute top-full left-0 w-full bg-white border rounded-2xl shadow-2xl mt-1 max-h-80 overflow-y-auto z-50 p-1 custom-scrollbar">
-                            {filteredProducts.map(p => (
-                                <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-3 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50 group">
-                                    <div>
-                                        <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
-                                        <div className="flex gap-2 text-[7px] font-bold text-gray-400 uppercase">
-                                            <span>INT: {p.internalCodes[0]}</span>
-                                            <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
+                            {searchResults.length > 0 ? (
+                                searchResults.map(p => (
+                                    <button key={p.id} onClick={() => addToCart(p)} className="w-full text-left p-3 hover:bg-indigo-50 rounded-lg flex justify-between items-center border-b last:border-0 border-gray-50 group">
+                                        <div>
+                                            <p className="font-black text-slate-800 uppercase text-[10px]">{p.name}</p>
+                                            <div className="flex gap-2 text-[7px] font-bold text-gray-400 uppercase">
+                                                <span>INT: {p.internalCodes[0]}</span>
+                                                <span>PROV: {p.providerCodes[0] || 'S/D'}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div onClick={(e) => handlePedir(e, p)} className="p-2 bg-slate-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><Truck size={14}/></div>
-                                        <p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p>
-                                    </div>
-                                </button>
-                            ))}
+                                        <div className="flex items-center gap-3">
+                                            <div onClick={(e) => { e.stopPropagation(); handlePedir(e, p); }} className="p-2 bg-slate-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><Truck size={14}/></div>
+                                            <p className="text-[10px] font-black text-indigo-600">${p.priceFinal}</p>
+                                        </div>
+                                    </button>
+                                ))
+                            ) : !isSearching && (
+                                <div className="p-4 text-center text-slate-400 text-[10px] font-bold">Sin resultados para "{searchTerm}"</div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -551,7 +559,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
               </div>
               <div className="p-8 bg-slate-50 border-t flex gap-3 print:hidden">
                  <button onClick={() => setShowPrintModal(null)} className="px-8 py-4 text-[10px] font-black uppercase text-slate-400">Cerrar</button>
-                 <button onClick={handlePrint} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95"><Printer size={18}/> Imprimir Comprobante</button>
+                 <button onClick={() => window.print()} className="flex-1 py-4 text-[10px] font-black uppercase bg-slate-900 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95"><Printer size={18}/> Imprimir Comprobante</button>
                  <button onClick={() => convertRemitoToSale(showPrintModal)} className="flex-1 py-4 text-[10px] font-black uppercase bg-indigo-600 text-white rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95"><Receipt size={18}/> Facturar Ahora</button>
               </div>
            </div>
