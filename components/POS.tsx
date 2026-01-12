@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, TreasuryMovement, CashRegister, Check } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
+import { syncService } from '../services/syncService';
 
 const DEFAULT_CLIENT: Client = {
     id: 'cf-default', 
@@ -55,7 +56,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [cardMode, setCardMode] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
     const [selectedCuotaId, setSelectedCuotaId] = useState<string>('');
 
-    // Búsqueda reactiva optimizada para 140k artículos
+    // Escuchar actualizaciones externas
+    useEffect(() => {
+        const handleSync = () => {
+            const updated = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
+            setSalesHistory(updated);
+        };
+        window.addEventListener('ferrecloud_sync_pulse', handleSync);
+        return () => window.removeEventListener('ferrecloud_sync_pulse', handleSync);
+    }, []);
+
     useEffect(() => {
         const performSearch = async () => {
             const term = productSearch.trim().toUpperCase();
@@ -172,7 +182,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             items: cart.map(i => ({ sku: i.product.internalCodes[0], name: i.product.name, qty: i.quantity, price: i.appliedPrice })) 
         };
         
-        // Si es pago con cheque, registrar en cartera
         if (paymentMethod === 'CHEQUE' || paymentMethod === 'E-CHEQ') {
             const checks: Check[] = JSON.parse(localStorage.getItem('ferrecloud_checks') || '[]');
             const newCheck: Check = {
@@ -199,13 +208,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             if (p) {
                 const updatedProd = { ...p, stockPrincipal: Math.max(0, (p.stockPrincipal || 0) - item.quantity), stock: Math.max(0, (p.stock || 0) - item.quantity) };
                 productsToUpdate.push(updatedProd);
+                await productDB.save(updatedProd);
             }
         }
-        await productDB.saveBulk(productsToUpdate);
 
-        window.dispatchEvent(new CustomEvent('ferrecloud_sync_request', { 
-            detail: { type: 'SALE', data: { sale, stockUpdates: productsToUpdate } } 
-        }));
+        // FORZAR SINCRONIZACIÓN CLOUD INMEDIATA
+        await syncService.pushToCloud();
 
         setLastSale(sale);
         setIsFiscalInvoicing(false);
