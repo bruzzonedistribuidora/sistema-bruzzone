@@ -7,7 +7,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
-    CloudIcon, Boxes as BoxesIcon, Network
+    CloudIcon, Boxes as BoxesIcon, Network, Tags
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -28,6 +28,7 @@ import Backup from './components/Backup';
 import Branches from './components/Branches';
 import UsersComponent from './components/Users';
 import PriceUpdates from './components/PriceUpdates';
+import PriceLists from './components/PriceLists';
 import Assistant from './components/Assistant';
 import CompanySettings from './components/CompanySettings';
 import AfipConfig from './components/AfipConfig';
@@ -64,6 +65,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.DASHBOARD]: { icon: LayoutDashboard, label: "Escritorio", color: "bg-slate-500" },
     [ViewState.ANALYTICS]: { icon: BarChart3, label: "Panel Control", color: "bg-indigo-600" },
     [ViewState.INVENTORY]: { icon: Database, label: "Inventario", color: "bg-indigo-500" },
+    [ViewState.PRICE_LISTS]: { icon: Tags, label: "Listas Precios", color: "bg-emerald-600" },
     [ViewState.POS]: { icon: Receipt, label: "Caja (Venta)", color: "bg-emerald-500" },
     [ViewState.PURCHASES]: { icon: Truck, label: "Compras", color: "bg-blue-500" },
     [ViewState.TREASURY]: { icon: Wallet, label: "Finanzas", color: "bg-orange-500" },
@@ -139,6 +141,7 @@ const App: React.FC = () => {
       case ViewState.DASHBOARD: return <Dashboard key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory key={renderKey} />;
+      case ViewState.PRICE_LISTS: return <PriceLists key={renderKey} />;
       case ViewState.POS: return <POS key={renderKey} initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
       case ViewState.PURCHASES: return <Purchases key={renderKey} />;
       case ViewState.TREASURY: return <Treasury key={renderKey} />;
