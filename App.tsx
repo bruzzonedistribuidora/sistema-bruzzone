@@ -7,7 +7,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
-    CloudIcon, Boxes as BoxesIcon
+    CloudIcon, Boxes as BoxesIcon, Network
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -138,17 +138,14 @@ const App: React.FC = () => {
     loadLicense();
     window.addEventListener('license_updated', loadLicense);
     
-    // Iniciar bootstrap de red
     runBootstrap();
 
-    // ESCUCHADOR DE CAMBIOS EXTERNOS
     const handleRemotePulse = () => {
         setCloudStatus('SYNCING');
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1500);
     };
     window.addEventListener('ferrecloud_sync_pulse', handleRemotePulse);
 
-    // ESCUCHADOR DE CAMBIOS LOCALES PARA SUBIDA
     const handleSyncRequest = async (e: any) => {
         setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
@@ -282,7 +279,7 @@ const App: React.FC = () => {
       <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={handleLogout} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
-        <header className="h-10 bg-white border-b border-slate-200 flex items-center px-4 justify-between z-50 shrink-0 shadow-sm">
+        <header className="h-12 bg-white border-b border-slate-200 flex items-center px-4 justify-between z-50 shrink-0 shadow-sm">
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar flex-1">
                 {openViews.map((view) => {
                     const config = VIEW_CONFIG[view] || { icon: LayoutDashboard, label: view };
@@ -291,20 +288,20 @@ const App: React.FC = () => {
                         <button 
                             key={view} 
                             onClick={() => setActiveView(view)} 
-                            className={`flex items-center gap-2 px-3 h-8 rounded-t-lg transition-all border-x border-t relative group min-w-[100px] max-w-[160px] ${
+                            className={`flex items-center gap-2 px-3 h-9 rounded-t-lg transition-all border-x border-t relative group min-w-[110px] max-w-[180px] ${
                                 activeView === view 
-                                ? 'bg-slate-50 text-indigo-600 border-slate-200 font-black' 
+                                ? 'bg-slate-50 text-indigo-600 border-slate-200 font-black shadow-[0_-4px_10px_rgba(79,70,229,0.05)]' 
                                 : 'bg-transparent text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-50/50'
                             }`}
                         >
-                            <Icon size={12} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
-                            <span className="text-[9px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
+                            <Icon size={14} className={activeView === view ? 'text-indigo-600' : 'text-slate-300'} />
+                            <span className="text-[10px] uppercase tracking-wider whitespace-nowrap truncate flex-1 text-left">
                                 {config.label}
                             </span>
                             {view !== ViewState.DASHBOARD && (
                                 <div 
                                     onClick={(e) => closeView(view, e)}
-                                    className={`p-0.5 rounded transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
+                                    className={`p-1 rounded transition-colors ${activeView === view ? 'hover:bg-indigo-100 text-indigo-400' : 'hover:bg-slate-200 text-slate-300'}`}
                                 >
                                     <X size={10} />
                                 </div>
@@ -314,18 +311,23 @@ const App: React.FC = () => {
                 })}
             </div>
             
-            <div className="flex items-center gap-4 px-4 border-l border-slate-100">
+            <div className="flex items-center gap-4 px-4 border-l border-slate-100 h-full">
+                <div className="flex flex-col items-end justify-center mr-2">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Red Global</p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-slate-700 uppercase">{localStorage.getItem('ferrecloud_terminal_name') || 'TERM-01'}</span>
+                        <div className={`w-2 h-2 rounded-full ${cloudStatus === 'UP_TO_DATE' ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                    </div>
+                </div>
                 <button 
                     onClick={() => { runBootstrap(); handleNavigate(ViewState.CLOUD_HUB); }}
-                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase transition-all hover:scale-105 active:scale-95 ${
-                        cloudStatus === 'SYNCING' ? 'bg-indigo-50 text-indigo-600' : 
-                        cloudStatus === 'UP_TO_DATE' ? 'bg-green-50 text-green-600' : 
-                        cloudStatus === 'ERROR' ? 'bg-red-50 text-red-600' :
-                        cloudStatus === 'OFFLINE' ? 'bg-slate-100 text-slate-400' :
-                        'bg-slate-900 text-white shadow-lg'
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all hover:scale-105 active:scale-95 ${
+                        cloudStatus === 'SYNCING' ? 'bg-indigo-600 text-white shadow-lg' : 
+                        cloudStatus === 'UP_TO_DATE' ? 'bg-slate-900 text-green-400' : 
+                        'bg-slate-100 text-slate-400'
                     }`}>
-                    {cloudStatus === 'SYNCING' ? <RefreshCw size={10} className="animate-spin"/> : (cloudStatus === 'UP_TO_DATE' ? <CheckCircle2 size={10}/> : (cloudStatus === 'ERROR' ? <AlertTriangle size={10}/> : <CloudIcon size={10}/>))}
-                    {cloudStatus === 'SYNCING' ? 'Sincronizando' : cloudStatus === 'UP_TO_DATE' ? 'Bóveda Conectada' : cloudStatus === 'ERROR' ? 'Error Nube' : 'Vincular Cloud'}
+                    {cloudStatus === 'SYNCING' ? <RefreshCw size={14} className="animate-spin"/> : <Network size={14}/>}
+                    {cloudStatus === 'SYNCING' ? 'Sincronizando' : 'Terminal en Línea'}
                 </button>
             </div>
         </header>
