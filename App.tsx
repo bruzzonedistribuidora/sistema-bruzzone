@@ -56,6 +56,7 @@ import Shortages from './components/Shortages';
 import MobileApp from './components/MobileApp';
 import LicenseConsole from './components/LicenseConsole';
 import LabelPrinting from './components/LabelPrinting';
+import PrintSettings from './components/PrintSettings';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, Product } from './types';
 import { syncService } from './services/syncService';
 
@@ -79,7 +80,6 @@ const App: React.FC = () => {
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
   
-  // SEÑAL DE REFRESCO: Cada vez que cambia, todos los componentes se actualizan
   const [renderKey, setRenderKey] = useState(0);
 
   useEffect(() => {
@@ -92,16 +92,13 @@ const App: React.FC = () => {
     };
     loadLicense();
 
-    // Listener de sincronización: Forzar actualización de UI
     const handleSyncPulse = () => {
-        console.log("[App] Sincronización detectada. Refrescando vistas...");
         setCloudStatus('SYNCING');
-        setRenderKey(prev => prev + 1); // <--- ESTO FUERZA EL RE-RENDER DE TODO EL APP
+        setRenderKey(prev => prev + 1); 
         setTimeout(() => setCloudStatus('UP_TO_DATE'), 1000);
     };
     window.addEventListener('ferrecloud_sync_pulse', handleSyncPulse);
 
-    // Búsqueda de artículos enviada al POS
     const handleQuickAddPOS = (e: any) => {
         const product: Product = e.detail.product;
         if (product) {
@@ -138,7 +135,6 @@ const App: React.FC = () => {
   };
 
   const renderViewContent = (view: ViewState) => {
-    // Al usar renderKey aquí, nos aseguramos que los componentes reciban una señal de cambio
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard key={renderKey} onNavigate={handleNavigate} />;
@@ -158,15 +154,28 @@ const App: React.FC = () => {
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
       case ViewState.LICENSE_MANAGER: return <LicenseConsole key={renderKey} />;
+      
+      // CASOS DE CONFIGURACIÓN FALTANTES
+      case ViewState.COMPANY_SETTINGS: return <CompanySettings key={renderKey} />;
+      case ViewState.AFIP_CONFIG: return <AfipConfig key={renderKey} />;
+      case ViewState.USERS: return <UsersComponent key={renderKey} />;
+      case ViewState.BRANCHES: return <Branches key={renderKey} />;
+      case ViewState.PRINT_CONFIG: return <PrintSettings key={renderKey} />;
+      case ViewState.BACKUP: return <Backup key={renderKey} />;
+      case ViewState.PRICE_UPDATES: return <PriceUpdates key={renderKey} />;
+      case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate key={renderKey} />;
+      case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate key={renderKey} onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
+      case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment key={renderKey} />;
+
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
 
-  if (!loggedInUser) return <Login onLogin={(u) => setLoggedInUser(u)} />;
+  if (!loggedInUser) return <Login onLogin={(u) => { setLoggedInUser(u); sessionStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
 
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
-      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={() => setLoggedInUser(null)} />
+      <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={() => { setLoggedInUser(null); sessionStorage.removeItem('ferrecloud_session'); }} />
       
       <div className="flex-1 flex flex-col min-w-0 relative">
         <header className="h-12 bg-slate-900 flex items-center px-4 justify-between z-50 shrink-0">
