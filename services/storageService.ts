@@ -83,6 +83,20 @@ export const productDB = {
     });
   },
 
+  async delete(id: string): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
+      const store = transaction.objectStore(PRODUCT_STORE);
+      const request = store.delete(id);
+      request.onsuccess = () => {
+        window.dispatchEvent(new Event('ferrecloud_products_updated'));
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  },
+
   async saveBulk(products: Product[]): Promise<void> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -97,10 +111,6 @@ export const productDB = {
     });
   },
 
-  /**
-   * BUSQUEDA OPTIMIZADA CON CURSOR
-   * No carga todo el array, recorre el disco y se detiene en 50 coincidencias.
-   */
   async search(term: string): Promise<Product[]> {
     const db = await openDB();
     const upperTerm = term.toUpperCase().trim();
