@@ -49,6 +49,13 @@ export enum ViewState {
   LICENSE_MANAGER = 'LICENSE_MANAGER'
 }
 
+export interface RestApiConfig {
+  baseUrl: string;
+  apiKey: string;
+  enabled: boolean;
+  lastSyncStatus: 'SUCCESS' | 'ERROR' | 'IDLE';
+}
+
 export interface SyncLogEntry {
     id: string;
     timestamp: string;
@@ -115,6 +122,7 @@ export interface Product {
   measureUnitPurchase: string; 
   measureUnitSale?: string; 
   conversionFactor?: number; 
+  updatedAt?: string;
   ecommerce: { 
     isPublished?: boolean; 
     isOffer?: boolean; 
