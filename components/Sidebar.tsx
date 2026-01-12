@@ -23,14 +23,14 @@ interface SidebarProps {
 const NavItem: React.FC<{ view: ViewState, label: string, icon: any, active: boolean, onClick: () => void }> = ({ label, icon: Icon, active, onClick }) => (
     <button 
         onClick={onClick}
-        className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all duration-200 group ${
+        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${
             active 
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
-            : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'
+            ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' 
+            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
         }`}
     >
-        <Icon size={16} className={active ? 'text-white' : 'group-hover:text-indigo-600'} />
-        <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
+        <Icon size={18} className={active ? 'text-white' : 'group-hover:text-indigo-600'} />
+        <span className="text-[11px] font-black uppercase tracking-wider">{label}</span>
     </button>
 );
 
@@ -40,15 +40,15 @@ const NavDropdown: React.FC<{ id: string, label: string, icon: any, children: Re
         <div className="space-y-0.5">
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-all group"
+                className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-all group"
             >
-                <div className="flex items-center gap-2.5">
-                    <Icon size={16} className="group-hover:text-indigo-600" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
+                <div className="flex items-center gap-3">
+                    <Icon size={18} className="group-hover:text-indigo-600" />
+                    <span className="text-[11px] font-black uppercase tracking-wider">{label}</span>
                 </div>
-                <ChevronDown size={12} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            {isOpen && <div className="pl-3 space-y-0.5 border-l border-slate-100 ml-5">{children}</div>}
+            {isOpen && <div className="pl-4 space-y-1 mt-1 mb-2 border-l-2 border-slate-100 ml-6">{children}</div>}
         </div>
     );
 };
@@ -56,11 +56,11 @@ const NavDropdown: React.FC<{ id: string, label: string, icon: any, children: Re
 const DropdownItem: React.FC<{ view: ViewState, label: string, icon: any, onClick: () => void, active: boolean }> = ({ label, icon: Icon, onClick, active }) => (
     <button 
         onClick={onClick}
-        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-            active ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+            active ? 'text-indigo-600 bg-indigo-50 shadow-sm' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
         }`}
     >
-        <Icon size={12} />
+        <Icon size={14} />
         {label}
     </button>
 );
@@ -127,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                 {(mode === 'NAME' || mode === 'BOTH') && (
                     <div className={mode === 'BOTH' ? 'text-center' : 'flex items-center gap-2'}>
                         <div className="min-w-0">
-                            <h1 className="text-[11px] font-black text-slate-900 uppercase tracking-tighter leading-none truncate">
+                            <h1 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter leading-none truncate">
                                 {name}
                             </h1>
                         </div>
@@ -138,73 +138,74 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
     };
 
     return (
-        <div className="w-52 bg-white border-r border-slate-200 h-full flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
-            <div className="p-4 border-b border-slate-100">
+        <div className="w-56 bg-white border-r border-slate-200 h-full flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+            <div className="p-5 border-b border-slate-100">
                 {renderHeader()}
                 
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-[10px] uppercase shrink-0">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mt-2">
+                    <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white font-black text-[11px] uppercase shrink-0 shadow-md">
                             {user?.name.charAt(0) || 'U'}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-[9px] font-black text-slate-800 uppercase truncate leading-none">{user?.name || 'Usuario'}</p>
-                            <div className="flex items-center gap-1 mt-0.5">
-                                <div className={`w-1 h-1 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
-                                <span className="text-[7px] font-bold text-slate-400 uppercase">{syncStatus}</span>
+                            <p className="text-[10px] font-black text-slate-800 uppercase truncate leading-none">{user?.name || 'Usuario'}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                                <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'ONLINE' ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{syncStatus}</span>
                             </div>
                         </div>
-                        <button onClick={onLogout} className="text-slate-300 hover:text-red-500 p-1">
-                            <LogOut size={12}/>
+                        <button onClick={onLogout} className="text-slate-300 hover:text-red-500 p-1 transition-colors">
+                            <LogOut size={14}/>
                         </button>
                     </div>
                 </div>
             </div>
 
-            <nav className="flex-1 p-3 space-y-0.5">
+            <nav className="flex-1 p-3 space-y-1">
                 <NavItem view={ViewState.DASHBOARD} label="Escritorio" icon={LayoutDashboard} active={activeView === ViewState.DASHBOARD} onClick={() => handleNav(ViewState.DASHBOARD)} />
                 <NavItem view={ViewState.CLOUD_HUB} label="Nube / Red LAN" icon={Network} active={activeView === ViewState.CLOUD_HUB} onClick={() => handleNav(ViewState.CLOUD_HUB)} />
                 <NavItem view={ViewState.ANALYTICS} label="Dashboard" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
                 
                 <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
-                    {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="POS" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
-                    {isModuleEnabled(ViewState.CLIENT_BALANCES) && <DropdownItem view={ViewState.CLIENT_BALANCES} label="Saldos" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />}
+                    {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="Caja (POS)" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
+                    {isModuleEnabled(ViewState.CLIENT_BALANCES) && <DropdownItem view={ViewState.CLIENT_BALANCES} label="Cuentas Ctes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />}
                     {isModuleEnabled(ViewState.REMITOS) && <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />}
                     {isModuleEnabled(ViewState.PRESUPUESTOS) && <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />}
                     <DropdownItem view={ViewState.CLIENTS} label="Clientes" icon={Users} active={activeView === ViewState.CLIENTS} onClick={() => handleNav(ViewState.CLIENTS)} />
                 </NavDropdown>
 
                 <NavDropdown id="digital" label="E-Commerce" icon={Globe}>
-                    {isModuleEnabled(ViewState.ECOMMERCE_ADMIN) && <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Gestión Web" icon={Laptop2} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />}
-                    {isModuleEnabled(ViewState.ONLINE_SALES) && <DropdownItem view={ViewState.ONLINE_SALES} label="Hub Canales" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />}
-                    {isModuleEnabled(ViewState.MARKETING) && <DropdownItem view={ViewState.MARKETING} label="Fidelización" icon={Tag} active={activeView === ViewState.MARKETING} onClick={() => handleNav(ViewState.MARKETING)} />}
+                    {isModuleEnabled(ViewState.ECOMMERCE_ADMIN) && <DropdownItem view={ViewState.ECOMMERCE_ADMIN} label="Web Admin" icon={Laptop2} active={activeView === ViewState.ECOMMERCE_ADMIN} onClick={() => handleNav(ViewState.ECOMMERCE_ADMIN)} />}
+                    {isModuleEnabled(ViewState.ONLINE_SALES) && <DropdownItem view={ViewState.ONLINE_SALES} label="Hub ML/Nube" icon={OrderIcon} active={activeView === ViewState.ONLINE_SALES} onClick={() => handleNav(ViewState.ONLINE_SALES)} />}
+                    {isModuleEnabled(ViewState.MARKETING) && <DropdownItem view={ViewState.MARKETING} label="Marketing" icon={Tag} active={activeView === ViewState.MARKETING} onClick={() => handleNav(ViewState.MARKETING)} />}
                 </NavDropdown>
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
-                    {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro" icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
-                    {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Excel Stock" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
+                    {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro Art." icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
+                    {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Actualizar Excel" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
                     {isModuleEnabled(ViewState.STOCK_ADJUSTMENT) && <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajustes" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />}
-                    {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedido" icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
+                    {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos Prov." icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
                     {isModuleEnabled(ViewState.PRICE_UPDATES) && <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />}
                 </NavDropdown>
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
                 
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
-                    {isModuleEnabled(ViewState.ACCOUNTING) && <DropdownItem view={ViewState.ACCOUNTING} label="Conta Pro" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />}
-                    {isModuleEnabled(ViewState.TREASURY) && <DropdownItem view={ViewState.TREASURY} label="Cajas" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />}
-                    <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
+                    {isModuleEnabled(ViewState.ACCOUNTING) && <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />}
+                    {isModuleEnabled(ViewState.TREASURY) && <DropdownItem view={ViewState.TREASURY} label="Arqueos Caja" icon={Wallet} active={activeView === ViewState.TREASURY} onClick={() => handleNav(ViewState.TREASURY)} />}
+                    <DropdownItem view={ViewState.DAILY_MOVEMENTS} label="Gastos Diarios" icon={Activity} active={activeView === ViewState.DAILY_MOVEMENTS} onClick={() => handleNav(ViewState.DAILY_MOVEMENTS)} />
                 </NavDropdown>
                 
                 <div className="pt-2 mt-2 border-t border-slate-100">
-                    <NavItem view={ViewState.CONFIG_PANEL} label="Configuración" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
+                    <NavItem view={ViewState.CONFIG_PANEL} label="Ajustes Sistema" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
                 </div>
             </nav>
 
-            <div className="p-3 mt-auto">
-                <div className="bg-indigo-900 rounded-xl p-3 text-white relative overflow-hidden group cursor-pointer" onClick={() => handleNav(ViewState.SHOP)}>
-                    <p className="text-[7px] font-black uppercase text-indigo-300">Sucursal Online</p>
-                    <h4 className="text-[9px] font-black uppercase">Web Propia</h4>
+            <div className="p-4 mt-auto">
+                <div className="bg-slate-900 rounded-2xl p-4 text-white relative overflow-hidden group cursor-pointer shadow-xl" onClick={() => handleNav(ViewState.SHOP)}>
+                    <div className="absolute top-0 right-0 p-2 opacity-10"><Globe size={40}/></div>
+                    <p className="text-[8px] font-black uppercase text-indigo-400 tracking-widest mb-1">Mi Tienda Online</p>
+                    <h4 className="text-[10px] font-black uppercase">Ver Web Propia</h4>
                 </div>
             </div>
         </div>
