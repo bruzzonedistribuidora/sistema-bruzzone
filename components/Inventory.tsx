@@ -1,238 +1,228 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-    Search, Plus, Package, X, Save, DollarSign, 
-    Barcode, Pen, Trash2, Tag, Layers, Info, 
-    Percent, Activity, Database, Boxes, RefreshCw, 
-    Settings2, Zap, Calculator, ShoppingCart, ChevronRight,
-    Truck, ListFilter, FileUp, PlusCircle, CheckCircle, Hash,
-    PlusSquare, MinusCircle, Scaling, ChevronUp, ChevronDown, Download, FileSpreadsheet,
-    PackagePlus, Link2, Upload, Ruler, Building2, Store, Globe, ArrowRight, TrendingUp,
-    Scale, Boxes as BoxesIcon, Plus as PlusIcon, Minus as MinusIcon,
-    MapPin
+    Cloud, RefreshCw, Save, 
+    Zap, CloudDownload, Smartphone,
+    Network, Wifi, ShieldCheck,
+    FileUp, FileOutput, Monitor, Laptop, 
+    ArrowRight, Info, AlertTriangle, CheckCircle2,
+    Database, Download
 } from 'lucide-react';
-import { Product, Provider, Brand, Category, ViewState } from '../types';
-import { productDB, addToReplenishmentQueue } from '../services/storageService';
-import Providers from './Providers';
-import InitialImport from './InitialImport';
+import { syncService } from '../services/syncService';
+import { productDB } from '../services/storageService';
 
-const Inventory: React.FC = () => {
-  const [inventoryTab, setInventoryTab] = useState<'PRODUCTS' | 'IMPORT' | 'BRANDS' | 'CATEGORIES' | 'PROVIDERS'>('PRODUCTS');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
-  const [categories, setCategories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
-  const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState<Partial<Product>>({});
-  const [modalTab, setModalTab] = useState<'GENERAL' | 'CODES' | 'PRICING' | 'STOCK' | 'TECHNICAL'>('GENERAL');
+const CloudHub: React.FC = () => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [syncProgress, setSyncProgress] = useState(0);
+    const [syncMessage, setSyncMessage] = useState("");
+    const [vaultId, setVaultId] = useState(syncService.getVaultId() || '');
+    const [stats, setStats] = useState({ count: 0 });
+    const [lastSync, setLastSync] = useState(localStorage.getItem('ferrecloud_last_sync') || 'Nunca');
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadProducts = async () => {
-      if (searchTerm.trim().length > 2) {
-          const results = await productDB.search(searchTerm);
-          setProducts(results);
-      } else {
-          const initial = await productDB.getAll(100);
-          setProducts(initial);
-      }
-  };
+    const refreshStats = async () => {
+        const s = await productDB.getStats();
+        setStats(s);
+    };
 
-  useEffect(() => {
-    loadProducts();
-    const handleSync = () => loadProducts();
-    window.addEventListener('ferrecloud_products_updated', handleSync);
-    return () => window.removeEventListener('ferrecloud_products_updated', handleSync);
-  }, [searchTerm]);
+    useEffect(() => {
+        refreshStats();
+        const handleProgress = (e: any) => {
+            setSyncProgress(e.detail.progress);
+            if (e.detail.message) setSyncMessage(e.detail.message);
+            if (e.detail.progress === 100) {
+                refreshStats();
+                setLastSync(new Date().toLocaleString());
+                setTimeout(() => { setSyncProgress(0); setSyncMessage(""); }, 4000);
+            }
+        };
+        window.addEventListener('ferrecloud_sync_progress', handleProgress);
+        return () => window.removeEventListener('ferrecloud_sync_progress', handleProgress);
+    }, []);
 
-  const sortedProducts = useMemo(() => {
-    let sortableItems = [...products];
-    sortableItems.sort((a, b) => {
-        let aValue = a[sortConfig.key as keyof Product] || '';
-        let bValue = b[sortConfig.key as keyof Product] || '';
-        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-    });
-    return sortableItems;
-  }, [products, sortConfig]);
+    const handleSaveConfig = () => {
+        if (!vaultId) return alert("Ingresa un nombre para tu bóveda.");
+        syncService.setVaultId(vaultId);
+        alert("✅ ID de Bóveda establecido en este dispositivo.");
+    };
 
-  const updatePricing = (updates: Partial<Product>) => {
-      setFormData(prev => {
-          const next = { ...prev, ...updates };
-          const listCost = next.listCost || 0;
-          const ds = next.discounts || [0, 0, 0, 0];
-          const coef = ds.reduce((acc, d) => acc * (1 - (d / 100)), 1);
-          
-          const factor = next.conversionFactor || 1;
-          const unitCostBase = (listCost * coef) * factor;
-          
-          const margin = next.profitMargin || 30;
-          const priceNeto = unitCostBase * (1 + (margin / 100));
-          const vat = next.vatRate || 21;
-          const priceFinal = priceNeto * (1 + (vat / 100));
+    const handleManualSync = async () => {
+        if (!vaultId) return alert("Configura primero tu ID de Bóveda.");
+        setIsProcessing(true);
+        const success = await syncService.syncFromRemote();
+        setIsProcessing(false);
+        if (!success && syncProgress === 0) {
+            alert("❌ No se encontró la base de datos en esta PC.\n\nSi es una PC nueva, usa el botón 'Vincular Nueva PC' abajo para traer los datos por primera vez.");
+        }
+    };
 
-          return {
-              ...next,
-              costAfterDiscounts: parseFloat((listCost * coef).toFixed(4)),
-              priceNeto: parseFloat(priceNeto.toFixed(2)),
-              priceFinal: parseFloat(priceFinal.toFixed(2))
-          };
-      });
-  };
+    const handleBackup = async () => {
+        if (!vaultId) return alert("Configura tu ID de Bóveda.");
+        setIsProcessing(true);
+        await syncService.pushToCloud(null, 'MANUAL_BACKUP');
+        setIsProcessing(false);
+    };
 
-  const handleArrayUpdate = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number, value: string) => {
-      setFormData(prev => {
-          const arr = [...(prev[field] || [''])];
-          arr[index] = value.toUpperCase();
-          return { ...prev, [field]: arr };
-      });
-  };
+    const handleExportVault = async () => {
+        if (!vaultId) return alert("Configura el ID de Bóveda primero.");
+        setIsProcessing(true);
+        await syncService.exportFullVault();
+        setIsProcessing(false);
+    };
 
-  const addArrayItem = (field: 'internalCodes' | 'barcodes' | 'providerCodes') => {
-      setFormData(prev => ({ ...prev, [field]: [...(prev[field] || []), ''] }));
-  };
+    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsProcessing(true);
+        const success = await syncService.importVaultFile(file);
+        setIsProcessing(false);
+        if (success) {
+            setVaultId(syncService.getVaultId() || '');
+            refreshStats();
+        }
+    };
 
-  const removeArrayItem = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number) => {
-      setFormData(prev => {
-          const arr = [...(prev[field] || [])];
-          if (arr.length <= 1 && field === 'internalCodes') return prev; // Siempre debe haber un SKU
-          arr.splice(index, 1);
-          return { ...prev, [field]: arr };
-      });
-  };
-
-  const handlePedir = (p: Product) => {
-      if (addToReplenishmentQueue(p)) {
-          alert(`✅ ${p.name} agregado a la lista de faltantes.`);
-      }
-  };
-
-  const handleSaveProduct = async () => {
-      if (!formData.name) return alert("El nombre es obligatorio");
-      
-      setIsSaving(true);
-      try {
-          const productToSave: Product = {
-              ...formData,
-              id: formData.id || `PROD-${Date.now()}`,
-              name: formData.name.toUpperCase(),
-              internalCodes: (formData.internalCodes || ['']).filter(c => c.trim() !== ''),
-              barcodes: (formData.barcodes || []).filter(c => c.trim() !== ''),
-              providerCodes: (formData.providerCodes || []).filter(c => c.trim() !== ''),
-              stock: (formData.stockPrincipal || 0) + (formData.stockDeposito || 0) + (formData.stockSucursal || 0),
-              ecommerce: formData.ecommerce || { isPublished: false }
-          } as Product;
-
-          if (productToSave.internalCodes.length === 0) {
-              productToSave.internalCodes = [`SKU-${Date.now().toString().slice(-6)}`];
-          }
-
-          await productDB.save(productToSave);
-          setIsModalOpen(false);
-          setFormData({});
-          await loadProducts();
-      } catch (err) {
-          alert("Error al guardar el artículo");
-      } finally {
-          setIsSaving(false);
-      }
-  };
-
-  return (
-    <div className="p-4 h-full flex flex-col space-y-4 bg-slate-200 overflow-hidden font-sans">
-      <div className="bg-white p-5 rounded-[2.5rem] border border-slate-300 shadow-xl shrink-0">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-slate-900 text-indigo-400 rounded-2xl shadow-lg"><BoxesIcon size={28}/></div>
-                <div>
-                    <h2 className="text-2xl font-black text-slate-950 uppercase tracking-tighter leading-none">Inventario Maestro</h2>
-                    <p className="text-slate-600 text-[11px] font-black uppercase tracking-[0.2em] mt-2">Gestión Pro: 140.000 Artículos</p>
+    return (
+        <div className="p-8 max-w-7xl mx-auto h-full space-y-8 animate-fade-in bg-slate-50 overflow-y-auto pb-32">
+            
+            <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none">
+                    <Cloud size={240}/>
                 </div>
-            </div>
-
-            <div className="flex bg-slate-100 rounded-2xl p-1 border border-slate-300 shadow-inner">
-                <button onClick={() => setInventoryTab('PRODUCTS')} className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all tracking-widest ${inventoryTab === 'PRODUCTS' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-500'}`}>Artículos</button>
-                <button onClick={() => setInventoryTab('IMPORT')} className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all tracking-widest ${inventoryTab === 'IMPORT' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-500'}`}>Carga Masiva</button>
-                <button onClick={() => setInventoryTab('PROVIDERS')} className={`px-6 py-3 rounded-xl text-[11px] font-black uppercase transition-all tracking-widest ${inventoryTab === 'PROVIDERS' ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-500'}`}>Proveedores</button>
-            </div>
-
-            <button onClick={() => { setFormData({name: '', brand: '', category: '', provider: '', internalCodes: [''], barcodes: [], providerCodes: [], vatRate: 21, profitMargin: 30, discounts: [0,0,0,0], purchaseCurrency: 'ARS', saleCurrency: 'ARS', measureUnitPurchase: 'UNIDAD', measureUnitSale: 'UNIDAD', conversionFactor: 1, purchasePackageQuantity: 1, stockPrincipal: 0, stockDeposito: 0, stockSucursal: 0}); setModalTab('GENERAL'); setIsModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-4 rounded-[1.8rem] font-black shadow-2xl flex items-center gap-3 hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest">
-                <PlusCircle size={20} /> Nuevo Artículo
-            </button>
-          </div>
-      </div>
-
-      <div className="flex-1 overflow-hidden">
-        {inventoryTab === 'PRODUCTS' && (
-            <div className="h-full flex flex-col space-y-4 animate-fade-in">
-                <div className="bg-white rounded-3xl shadow-lg border border-slate-300 p-3 shrink-0 flex gap-4">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input type="text" placeholder="Buscar por Nombre, Marca, SKU, Barras o Código de Proveedor..." className="w-full pl-14 pr-6 py-4 bg-slate-50 border-2 border-slate-200 rounded-[1.5rem] text-sm font-black outline-none focus:bg-white focus:border-indigo-500 transition-all uppercase placeholder:text-slate-300" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <div className="relative z-10 space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20"><Network size={28}/></div>
+                        <div>
+                            <h2 className="text-3xl font-black uppercase tracking-tighter">FerreConnect Cloud</h2>
+                            <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Gestión Multi-PC de Alto Rendimiento</p>
+                        </div>
                     </div>
-                </div>
 
-                <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-300 flex-1 overflow-hidden flex flex-col">
-                    <div className="flex-1 overflow-auto custom-scrollbar">
-                        <table className="w-full text-left border-collapse table-fixed">
-                            <thead className="bg-slate-900 sticky top-0 z-20 text-[11px] uppercase font-black text-slate-300 tracking-widest">
-                                <tr>
-                                    <th className="w-[15%] px-6 py-5 border-r border-slate-800">SKU / Ref</th>
-                                    <th className="w-[30%] px-6 py-5 border-r border-slate-800">Descripción</th>
-                                    <th className="w-[15%] px-6 py-5 border-r border-slate-800">Marca / Rubro</th>
-                                    <th className="w-[10%] px-6 py-5 text-center border-r border-slate-800">Stock</th>
-                                    <th className="w-[10%] px-6 py-5 text-right border-r border-slate-800">PVP Final</th>
-                                    <th className="w-[20%] px-6 py-5 text-center">Gestión</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {sortedProducts.map(p => (
-                                    <tr key={p.id} className="hover:bg-indigo-50/50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <p className="font-mono font-black text-indigo-700 text-xs truncate">{p.internalCodes?.[0] || 'S/C'}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">{p.barcodes?.[0] || 'SIN EAN'}</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black uppercase text-slate-950 text-xs truncate">{p.name}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">Prov: {p.provider || 'S/D'}</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black text-slate-600 text-[10px] uppercase truncate">{p.brand || 'GENÉRICO'}</p>
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase truncate">{p.category || 'SIN RUBRO'}</p>
-                                        </td>
-                                        <td className={`px-6 py-4 text-center font-black text-lg tracking-tighter ${p.stock <= (p.stockMinimo || 0) ? 'text-red-500' : 'text-slate-900'}`}>{p.stock}</td>
-                                        <td className="px-6 py-4 text-right font-black text-slate-950 text-lg tracking-tighter bg-slate-50/50">${p.priceFinal?.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex justify-center gap-1.5">
-                                                <button 
-                                                    onClick={() => handlePedir(p)}
-                                                    className="p-2.5 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100 flex flex-col items-center group"
-                                                    title="Pedir Reposición">
-                                                    <Truck size={14}/>
-                                                    <span className="text-[7px] font-black uppercase mt-0.5 group-hover:block">Pedir</span>
-                                                </button>
-                                                <button onClick={() => { setFormData(p); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-2.5 text-indigo-700 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"><Pen size={14}/></button>
-                                                <button onClick={async () => { if(confirm('¿Eliminar definitivamente?')) await productDB.delete(p.id); }} className="p-2.5 text-red-300 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-50"><Trash2 size={14}/></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest ml-2">ID de Bóveda en esta PC</label>
+                            <div className="flex gap-3">
+                                <input 
+                                    type="text" 
+                                    placeholder="EJ: BRUZZONE-SUR"
+                                    className="flex-1 p-4 bg-white/5 border-2 border-white/10 rounded-2xl font-black text-indigo-400 outline-none focus:border-indigo-500 transition-all uppercase"
+                                    value={vaultId}
+                                    onChange={(e) => setVaultId(e.target.value)}
+                                />
+                                <button 
+                                    onClick={handleSaveConfig}
+                                    className="bg-indigo-600 px-8 py-4 rounded-2xl font-black hover:bg-indigo-500 transition-all shadow-xl active:scale-95">
+                                    <Save size={20}/>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-[2rem] p-6 grid grid-cols-2 gap-4">
+                            <div className="text-center">
+                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Artículos en esta PC</p>
+                                <p className="text-3xl font-black">{stats.count.toLocaleString()}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Último Sync</p>
+                                <p className="text-xs font-black text-indigo-400 uppercase mt-2">{lastSync}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        )}
-        {inventoryTab === 'IMPORT' && <InitialImport onComplete={() => setInventoryTab('PRODUCTS')} />}
-        {inventoryTab === 'PROVIDERS' && <Providers />}
-      </div>
-      {/* ... resto del componente modal omitido por brevedad pero se asume existente ... */}
-    </div>
-  );
+
+            {(syncProgress > 0 || isProcessing) && (
+                <div className="bg-white p-8 rounded-[2.5rem] border-2 border-indigo-500 shadow-2xl animate-fade-in">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="space-y-1">
+                            <span className="font-black text-indigo-600 uppercase tracking-widest text-xs flex items-center gap-2">
+                                <RefreshCw className="animate-spin" size={14}/> Procesando...
+                            </span>
+                            <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{syncMessage}</p>
+                        </div>
+                        <span className="font-black text-3xl text-slate-900">{syncProgress}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden border border-slate-200">
+                        <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${syncProgress}%` }}></div>
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-sm space-y-8">
+                    <div className="flex items-center gap-4">
+                        <div className="p-4 rounded-3xl bg-indigo-50 text-indigo-600">
+                            <CloudDownload size={28}/>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Sincronizar Cambios</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Solo para PCs ya vinculadas</p>
+                        </div>
+                    </div>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed italic">
+                        Usa este botón para actualizar los precios o stock si ya has vinculado esta PC anteriormente.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button 
+                            onClick={handleManualSync}
+                            disabled={isProcessing}
+                            className="bg-indigo-600 text-white py-5 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-30">
+                            <CloudDownload size={18}/> Actualizar
+                        </button>
+                        <button 
+                            onClick={handleBackup}
+                            disabled={isProcessing}
+                            className="bg-slate-900 text-white py-5 rounded-3xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-30">
+                            <ShieldCheck size={18}/> Respaldar
+                        </button>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-[3.5rem] p-10 border border-slate-200 shadow-sm space-y-8 border-l-8 border-l-indigo-600">
+                    <div className="flex items-center gap-4">
+                        <div className="p-4 rounded-3xl bg-indigo-900 text-white">
+                            <Monitor size={28}/>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tighter">Vincular Nueva PC</h3>
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Traspaso de datos por primera vez</p>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">1</div>
+                            <p className="text-xs font-bold text-slate-600">En la PC que tiene los 140k artículos:</p>
+                            <button onClick={handleExportVault} className="ml-auto bg-white border border-slate-200 px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-slate-100 flex items-center gap-2 shadow-sm">
+                                <FileOutput size={12}/> Generar Vinculo
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black">2</div>
+                            <p className="text-xs font-bold text-slate-600">En esta PC (la nueva):</p>
+                            <input type="file" ref={fileInputRef} className="hidden" accept=".ferre" onChange={handleImportFile} />
+                            <button onClick={() => fileInputRef.current?.click()} className="ml-auto bg-indigo-600 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase hover:bg-indigo-700 flex items-center gap-2 shadow-lg">
+                                <FileUp size={12}/> Cargar Vinculo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-amber-50 border-2 border-amber-100 p-8 rounded-[3rem] flex items-start gap-6">
+                <div className="p-4 bg-white rounded-2xl text-amber-500 shadow-sm shrink-0">
+                    <Info size={28}/>
+                </div>
+                <div className="space-y-2">
+                    <h4 className="text-lg font-black text-amber-900 uppercase tracking-tighter">¿Por qué me dice "ID no encontrado"?</h4>
+                    <p className="text-sm text-amber-800 font-medium leading-relaxed">
+                        Cada computadora almacena su propia base de datos de 140.000 artículos localmente para poder trabajar sin internet y a máxima velocidad. 
+                        <strong> Si estás en una computadora nueva, el ID de Bóveda no existe todavía en su memoria local.</strong> 
+                        Debes usar el botón "Cargar Vinculo" para traer la base de datos desde tu PC principal por única vez.
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-export default Inventory;
+export default CloudHub;
