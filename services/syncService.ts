@@ -13,32 +13,23 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_budgets'
 ];
 
-// Usamos un servicio de intercambio de JSON más directo
-const CLOUD_RELAY_URL = 'https://api.keyvalue.xyz';
-// Generamos una clave única basada en el vaultId para este servicio específico
-const getVaultKey = (id: string) => `ferrecloud_${id.toLowerCase()}`;
+// Servidor de relevo de alta disponibilidad con soporte CORS total
+const CLOUD_RELAY_URL = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
 
 class SyncService {
     private vaultId: string | null = null;
-    private apiConfig: RestApiConfig = { baseUrl: '', apiKey: '', enabled: false, lastSyncStatus: 'IDLE' };
     private isProcessing: boolean = false;
     private pollingInterval: number | null = null;
     private sessionId: string = Math.random().toString(36).substring(7);
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
-        this.loadApiConfig();
         if (this.vaultId) this.startAutoSync();
     }
 
-    private loadApiConfig() {
-        const saved = localStorage.getItem('ferrecloud_rest_config');
-        if (saved) this.apiConfig = JSON.parse(saved);
-    }
-
     setVaultId(id: string) {
-        // Limpiamos espacios y caracteres raros
         const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!cleanId) return;
         this.vaultId = cleanId;
         localStorage.setItem('ferrecloud_vault_id', cleanId);
         this.startAutoSync();
@@ -49,34 +40,33 @@ class SyncService {
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        // Polling cada 15 segundos para no saturar pero mantener vivo el sistema
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 15000);
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 10000);
     }
 
     private async syncLoop() {
         if (this.isProcessing || !this.vaultId) return;
         this.isProcessing = true;
         
-        try {
-            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'PC-SIN-NOMBRE';
-            const vaultKey = getVaultKey(this.vaultId);
-            const relayUrl = `${CLOUD_RELAY_URL}/${vaultKey}`;
+        const relayUrl = `${CLOUD_RELAY_URL}/${this.vaultId}`;
 
+        try {
+            const myTerminal = localStorage.getItem('ferrecloud_terminal_name') || 'CAJA-LOCAL';
+            
             // 1. INTENTAR OBTENER DATOS (PULL)
             let remoteData: any = { terminals: {}, sharedStorage: {}, logs: [] };
+            
             try {
-                const response = await fetch(relayUrl);
+                const response = await fetch(relayUrl, { mode: 'cors' });
                 if (response.ok) {
                     const text = await response.text();
-                    if (text && text.length > 5) {
-                        remoteData = JSON.parse(text);
-                    }
+                    if (text && text.length > 5) remoteData = JSON.parse(text);
                 }
             } catch (e) {
-                console.warn("Cloud pull error, using local data structure.");
+                // Si falla el GET (bóveda nueva), seguimos adelante para crearla con el POST
+                console.log("Vault empty or first time setup.");
             }
 
-            // 2. ACTUALIZAR MI PRESENCIA (Merge)
+            // 2. ACTUALIZAR PRESENCIA
             const now = Date.now();
             if (!remoteData.terminals) remoteData.terminals = {};
             
@@ -85,20 +75,19 @@ class SyncService {
                 lastSeen: now
             };
 
-            // Limpiar terminales inactivas (> 1 minuto)
+            // Limpiar terminales inactivas (> 45 segundos)
             Object.keys(remoteData.terminals).forEach(id => {
-                if (now - remoteData.terminals[id].lastSeen > 60000) {
+                if (now - remoteData.terminals[id].lastSeen > 45000) {
                     delete remoteData.terminals[id];
                 }
             });
 
             let localUpdated = false;
 
-            // 3. SINCRONIZAR DATOS COMPARTIDOS
+            // 3. SINCRONIZAR ARRAYS
             ARRAY_SYNC_KEYS.forEach(key => {
                 const localVal = localStorage.getItem(key);
                 const remoteVal = remoteData.sharedStorage?.[key];
-
                 if (remoteVal && localVal !== remoteVal) {
                     localStorage.setItem(key, remoteVal);
                     localUpdated = true;
@@ -108,7 +97,7 @@ class SyncService {
             // 4. LOGS DE PRODUCTOS
             const pendingLogs = await productDB.getPendingLogs();
             if (pendingLogs.length > 0) {
-                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-200);
+                remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-150);
             }
 
             const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_sync_ts') || '0');
@@ -124,7 +113,7 @@ class SyncService {
                 localUpdated = true;
             }
 
-            // 5. SUBIR ESTADO (PUSH)
+            // 5. SUBIR ESTADO ACTUALIZADO (PUSH)
             const payload = {
                 terminals: remoteData.terminals,
                 logs: remoteData.logs,
@@ -141,6 +130,7 @@ class SyncService {
 
             await fetch(relayUrl, {
                 method: 'POST',
+                mode: 'cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
@@ -148,12 +138,17 @@ class SyncService {
             if (pendingLogs.length > 0) await productDB.clearLogs();
             
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
-            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { terminals: remoteData.terminals } }));
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                detail: { terminals: remoteData.terminals } 
+            }));
+            
             if (localUpdated) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
             console.error("Sync Error:", e);
-            window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { detail: { error: String(e) } }));
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { 
+                detail: { error: "Fallo de conexión. Verifique internet o firewall." } 
+            }));
         } finally {
             this.isProcessing = false;
         }
