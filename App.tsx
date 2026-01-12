@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     X, Smartphone, ShoppingBag, LayoutDashboard, Database, 
@@ -150,7 +149,9 @@ const App: React.FC = () => {
         setCloudStatus('SYNCING');
         const { type, data } = e.detail || {};
         try {
-            await syncService.pushToCloud(data, type || 'GENERIC');
+            // Fix: syncService.pushToCloud expects 0 arguments. The specific data changes are already
+            // managed via log queue in productDB which pushToCloud automatically processes.
+            await syncService.pushToCloud();
             setCloudStatus('UP_TO_DATE');
         } catch (err) {
             setCloudStatus('ERROR');
