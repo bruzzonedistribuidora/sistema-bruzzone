@@ -6,7 +6,7 @@ import {
     Minus, Package, Trash2, History, CheckCircle, 
     ChevronRight, DollarSign, UserSearch, Filter,
     TrendingUp, Receipt, Pencil, PlusCircle, ShoppingBag, ShoppingCart, Download,
-    PackagePlus, Save, Truck, RefreshCw, ArrowLeft
+    PackagePlus, Save, Truck, RefreshCw, ArrowLeft, Cloud
 } from 'lucide-react';
 import { Product, Remito, RemitoItem, Client, InvoiceItem, CompanyConfig } from '../types';
 import { productDB } from '../services/storageService';
@@ -26,24 +26,32 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [historySearch, setHistorySearch] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   
   const [historyFilter, setHistoryFilter] = useState<'PENDING' | 'BILLED' | 'ALL'>('ALL');
   const [showPrintModal, setShowPrintModal] = useState<Remito | null>(null);
   const [editingRemitoId, setEditingRemitoId] = useState<string | null>(null);
 
-  const [allClients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
+  const [allClients, setAllClients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
   const [existingRemitos, setExistingRemitos] = useState<Remito[]>(() => JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]'));
   const [companyConfig] = useState<CompanyConfig>(() => JSON.parse(localStorage.getItem('company_config') || '{}'));
 
-  // ESCUCHAR PULSO DE SINCRONIZACIÓN PARA ACTUALIZAR HISTORIAL
+  // CARGAR DATOS CUANDO HAY UN PULSO DE RED
+  const loadDataFromStorage = () => {
+    setExistingRemitos(JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]'));
+    setAllClients(JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
+    setIsSyncing(true);
+    setTimeout(() => setIsSyncing(false), 1000);
+  };
+
   useEffect(() => {
-    const handleSync = () => {
-        const updated = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
-        setExistingRemitos(updated);
+    window.addEventListener('ferrecloud_sync_pulse', loadDataFromStorage);
+    window.addEventListener('storage', loadDataFromStorage);
+    return () => {
+      window.removeEventListener('ferrecloud_sync_pulse', loadDataFromStorage);
+      window.removeEventListener('storage', loadDataFromStorage);
     };
-    window.addEventListener('ferrecloud_sync_pulse', handleSync);
-    return () => window.removeEventListener('ferrecloud_sync_pulse', handleSync);
   }, []);
 
   useEffect(() => {
@@ -79,10 +87,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     }
   }, [initialItems]);
 
-  useEffect(() => {
-      localStorage.setItem('ferrecloud_remitos', JSON.stringify(existingRemitos));
-  }, [existingRemitos]);
-
   const addToCart = (product: Product) => {
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
@@ -115,28 +119,31 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     };
 
     let updatedRemitos;
+    const currentOnStorage = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
+    
     if (editingRemitoId) {
-        updatedRemitos = existingRemitos.map(r => r.id === editingRemitoId ? newRemito : r);
+        updatedRemitos = currentOnStorage.map((r: any) => r.id === editingRemitoId ? newRemito : r);
         setEditingRemitoId(null);
     } else {
-        updatedRemitos = [newRemito, ...existingRemitos];
+        updatedRemitos = [newRemito, ...currentOnStorage];
     }
 
     setExistingRemitos(updatedRemitos);
     localStorage.setItem('ferrecloud_remitos', JSON.stringify(updatedRemitos));
 
-    // DISPARAR SINCRONIZACION INMEDIATA
+    // DISPARAR FUSIÓN CON LA NUBE INMEDIATA
     await syncService.pushToCloud();
     
     setCart([]);
     setSelectedClient(null);
     setShowPrintModal(newRemito);
-    alert("✅ Remito registrado y sincronizado en todas las terminales.");
+    alert("✅ Remito registrado y sincronizado en la red.");
   };
 
   const deleteRemito = async (id: string) => {
       if (confirm('¿Desea eliminar este remito del historial?')) {
-          const updated = existingRemitos.filter(r => r.id !== id);
+          const current = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
+          const updated = current.filter((r: any) => r.id !== id);
           setExistingRemitos(updated);
           localStorage.setItem('ferrecloud_remitos', JSON.stringify(updated));
           await syncService.pushToCloud();
@@ -155,14 +162,20 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   return (
     <div className="p-4 h-full flex flex-col space-y-3 bg-slate-100 overflow-hidden font-sans">
       <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-sm shrink-0 print:hidden">
-        <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
-          <ClipboardList size={22} className="text-indigo-600"/> Remitos de Entrega
-        </h2>
+        <div className="flex items-center gap-3">
+            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
+              <ClipboardList size={22} className="text-indigo-600"/> Libro de Remitos
+            </h2>
+            {isSyncing && <div className="flex items-center gap-2 px-3 py-1 bg-indigo-50 rounded-full animate-pulse border border-indigo-100">
+                <RefreshCw size={10} className="animate-spin text-indigo-600"/>
+                <span className="text-[8px] font-black text-indigo-600 uppercase">Sincronizando Red</span>
+            </div>}
+        </div>
         <div className="flex bg-slate-100 rounded-xl p-1">
           <button onClick={() => { setActiveTab('NEW'); setEditingRemitoId(null); }} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'NEW' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>
             {editingRemitoId ? 'Editando Remito' : 'Generar Nuevo'}
           </button>
-          <button onClick={() => setActiveTab('HISTORY')} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'HISTORY' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Historial Registros</button>
+          <button onClick={() => { setActiveTab('HISTORY'); loadDataFromStorage(); }} className={`px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'HISTORY' ? 'bg-white text-slate-900 shadow-sm' : 'text-gray-400'}`}>Historial Central</button>
         </div>
       </div>
 
