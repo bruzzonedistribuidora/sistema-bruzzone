@@ -7,7 +7,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
-    CloudIcon, Boxes as BoxesIcon, Network, Tags
+    CloudIcon, Boxes as BoxesIcon, Network, Tags, Laptop2, Globe2
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -72,6 +72,9 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Ctas Ctes", color: "bg-emerald-600" },
     [ViewState.PROVIDER_BALANCES]: { icon: DollarSign, label: "Deuda Prov", color: "bg-orange-600" },
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube / Red", color: "bg-indigo-900" },
+    [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop2, label: "Web Admin", color: "bg-pink-600" },
+    [ViewState.ONLINE_SALES]: { icon: Globe2, label: "Hub Online", color: "bg-indigo-600" },
+    [ViewState.MARKETING]: { icon: Tag, label: "Marketing", color: "bg-purple-600" },
 };
 
 const App: React.FC = () => {
@@ -157,6 +160,9 @@ const App: React.FC = () => {
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
       case ViewState.LICENSE_MANAGER: return <LicenseConsole key={renderKey} />;
+      case ViewState.MARKETING: return <Marketing key={renderKey} />;
+      case ViewState.ONLINE_SALES: return <OnlineSales key={renderKey} />;
+      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin key={renderKey} />;
       
       // CASOS DE CONFIGURACIÓN FALTANTES
       case ViewState.COMPANY_SETTINGS: return <CompanySettings key={renderKey} />;
