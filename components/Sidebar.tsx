@@ -9,7 +9,7 @@ import {
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Scale, Activity, Settings2, DollarSign, Key, LogOut, Laptop2, Network,
-    Boxes as BoxesIcon
+    Boxes as BoxesIcon, Tags
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
@@ -182,10 +182,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
 
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
                     {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro Art." icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
+                    {isModuleEnabled(ViewState.PRICE_LISTS) && <DropdownItem view={ViewState.PRICE_LISTS} label="Listas Precios" icon={Tags} active={activeView === ViewState.PRICE_LISTS} onClick={() => handleNav(ViewState.PRICE_LISTS)} />}
                     {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Actualizar Excel" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
                     {isModuleEnabled(ViewState.STOCK_ADJUSTMENT) && <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajustes" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />}
                     {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos Prov." icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
-                    {isModuleEnabled(ViewState.PRICE_UPDATES) && <DropdownItem view={ViewState.PRICE_UPDATES} label="Precios" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />}
+                    {isModuleEnabled(ViewState.PRICE_UPDATES) && <DropdownItem view={ViewState.PRICE_UPDATES} label="Actualizar Costos" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />}
                 </NavDropdown>
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
