@@ -15,6 +15,8 @@ const createMockProduct = (id: string, internalCode: string, name: string, price
   vatRate: 21, listCost: priceFinal * 0.6,
   // Added purchasePackageQuantity to fix property missing error
   purchasePackageQuantity: 1,
+  // Fix: Added missing salePackageQuantity
+  salePackageQuantity: 1,
   discounts: [0, 0, 0, 0], costAfterDiscounts: priceFinal * 0.6, profitMargin: 40,
   priceNeto: priceFinal / 1.21, priceFinal: priceFinal, 
   stock, 
