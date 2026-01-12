@@ -229,8 +229,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                             <div key={p.id} onClick={() => addToCart(p)} className="p-4 hover:bg-indigo-50 border-b last:border-0 flex justify-between items-center cursor-pointer transition-colors rounded-xl group">
                                                 <div className="min-w-0">
                                                     <p className="font-black text-slate-900 uppercase text-xs truncate">{p.name}</p>
-                                                    <div className="flex gap-4 text-[10px] text-slate-400 font-black uppercase">
-                                                        <span>Ref: {p.internalCodes[0]}</span>
+                                                    <div className="flex gap-4 text-[10px] font-black uppercase">
+                                                        <span className="text-slate-400">Ref: {p.internalCodes[0]}</span>
+                                                        <span className="text-indigo-600">Marca: {p.brand || 'GENÉRICO'}</span>
                                                         <span className={p.stock > 0 ? 'text-emerald-600' : 'text-red-500'}>Stock: {p.stock}</span>
                                                     </div>
                                                 </div>
