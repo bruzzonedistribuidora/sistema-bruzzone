@@ -63,7 +63,7 @@ const CloudHub: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-5">
                             <div className={`p-5 rounded-[2rem] shadow-2xl transition-all ${connStatus === 'CONNECTED' ? 'bg-indigo-600' : connStatus === 'ERROR' ? 'bg-red-600' : 'bg-slate-800'}`}>
-                                {connStatus === 'CONNECTED' ? <Signal size={36} className="animate-pulse text-indigo-200"/> : <WifiOff size={36} className="text-slate-500"/>}
+                                {connStatus === 'CONNECTED' ? <Signal size={36} className="animate-pulse text-indigo-200"/> : <WifiOff size={36} className="text-slate-50"/>}
                             </div>
                             <div>
                                 <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Motor de Sincronización</h2>
@@ -93,7 +93,6 @@ const CloudHub: React.FC = () => {
                             </div>
                             <button onClick={handleSaveVault} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all shadow-xl">Vincular y Escuchar Cambios</button>
                             <div className="flex items-start gap-3 bg-white/5 p-4 rounded-2xl border border-white/10">
-                                {/* Fix: Added missing Info icon import from lucide-react */}
                                 <Info size={16} className="text-indigo-400 shrink-0 mt-0.5" />
                                 <p className="text-[9px] text-white/40 uppercase font-bold leading-relaxed">
                                     La sincronización cloud transmite ventas, ajustes de stock y clientes entre sucursales. Para los 140.000 artículos, use el "Plan B" de clonación masiva abajo si es la primera vez.
@@ -173,7 +172,7 @@ const CloudHub: React.FC = () => {
                 <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
                     <CheckCircle2 className="text-blue-600 shrink-0 mt-1" size={24}/>
                     <p className="text-[10px] text-blue-800 font-bold uppercase leading-relaxed">
-                        Flujo Óptimo: 1. Clona los 140k con archivo -> 2. Vincula la Bóveda en ambas PCs -> 3. ¡Vende en simultáneo! Los cambios de stock se sincronizarán solos.
+                        Flujo Óptimo: 1. Clona los 140k con archivo → 2. Vincula la Bóveda en ambas PCs → 3. ¡Vende en simultáneo! Los cambios de stock se sincronizarán solos.
                     </p>
                 </div>
             </div>
