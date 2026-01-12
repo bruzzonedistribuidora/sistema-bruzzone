@@ -219,6 +219,12 @@ const Inventory: React.FC = () => {
       }
   };
 
+  const handleQuickSale = (p: Product) => {
+      window.dispatchEvent(new CustomEvent('ferrecloud_add_to_pos', { 
+        detail: { product: p } 
+      }));
+  };
+
   return (
     <div className="p-4 h-full flex flex-col space-y-4 bg-slate-200 overflow-hidden font-sans">
       <div className="bg-white p-5 rounded-[2.5rem] border border-slate-300 shadow-xl shrink-0">
@@ -261,8 +267,8 @@ const Inventory: React.FC = () => {
                         <table className="w-full text-left border-collapse table-fixed">
                             <thead className="bg-slate-900 text-white sticky top-0 z-20 text-[11px] uppercase font-black tracking-widest">
                                 <tr>
-                                    <th className="w-[15%] px-6 py-5 border-r border-slate-800">SKU / Ref</th>
-                                    <th className="w-[25%] px-6 py-5 border-r border-slate-800">Descripción Comercial</th>
+                                    <th className="w-[12%] px-6 py-5 border-r border-slate-800">SKU / Ref</th>
+                                    <th className="w-[28%] px-6 py-5 border-r border-slate-800">Descripción Comercial</th>
                                     <th className="w-[15%] px-6 py-5 border-r border-slate-800">Marca / Rubro</th>
                                     <th className="w-[10%] px-6 py-5 text-center border-r border-slate-800">Stock</th>
                                     <th className="w-[10%] px-6 py-5 text-right border-r border-slate-800">PVP Final</th>
@@ -287,12 +293,18 @@ const Inventory: React.FC = () => {
                                             <td className="px-6 py-4 text-center">
                                                 <div className="flex justify-center gap-1.5">
                                                     <button 
+                                                        onClick={() => handleQuickSale(p)}
+                                                        title="Venta Rápida / Pedido"
+                                                        className="p-2.5 text-indigo-700 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100">
+                                                        <ShoppingCart size={16}/>
+                                                    </button>
+                                                    <button 
                                                         onClick={() => handleQuickReplenishment(p)}
                                                         title="Agregar a pedido de reposición"
                                                         className="p-2.5 text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100">
                                                         <PackagePlus size={16}/>
                                                     </button>
-                                                    <button onClick={() => { setFormData(p); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-2.5 text-indigo-700 bg-indigo-50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"><Pen size={16}/></button>
+                                                    <button onClick={() => { setFormData(p); setModalTab('GENERAL'); setIsModalOpen(true); }} className="p-2.5 text-slate-700 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm border border-slate-100"><Pen size={16}/></button>
                                                     <button onClick={async () => { if(confirm('¿Eliminar definitivamente?')) { await productDB.delete(p.id); loadProducts(); } }} className="p-2.5 text-red-300 bg-red-50 rounded-xl hover:bg-red-500 hover:text-white transition-all border border-red-50"><Trash2 size={16}/></button>
                                                 </div>
                                             </td>
