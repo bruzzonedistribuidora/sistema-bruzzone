@@ -25,8 +25,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
     const productFields = [
         { key: 'internalCodes', label: 'CODIGO Propio (SKU)', required: false },
         { key: 'barcodes', label: 'Código de Barras (EAN)', required: false },
+        { key: 'providerCodes', label: 'Código PROVEEDOR', required: false },
         { key: 'name', label: 'Nombre / Descripción', required: true },
         { key: 'listCost', label: 'COSTOS LISTA', required: true },
+        { key: 'purchaseCurrency', label: 'Moneda Compra (ARS/USD)', required: false },
         { key: 'purchasePackageQuantity', label: 'Cant. por Bulto', required: false },
         { key: 'measureUnitSale', label: 'U. de Venta', required: false },
         { key: 'conversionFactor', label: 'Factor Venta (Multiplicador)', required: false },
@@ -36,10 +38,13 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         { key: 'stock', label: 'Stock Total', required: false },
         { key: 'stockPrincipal', label: 'Stock Local / Mostrador', required: false },
         { key: 'stockDeposito', label: 'Stock Depósito', required: false },
-        { key: 'stockMinimo', label: 'Stock Mínimo', required: false },
+        { key: 'stockMinimo', label: 'Stock Mínimo (Alerta)', required: false },
+        { key: 'reorderPoint', label: 'Punto de Pedido (Crítico)', required: false },
         { key: 'profitMargin', label: 'Porcentaje Ganancia (%)', required: false },
         { key: 'vatRate', label: 'Tasa (IVA %)', required: false },
         { key: 'disc1', label: 'Descuento 1 (%)', required: false },
+        { key: 'disc2', label: 'Descuento 2 (%)', required: false },
+        { key: 'disc3', label: 'Descuento 3 (%)', required: false },
     ];
 
     const parseNumber = (val: any, defaultValue: number): number => {
@@ -70,7 +75,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const index = parsedRows[0].findIndex(h => {
                     const header = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     const target = field.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    return header === target || header.includes(target) || header === field.key.toLowerCase();
+                    const key = field.key.toLowerCase();
+                    return header === target || header.includes(target) || header === key;
                 });
                 if (index !== -1) autoMap[field.key] = index;
             });
@@ -91,7 +97,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
         
         const currentProducts = await productDB.getAll();
         const productMap = new Map<string, Product>();
-        currentProducts.forEach(p => productMap.set(p.internalCodes[0].toString().toUpperCase(), p));
+        currentProducts.forEach(p => productMap.set(p.internalCodes[0]?.toString().toUpperCase(), p));
 
         const CHUNK_SIZE = 5000;
         let index = 0;
@@ -106,26 +112,39 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 const row = fileRows[i];
                 let sku = row[mapping.internalCodes]?.toString().toUpperCase();
                 const barcode = row[mapping.barcodes]?.toString();
+                const providerCode = row[mapping.providerCodes]?.toString();
+                
                 if (!sku && barcode) sku = barcode;
+                if (!sku && providerCode) sku = providerCode;
                 if (!sku) continue;
 
                 const existingProduct = productMap.get(sku);
+                
+                // Procesamiento de Precios y Descuentos
                 const listCost = parseNumber(row[mapping.listCost], 0);
                 const d1 = mapping.disc1 !== undefined ? parseNumber(row[mapping.disc1], 0) : 0;
+                const d2 = mapping.disc2 !== undefined ? parseNumber(row[mapping.disc2], 0) : 0;
+                const d3 = mapping.disc3 !== undefined ? parseNumber(row[mapping.disc3], 0) : 0;
+                
                 const factor = mapping.conversionFactor !== undefined ? parseNumber(row[mapping.conversionFactor], 1) : 1;
                 const margin = mapping.profitMargin !== undefined ? parseNumber(row[mapping.profitMargin], 30) : 30;
                 const vat = mapping.vatRate !== undefined ? parseNumber(row[mapping.vatRate], 21) : 21;
 
-                const unitCostBase = (listCost * (1 - d1/100)) * factor;
+                // Aplicación de bonificación en cascada
+                const costAfterDiscounts = listCost * (1 - d1/100) * (1 - d2/100) * (1 - d3/100);
+                const unitCostBase = costAfterDiscounts * factor;
                 const priceNeto = unitCostBase * (1 + margin/100);
                 const priceFinal = (priceNeto * (1 + vat/100));
+
+                // Procesamiento de Moneda
+                const currencyRaw = row[mapping.purchaseCurrency]?.toString().toUpperCase() || 'ARS';
+                const purchaseCurrency = currencyRaw.includes('USD') || currencyRaw.includes('DOL') ? 'USD' : 'ARS';
 
                 const productData: Product = {
                     id: existingProduct?.id || `PROD-${sku}-${Date.now()}`,
                     internalCodes: [sku],
                     barcodes: barcode ? [barcode] : (existingProduct?.barcodes || []),
-                    // Fix: Include missing required properties for type 'Product'
-                    providerCodes: existingProduct?.providerCodes || [],
+                    providerCodes: providerCode ? [providerCode] : (existingProduct?.providerCodes || []),
                     name: (row[mapping.name] || 'ARTICULO SIN NOMBRE').toUpperCase(),
                     brand: (mapping.brand !== undefined ? row[mapping.brand] : (existingProduct?.brand || 'GENÉRICO')).toUpperCase(),
                     category: (mapping.category !== undefined ? row[mapping.category] : (existingProduct?.category || 'GENERAL')).toUpperCase(),
@@ -133,10 +152,9 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     listCost: listCost,
                     conversionFactor: factor,
                     measureUnitSale: (mapping.measureUnitSale !== undefined ? row[mapping.measureUnitSale] : (existingProduct?.measureUnitSale || 'UNIDAD')).toUpperCase(),
-                    // Fix: Include missing required measureUnitPurchase
                     measureUnitPurchase: existingProduct?.measureUnitPurchase || 'UNIDAD',
-                    discounts: [d1, 0, 0, 0],
-                    costAfterDiscounts: parseFloat((listCost * (1 - d1/100)).toFixed(4)),
+                    discounts: [d1, d2, d3, 0],
+                    costAfterDiscounts: parseFloat(costAfterDiscounts.toFixed(4)),
                     profitMargin: margin,
                     vatRate: vat,
                     priceNeto: parseFloat(priceNeto.toFixed(2)),
@@ -144,12 +162,10 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     stock: mapping.stock !== undefined ? parseNumber(row[mapping.stock], 0) : (existingProduct?.stock || 0),
                     stockPrincipal: mapping.stockPrincipal !== undefined ? parseNumber(row[mapping.stockPrincipal], 0) : (existingProduct?.stockPrincipal || 0),
                     stockDeposito: mapping.stockDeposito !== undefined ? parseNumber(row[mapping.stockDeposito], 0) : (existingProduct?.stockDeposito || 0),
-                    // Fix: Include missing required stockSucursal
                     stockSucursal: existingProduct?.stockSucursal || 0,
                     stockMinimo: mapping.stockMinimo !== undefined ? parseNumber(row[mapping.stockMinimo], 0) : (existingProduct?.stockMinimo || 0),
-                    // Fix: Include missing required reorderPoint
-                    reorderPoint: existingProduct?.reorderPoint || 0,
-                    purchaseCurrency: 'ARS',
+                    reorderPoint: mapping.reorderPoint !== undefined ? parseNumber(row[mapping.reorderPoint], 0) : (existingProduct?.reorderPoint || 0),
+                    purchaseCurrency: purchaseCurrency,
                     saleCurrency: 'ARS',
                     ecommerce: existingProduct?.ecommerce || { isPublished: false },
                     isCombo: existingProduct?.isCombo || false,
@@ -157,7 +173,6 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     stockDetails: existingProduct?.stockDetails || [],
                     description: existingProduct?.description || '',
                     purchasePackageQuantity: mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1,
-                    // Fix: Added missing salePackageQuantity property
                     salePackageQuantity: 1,
                     location: existingProduct?.location || ''
                 };
@@ -189,7 +204,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                 <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl"><DatabaseZap size={32}/></div>
                 <div>
                     <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Importador Masivo Pro</h2>
-                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Soporta Unidad de Venta y Factor de Conversión</p>
+                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Soporta Descuentos Escalonados, USD y Puntos Críticos</p>
                 </div>
                 {step === 2 && (
                     <div className="ml-auto flex items-center gap-4">
@@ -226,7 +241,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                 <div key={field.key} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group hover:bg-white transition-all">
                                     <div className="flex items-center gap-2">
                                         <div className={`w-1.5 h-1.5 rounded-full ${field.required ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                                        <label className="text- [10px] font-black text-slate-500 uppercase tracking-tighter">{field.label}</label>
+                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{field.label}</label>
                                     </div>
                                     <select 
                                         className="max-w-[150px] p-2 bg-white border rounded-xl text-[10px] font-bold outline-none focus:border-indigo-600 shadow-sm"
