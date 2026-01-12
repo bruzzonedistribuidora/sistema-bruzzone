@@ -1,21 +1,12 @@
 
 import { productDB } from './storageService';
 
-const ARRAY_SYNC_KEYS = [
-    'ferrecloud_remitos',
-    'ferrecloud_sales_history',
-    'ferrecloud_clients',
-    'ferrecloud_movements',
-    'ferrecloud_purchases',
-    'ferrecloud_providers',
-    'ferrecloud_registers',
-    'ferrecloud_budgets',
-    'company_config',
-    'ferrecloud_brands',
-    'ferrecloud_categories'
-];
+const CLOUD_ENDPOINT = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2';
 
-const CLOUD_ENDPOINT = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
+const SHARED_KEYS = [
+    'ferrecloud_remitos', 'ferrecloud_sales_history', 'ferrecloud_clients',
+    'ferrecloud_movements', 'ferrecloud_registers', 'ferrecloud_budgets'
+];
 
 class SyncService {
     private vaultId: string | null = null;
@@ -30,7 +21,7 @@ class SyncService {
 
     setVaultId(id: string) {
         const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (!cleanId || cleanId.length < 3) return;
+        if (!cleanId) return;
         this.vaultId = cleanId;
         localStorage.setItem('ferrecloud_vault_id', cleanId);
         this.startAutoSync();
@@ -38,135 +29,156 @@ class SyncService {
 
     getVaultId() { return this.vaultId; }
 
-    // --- PLAN B: SINCRONIZACIÓN POR ARCHIVO (RECOMENDADO PARA 140K ITEMS) ---
-    
-    async exportFullVault() {
-        try {
-            const allProducts = await productDB.getAll(200000); // Traer todos
-            const storageData: any = {};
-            
-            ARRAY_SYNC_KEYS.forEach(key => {
-                const val = localStorage.getItem(key);
-                if (val) storageData[key] = JSON.parse(val);
-            });
-
-            const fullPackage = {
-                version: '1.0',
-                timestamp: new Date().toISOString(),
-                products: allProducts,
-                storage: storageData
-            };
-
-            const blob = new Blob([JSON.stringify(fullPackage)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const dateStr = new Date().toISOString().split('T')[0];
-            a.href = url;
-            a.download = `MAESTRO_FERRETERIA_${dateStr}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            return true;
-        } catch (e) {
-            console.error(e);
-            return false;
-        }
-    }
-
-    async importFullVault(file: File): Promise<boolean> {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target?.result as string);
-                    if (!data.products) throw new Error("Formato inválido");
-
-                    // 1. Limpiar e Importar Productos (IndexedDB)
-                    await productDB.clearAll();
-                    await productDB.saveBulk(data.products);
-
-                    // 2. Importar LocalStorage
-                    if (data.storage) {
-                        Object.entries(data.storage).forEach(([key, val]) => {
-                            localStorage.setItem(key, JSON.stringify(val));
-                        });
-                    }
-
-                    resolve(true);
-                } catch (err) {
-                    console.error(err);
-                    resolve(false);
-                }
-            };
-            reader.readAsText(file);
-        });
-    }
-
-    // --- PLAN A: NUBE (SOLO PARA CAMBIOS PEQUEÑOS Y PRESENCIA) ---
-
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 10000); 
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 5000); // Cada 5 seg para simultaneidad
     }
 
     private async syncLoop() {
         if (this.isProcessing || !this.vaultId) return;
         this.isProcessing = true;
-        
         const url = `${CLOUD_ENDPOINT}/${this.vaultId}`;
 
         try {
-            const myTerminalName = (localStorage.getItem('ferrecloud_terminal_name') || 'PC').toUpperCase();
-            
-            // Handshake ultraligero
-            const response = await fetch(url, { 
-                method: 'GET',
-                cache: 'no-store',
-                mode: 'cors'
-            });
-
-            let remoteData: any = { terminals: {} };
-            if (response.ok) {
-                const text = await response.text();
-                if (text) remoteData = JSON.parse(text);
+            // 1. OBTENER ESTADO ACTUAL DE LA NUBE
+            let remote: any = { logs: [], shared: {}, terminals: {} };
+            const resp = await fetch(url);
+            if (resp.ok) {
+                const text = await resp.text();
+                if (text) remote = JSON.parse(text);
             }
 
-            // Actualizar presencia
-            const now = Date.now();
-            if (!remoteData.terminals) remoteData.terminals = {};
-            remoteData.terminals[this.sessionId] = { name: myTerminalName, lastSeen: now };
+            // 2. APLICAR CAMBIOS REMOTOS (PULL INCREMENTAL)
+            const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_log_ts') || '0');
+            let hasChanges = false;
 
-            // Limpiar desconectados
-            Object.keys(remoteData.terminals).forEach(id => {
-                if (now - remoteData.terminals[id].lastSeen > 40000) delete remoteData.terminals[id];
+            // Procesar solo logs nuevos de otras PCs
+            const newLogs = (remote.logs || []).filter((l: any) => 
+                l.timestamp_ms > lastSyncTs && l.sid !== this.sessionId
+            );
+
+            for (const log of newLogs) {
+                if (log.payload?.id) {
+                    await productDB.save(log.payload, true);
+                    hasChanges = true;
+                }
+            }
+            
+            if (newLogs.length > 0) {
+                const maxTs = Math.max(...newLogs.map((l:any) => l.timestamp_ms));
+                localStorage.setItem('ferrecloud_last_log_ts', maxTs.toString());
+            }
+
+            // Sincronizar LocalStorage (Ventas, Clientes, etc)
+            SHARED_KEYS.forEach(key => {
+                const rVal = remote.shared?.[key];
+                const lVal = localStorage.getItem(key);
+                if (rVal && rVal !== lVal) {
+                    localStorage.setItem(key, rVal);
+                    hasChanges = true;
+                }
             });
 
-            // Solo subimos presencia para no saturar con 140k items
+            // 3. SUBIR CAMBIOS LOCALES (PUSH INCREMENTAL)
+            const myPendingLogs = await productDB.getPendingLogs();
+            const myTerminal = (localStorage.getItem('ferrecloud_terminal_name') || 'PC').toUpperCase();
+
+            // Actualizar presencia
+            remote.terminals[this.sessionId] = { name: myTerminal, last: Date.now() };
+            
+            // Limpiar terminales viejas (>1 min)
+            Object.keys(remote.terminals).forEach(k => {
+                if (Date.now() - remote.terminals[k].last > 60000) delete remote.terminals[k];
+            });
+
+            // Preparar nuevos logs para subir (limitar a los últimos 200 en la nube)
+            const formattedLogs = myPendingLogs.map(l => ({
+                id: l.id,
+                timestamp_ms: new Date(l.timestamp).getTime(),
+                sid: this.sessionId,
+                payload: l.payload
+            }));
+
+            const updatedLogs = [...(remote.logs || []), ...formattedLogs]
+                .sort((a,b) => a.timestamp_ms - b.timestamp_ms)
+                .slice(-200); // Solo mantenemos historial reciente para velocidad
+
+            const payload = {
+                terminals: remote.terminals,
+                logs: updatedLogs,
+                shared: {
+                    ...remote.shared,
+                    ...SHARED_KEYS.reduce((acc:any, k) => {
+                        const val = localStorage.getItem(k);
+                        if (val) acc[k] = val;
+                        return acc;
+                    }, {})
+                }
+            };
+
             await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify({
-                    terminals: remoteData.terminals,
-                    lastSync: new Date().toISOString()
-                })
+                body: JSON.stringify(payload)
             });
+
+            if (myPendingLogs.length > 0) await productDB.clearLogs();
 
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                detail: { terminals: remoteData.terminals } 
+                detail: { terminals: remote.terminals, logsCount: newLogs.length } 
             }));
+            
+            if (hasChanges) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
-            window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { 
-                detail: { error: "Nube en espera..." } 
-            }));
+            console.warn("Sync: Reintentando conexión...");
         } finally {
             this.isProcessing = false;
         }
     }
 
-    async syncFromRemote() { await this.syncLoop(); return true; }
+    // Exportar todo (Base 140k + Config)
+    async exportFullVault() {
+        const prods = await productDB.getAll(500000);
+        const data = {
+            products: prods,
+            storage: SHARED_KEYS.reduce((acc:any, k) => {
+                acc[k] = localStorage.getItem(k);
+                return acc;
+            }, {})
+        };
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `BASE_MAESTRA_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        return true;
+    }
+
+    // Importar todo
+    async importFullVault(file: File) {
+        return new Promise<boolean>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target?.result as string);
+                    await productDB.clearAll();
+                    await productDB.saveBulk(data.products);
+                    Object.entries(data.storage).forEach(([k, v]: [string, any]) => {
+                        if (v) localStorage.setItem(k, v);
+                    });
+                    resolve(true);
+                } catch { resolve(false); }
+            };
+            reader.readAsText(file);
+        });
+    }
+
     async pushToCloud() { await this.syncLoop(); return true; }
+    async syncFromRemote() { await this.syncLoop(); return true; }
 }
 
 export const syncService = new SyncService();
