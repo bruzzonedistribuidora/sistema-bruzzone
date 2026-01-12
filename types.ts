@@ -23,6 +23,7 @@ export enum ViewState {
   BRANCHES = 'BRANCHES',
   AI_ASSISTANT = 'AI_ASSISTANT',
   PRICE_UPDATES = 'PRICE_UPDATES',
+  PRICE_LISTS = 'PRICE_LISTS',
   USERS = 'USERS',
   REPLENISHMENT = 'REPLENISHMENT',
   SHORTAGES = 'SHORTAGES',
@@ -173,7 +174,7 @@ export interface PaymentSystem { id: string; name: string; debitSurcharge: numbe
 export interface CreditInstallment { id: string; installments: number; surcharge: number; label: string; }
 export interface LoyaltyConfig { enabled: boolean; pointsPerPeso: number; minPointsToRedeem: number; valuePerPoint: number; }
 export interface CurrencyQuote { id: string; name: string; code: string; value: number; lastUpdate: string; }
-export interface PriceList { id: string; name: string; type: 'BASE' | 'CUSTOM'; fixedMargin?: number; baseListId?: string; adjustmentPercentage?: number; active: boolean; }
+export interface PriceList { id: string; name: string; type: 'BASE' | 'DERIVED'; fixedMargin?: number; baseListId?: string; adjustmentPercentage?: number; active: boolean; }
 export interface ReplenishmentItem { product: Product; quantity: number; selectedProviderId: string; selectedProviderName: string; }
 export interface ReplenishmentOrder { id: string; date: string; providerId: string; providerName: string; items: ReplenishmentItem[]; status: 'DRAFT' | 'SENT'; totalItems: number; estimatedCost: number; notes?: string; }
 export interface StockTransfer { id: string; date: string; sourceBranchId: string; sourceBranchName: string; destBranchId: string; destBranchName: string; items: StockTransferItem[]; notes: string; status: 'PENDING' | 'COMPLETED' | 'CANCELLED'; }
