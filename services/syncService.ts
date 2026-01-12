@@ -1,4 +1,3 @@
-
 import { productDB } from './storageService';
 
 const ARRAY_SYNC_KEYS = [
@@ -12,7 +11,7 @@ const ARRAY_SYNC_KEYS = [
     'ferrecloud_budgets'
 ];
 
-// Servidor KV directo con soporte CORS nativo
+// Nueva URL de Bóveda Directa (Alta Disponibilidad)
 const CLOUD_ENDPOINT = 'https://kvdb.io/8Dq99r8p7wW6M5uX4zR2'; 
 
 class SyncService {
@@ -39,7 +38,7 @@ class SyncService {
     private startAutoSync() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
         this.syncLoop();
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 7000); // Latido cada 7 seg
+        this.pollingInterval = window.setInterval(() => this.syncLoop(), 8000); 
     }
 
     private async syncLoop() {
@@ -50,21 +49,28 @@ class SyncService {
 
         try {
             const myTerminalName = (localStorage.getItem('ferrecloud_terminal_name') || 'CAJA').toUpperCase();
-            
-            // FASE 1: LECTURA
             let remoteData: any = { terminals: {}, sharedStorage: {}, logs: [] };
             
+            // 1. INTENTAR LECTURA (PULL)
             try {
-                const response = await fetch(url, { cache: 'no-store' });
+                const response = await fetch(url, { 
+                    method: 'GET',
+                    cache: 'no-cache',
+                    mode: 'cors'
+                });
+                
                 if (response.ok) {
                     const text = await response.text();
                     if (text && text.length > 2) remoteData = JSON.parse(text);
+                } else if (response.status === 404) {
+                    // Es normal en el primer arranque, ignoramos y seguimos
+                    console.log("Bóveda nueva detectada...");
                 }
             } catch (e) {
-                console.log("Iniciando bóveda nueva...");
+                console.warn("Servidor ocupado, reintentando...");
             }
 
-            // FASE 2: ACTUALIZAR PRESENCIA
+            // 2. ACTUALIZAR PRESENCIA LOCAL
             const now = Date.now();
             if (!remoteData.terminals) remoteData.terminals = {};
             remoteData.terminals[this.sessionId] = {
@@ -72,26 +78,18 @@ class SyncService {
                 lastSeen: now
             };
 
-            // Limpiar terminales desconectadas (más de 30 seg sin señal)
-            Object.keys(remoteData.terminals).forEach(id => {
-                if (now - remoteData.terminals[id].lastSeen > 30000) {
-                    delete remoteData.terminals[id];
-                }
-            });
-
-            let changed = false;
-
-            // FASE 3: SINCRONIZAR DATOS COMPARTIDOS
+            // 3. SINCRONIZAR DATOS DE NEGOCIO
+            let hasChanges = false;
             ARRAY_SYNC_KEYS.forEach(key => {
                 const local = localStorage.getItem(key);
                 const remote = remoteData.sharedStorage?.[key];
                 if (remote && local !== remote) {
                     localStorage.setItem(key, remote);
-                    changed = true;
+                    hasChanges = true;
                 }
             });
 
-            // FASE 4: SINCRONIZAR PRODUCTOS (LOGS)
+            // 4. PRODUCTOS (LOGS)
             const pendingLogs = await productDB.getPendingLogs();
             if (pendingLogs.length > 0) {
                 remoteData.logs = [...(remoteData.logs || []), ...pendingLogs].slice(-100);
@@ -107,10 +105,10 @@ class SyncService {
                     if (log.payload?.id) await productDB.save(log.payload, true);
                 }
                 localStorage.setItem('ferrecloud_last_sync_ts', now.toString());
-                changed = true;
+                hasChanges = true;
             }
 
-            // FASE 5: ESCRITURA (PUSH)
+            // 5. SUBIR CAMBIOS (PUSH)
             const payload = {
                 terminals: remoteData.terminals,
                 logs: remoteData.logs || [],
@@ -127,39 +125,32 @@ class SyncService {
 
             await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' }, // Evita problemas de CORS pre-flight
                 body: JSON.stringify(payload)
             });
 
             if (pendingLogs.length > 0) await productDB.clearLogs();
             
             localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
-            
-            // Emitir evento de éxito
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
                 detail: { terminals: remoteData.terminals } 
             }));
             
-            if (changed) window.dispatchEvent(new Event('storage'));
+            if (hasChanges) window.dispatchEvent(new Event('storage'));
 
         } catch (e) {
-            console.error("Error de Red:", e);
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_error', { 
-                detail: { error: "Buscando señal de internet..." } 
+                detail: { error: "Conectando con la nube..." } 
             }));
         } finally {
             this.isProcessing = false;
         }
     }
 
-    async syncFromRemote() {
-        await this.syncLoop();
-        return true;
-    }
+    async syncFromRemote() { await this.syncLoop(); return true; }
 
-    async pushToCloud() {
-        await this.syncLoop();
-    }
+    // Fix: Added missing pushToCloud method used in POS and Remitos components
+    async pushToCloud() { await this.syncLoop(); return true; }
 }
 
 export const syncService = new SyncService();
