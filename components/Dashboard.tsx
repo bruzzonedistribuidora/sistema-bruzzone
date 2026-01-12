@@ -4,7 +4,8 @@ import {
     Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
     Calculator, Layers, ClipboardList, Bot, X, Plus,
     FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
-    ShoppingBag, Laptop, PackagePlus, Globe, Key, Network
+    ShoppingBag, Laptop, PackagePlus, Globe, Key, Network,
+    Tag, Laptop2, Globe2
 } from 'lucide-react';
 import { ViewState, SystemLicense } from '../types';
 
@@ -30,8 +31,9 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.CLIENTS, label: "Clientes", category: "Ventas", icon: Users, color: "bg-sky-500" },
     { id: ViewState.PURCHASES, label: "Compras", category: "Stock", icon: Truck, color: "bg-blue-500" },
     { id: ViewState.ACCOUNTING, label: "Contabilidad", category: "Finanzas", icon: Calculator, color: "bg-violet-600" },
-    { id: ViewState.ECOMMERCE_ADMIN, label: "Catálogo Web", category: "Digital", icon: Laptop, color: "bg-pink-600" },
-    { id: ViewState.ONLINE_SALES, label: "Ventas Online", category: "Digital", icon: ShoppingCart, color: "bg-indigo-600" },
+    { id: ViewState.ECOMMERCE_ADMIN, label: "Web Admin", category: "E-Commerce", icon: Laptop2, color: "bg-pink-600" },
+    { id: ViewState.ONLINE_SALES, label: "Hub ML/Nube", category: "E-Commerce", icon: Globe2, color: "bg-indigo-600" },
+    { id: ViewState.MARKETING, label: "Marketing Pro", category: "Digital", icon: Tag, color: "bg-purple-500" },
     { id: ViewState.PRICE_UPDATES, label: "Precios", category: "Stock", icon: Layers, color: "bg-orange-500" },
     { id: ViewState.REMITOS, label: "Remitos", category: "Ventas", icon: ClipboardList, color: "bg-blue-600" },
     { id: ViewState.PRESUPUESTOS, label: "Presupuestos", category: "Ventas", icon: FileSpreadsheet, color: "bg-teal-500" },
@@ -42,7 +44,7 @@ const ALL_MODULES: ShortcutConfig[] = [
 
 const DEFAULT_SHORTCUTS = [
     ViewState.POS, ViewState.INVENTORY, ViewState.CLOUD_HUB, 
-    ViewState.REPLENISHMENT, ViewState.TREASURY, ViewState.CLIENTS
+    ViewState.REPLENISHMENT, ViewState.TREASURY, ViewState.ONLINE_SALES
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
