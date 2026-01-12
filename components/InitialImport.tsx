@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { 
     FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
@@ -156,6 +157,8 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                     stockDetails: existingProduct?.stockDetails || [],
                     description: existingProduct?.description || '',
                     purchasePackageQuantity: mapping.purchasePackageQuantity !== undefined ? parseNumber(row[mapping.purchasePackageQuantity], 1) : 1,
+                    // Fix: Added missing salePackageQuantity property
+                    salePackageQuantity: 1,
                     location: existingProduct?.location || ''
                 };
 
@@ -223,7 +226,7 @@ const InitialImport: React.FC<InitialImportProps> = ({ onComplete }) => {
                                 <div key={field.key} className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group hover:bg-white transition-all">
                                     <div className="flex items-center gap-2">
                                         <div className={`w-1.5 h-1.5 rounded-full ${field.required ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">{field.label}</label>
+                                        <label className="text- [10px] font-black text-slate-500 uppercase tracking-tighter">{field.label}</label>
                                     </div>
                                     <select 
                                         className="max-w-[150px] p-2 bg-white border rounded-xl text-[10px] font-bold outline-none focus:border-indigo-600 shadow-sm"
