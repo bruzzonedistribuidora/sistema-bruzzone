@@ -5,7 +5,9 @@ import {
     Barcode, Pen, Trash2, Tag, Layers, RefreshCw, 
     Truck, PlusCircle, CheckCircle, Hash,
     Boxes as BoxesIcon, PackagePlus, ShoppingCart, AlertCircle, Database,
-    Calculator, MapPin, Percent, DollarSign, TrendingUp, Zap, List, PlusSquare
+    Calculator, MapPin, Percent, DollarSign, TrendingUp, Zap, List, PlusSquare,
+    // Fix: Added missing ShoppingBag import
+    Ruler, Scale, Box, ShoppingBag
 } from 'lucide-react';
 import { Product, Provider, Brand, Category } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -19,11 +21,9 @@ const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [totalCount, setTotalCount] = useState<number>(0);
 
-  // Listas de referencia para Marcas y Proveedores
   const [brands, setBrands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
   const [providers, setProviders] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
 
-  // ESTADO DEL FORMULARIO PROFESIONAL
   const initialFormState: Partial<Product> = {
       name: '',
       brand: '',
@@ -43,6 +43,11 @@ const Inventory: React.FC = () => {
       stockMinimo: 0,
       stockMaximo: 0,
       priceFinal: 0,
+      measureUnitPurchase: 'UNIDAD',
+      measureUnitSale: 'UNIDAD',
+      purchasePackageQuantity: 1,
+      salePackageQuantity: 1,
+      conversionFactor: 1,
       ecommerce: { isPublished: false }
   };
 
@@ -116,7 +121,6 @@ const Inventory: React.FC = () => {
       });
   };
 
-  // Manejo de arrays de códigos
   const updateArrayField = (field: 'internalCodes' | 'barcodes' | 'providerCodes', index: number, value: string) => {
       setFormData(prev => {
           const arr = [...(prev[field] || [''])];
@@ -143,7 +147,6 @@ const Inventory: React.FC = () => {
       }
       setIsLoading(true);
       
-      // ALTA AUTOMATICA DE MARCA SI NO EXISTE
       const brandUpper = (formData.brand || 'GENERICO').toUpperCase();
       if (brandUpper !== 'GENERICO' && !brands.some(b => b.name === brandUpper)) {
           const newBrand = { id: `brand-${Date.now()}`, name: brandUpper };
@@ -152,7 +155,6 @@ const Inventory: React.FC = () => {
           localStorage.setItem('ferrecloud_brands', JSON.stringify(updatedBrands));
       }
 
-      // ALTA AUTOMATICA DE PROVEEDOR SI NO EXISTE
       const providerUpper = (formData.provider || 'S/D').toUpperCase();
       if (providerUpper !== 'S/D' && !providers.some(p => p.name === providerUpper)) {
           const newProvider = { id: `prov-${Date.now()}`, name: providerUpper, balance: 0, cuit: '', contact: '', defaultDiscounts: [0,0,0] } as Provider;
@@ -171,6 +173,8 @@ const Inventory: React.FC = () => {
           internalCodes: formData.internalCodes?.filter(c => c.trim() !== '') || [''],
           barcodes: formData.barcodes?.filter(c => c.trim() !== '') || [],
           providerCodes: formData.providerCodes?.filter(c => c.trim() !== '') || [],
+          purchasePackageQuantity: parseFloat(formData.purchasePackageQuantity as any) || 1,
+          salePackageQuantity: parseFloat(formData.salePackageQuantity as any) || 1,
           stock: (parseFloat(formData.stockPrincipal as any) || 0) + (parseFloat(formData.stockDeposito as any) || 0) + (parseFloat(formData.stockSucursal as any) || 0)
       } as Product;
 
@@ -288,7 +292,7 @@ const Inventory: React.FC = () => {
                                   <input className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.name} onChange={e => updateField('name', e.target.value)} />
                               </div>
                               <div>
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Marca (Escriba para crear)</label>
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Marca</label>
                                   <input list="brands-list" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.brand} onChange={e => updateField('brand', e.target.value)} />
                                   <datalist id="brands-list">
                                       {brands.map(b => <option key={b.id} value={b.name}/>)}
@@ -301,7 +305,7 @@ const Inventory: React.FC = () => {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               <div>
-                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Proveedor (Escriba para crear)</label>
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 block mb-1">Proveedor</label>
                                   <input list="providers-list" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm uppercase focus:bg-white focus:border-indigo-500 outline-none transition-all" value={formData.provider} onChange={e => updateField('provider', e.target.value)} />
                                   <datalist id="providers-list">
                                       {providers.map(p => <option key={p.id} value={p.name}/>)}
@@ -317,7 +321,46 @@ const Inventory: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* SECCION 2: CODIGOS MULTIPLES */}
+                      {/* SECCION 2: UNIDADES Y EMPAQUE (NUEVO) */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+                          <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><Ruler size={14}/> Unidades y Empaque</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                              <div>
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-1 block">Unidad de Medida</label>
+                                  <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-sm outline-none focus:bg-white focus:border-indigo-500" value={formData.measureUnitSale} onChange={e => updateField('measureUnitSale', e.target.value)}>
+                                      <option value="UNIDAD">UNIDAD</option>
+                                      <option value="METRO">METRO</option>
+                                      <option value="KILO">KILO</option>
+                                      <option value="LITRO">LITRO</option>
+                                      <option value="PACK">PACK</option>
+                                  </select>
+                              </div>
+                              <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                                  <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-2 mb-1 block">Cant. por Bulto (Compra)</label>
+                                  <div className="relative">
+                                      <Box className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={18}/>
+                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-blue-200 rounded-xl font-black text-blue-700 outline-none" value={formData.purchasePackageQuantity} onChange={e => updateField('purchasePackageQuantity', e.target.value)} />
+                                  </div>
+                                  <p className="text-[7px] font-bold text-blue-400 uppercase mt-1 ml-2">Unidades por caja del proveedor</p>
+                              </div>
+                              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                                  <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-2 mb-1 block">Cant. por Bulto (Venta)</label>
+                                  <div className="relative">
+                                      <ShoppingBag className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-300" size={18}/>
+                                      <input type="number" className="w-full pl-10 p-3 bg-white border border-emerald-200 rounded-xl font-black text-emerald-700 outline-none" value={formData.salePackageQuantity} onChange={e => updateField('salePackageQuantity', e.target.value)} />
+                                  </div>
+                                  <p className="text-[7px] font-bold text-emerald-400 uppercase mt-1 ml-2">Múltiplo de venta al mostrador</p>
+                              </div>
+                              <div className="flex flex-col justify-center p-4 bg-slate-50 rounded-2xl">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest text-center mb-1">Costo Unitario Real</p>
+                                  <p className="text-xl font-black text-slate-900 text-center">
+                                    ${((formData.costAfterDiscounts || 0) / (formData.purchasePackageQuantity || 1)).toFixed(2)}
+                                  </p>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* SECCION 3: CODIGOS MULTIPLES */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                           {/* CODIGOS PROPIOS */}
                           <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col">
@@ -368,7 +411,7 @@ const Inventory: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* SECCION 3: COSTOS Y PRECIOS */}
+                      {/* SECCION 4: COSTOS Y PRECIOS */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                           <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl space-y-6">
                               <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest border-b border-white/5 pb-3 flex items-center gap-2"><Calculator size={14}/> Estructura de Costos</h4>
@@ -442,7 +485,7 @@ const Inventory: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* SECCION 4: LOGÍSTICA */}
+                      {/* SECCION 5: LOGÍSTICA */}
                       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
                           <h4 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest border-b pb-3 flex items-center gap-2"><BoxesIcon size={14}/> Existencias por Ubicación</h4>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
