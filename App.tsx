@@ -7,7 +7,7 @@ import {
     Calculator, TrendingUp, FileBarChart2, Cloud, Laptop,
     ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Settings2, DollarSign, Key, ShieldAlert, Wifi, WifiOff, RefreshCw, CheckCircle2,
-    CloudIcon, Boxes as BoxesIcon, Network, Tags, Laptop2, Globe2, Globe
+    CloudIcon, Boxes as BoxesIcon, Network, Tags, Laptop2, Globe2, Globe, Activity
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -69,6 +69,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.POS]: { icon: Receipt, label: "Venta", color: "bg-emerald-500" },
     [ViewState.PURCHASES]: { icon: Truck, label: "Compras", color: "bg-blue-500" },
     [ViewState.TREASURY]: { icon: Wallet, label: "Finanzas", color: "bg-orange-500" },
+    [ViewState.DAILY_MOVEMENTS]: { icon: Activity, label: "Gastos Diarios", color: "bg-red-500" },
     [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Ctas Ctes", color: "bg-emerald-600" },
     [ViewState.PROVIDER_BALANCES]: { icon: DollarSign, label: "Deuda Prov", color: "bg-orange-600" },
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube / Red", color: "bg-indigo-900" },
@@ -217,6 +218,7 @@ const App: React.FC = () => {
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate key={renderKey} />;
       case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate key={renderKey} onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment key={renderKey} />;
+      case ViewState.DAILY_MOVEMENTS: return <DailyMovements key={renderKey} />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
