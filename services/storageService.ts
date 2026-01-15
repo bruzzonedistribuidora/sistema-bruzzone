@@ -1,6 +1,4 @@
-
-import { Product, SyncLogEntry } from '../types';
-import { syncService } from './syncService';
+import { Product } from '../types';
 
 const DB_NAME = 'ferrecloud_db';
 const DB_VERSION = 1;
@@ -34,7 +32,6 @@ export const productDB = {
     });
   },
 
-  // Fix: added getById method to retrieve a single product by its ID from IndexedDB
   async getById(id: string): Promise<Product | undefined> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -51,13 +48,14 @@ export const productDB = {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
       const store = transaction.objectStore(PRODUCT_STORE);
-      
       store.put(product);
       
       transaction.oncomplete = () => {
-        // Solo enviamos a Firebase si el cambio es local
+        // Notificar al sistema de sincronización mediante eventos para evitar dependencia circular
         if (!isRemoteSync) {
-            syncService.pushDelta('PRODUCT_UPDATE', product);
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_out', { 
+                detail: { type: 'PRODUCT_UPDATE', payload: product } 
+            }));
         }
         window.dispatchEvent(new Event('ferrecloud_products_updated'));
         resolve();
@@ -71,12 +69,13 @@ export const productDB = {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
       const store = transaction.objectStore(PRODUCT_STORE);
-      
       store.delete(id);
       
       transaction.oncomplete = () => {
         if (!isRemoteSync) {
-            syncService.pushDelta('PRODUCT_DELETE', { id });
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_out', { 
+                detail: { type: 'PRODUCT_DELETE', payload: { id } } 
+            }));
         }
         window.dispatchEvent(new Event('ferrecloud_products_updated'));
         resolve();
@@ -90,7 +89,7 @@ export const productDB = {
     const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
     const store = transaction.objectStore(PRODUCT_STORE);
     products.forEach(p => store.put(p));
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
         transaction.oncomplete = () => resolve();
     });
   },
@@ -142,7 +141,6 @@ export const productDB = {
     const db = await openDB();
     const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
     transaction.objectStore(PRODUCT_STORE).clear();
-    // Fix: Added <void> to the Promise constructor to allow calling resolve() without arguments
     return new Promise<void>(resolve => transaction.oncomplete = () => resolve());
   }
 };
