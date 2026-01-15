@@ -5,7 +5,7 @@ import {
     Calculator, Layers, ClipboardList, Bot, X, Plus,
     FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
     ShoppingBag, Laptop, PackagePlus, Globe, Key, Network,
-    Tag, Laptop2, Globe2, BarChart3
+    Tag, Laptop2, Globe2, BarChart3, Activity
 } from 'lucide-react';
 import { ViewState, SystemLicense } from '../types';
 
@@ -28,6 +28,7 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.SHORTAGES, label: "Faltantes", category: "Logística", icon: AlertTriangle, color: "bg-orange-600" },
     { id: ViewState.REPLENISHMENT, label: "Armar Pedido", category: "Logística", icon: PackagePlus, color: "bg-emerald-600" },
     { id: ViewState.TREASURY, label: "Caja y Fondos", category: "Finanzas", icon: Wallet, color: "bg-emerald-600" },
+    { id: ViewState.DAILY_MOVEMENTS, label: "Gastos Diarios", category: "Finanzas", icon: Activity, color: "bg-red-500" },
     { id: ViewState.CLIENTS, label: "Clientes", category: "Ventas", icon: Users, color: "bg-sky-500" },
     { id: ViewState.PURCHASES, label: "Compras", category: "Stock", icon: Truck, color: "bg-blue-500" },
     { id: ViewState.ACCOUNTING, label: "Contabilidad", category: "Finanzas", icon: Calculator, color: "bg-violet-600" },
@@ -112,7 +113,35 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </button>
         </div>
       </div>
-      {/* ... (Modal de personalización se mantiene igual) */}
+      
+      {isEditMode && (
+          <div className="fixed inset-0 z-[300] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <h3 className="text-xl font-black uppercase tracking-widest">Configurar Accesos Directos</h3>
+                      <button onClick={() => setIsEditMode(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={28}/></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-10 custom-scrollbar grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {ALL_MODULES.map(m => (
+                          <button 
+                            key={m.id}
+                            onClick={() => toggleShortcut(m.id)}
+                            className={`p-6 rounded-2xl border-2 flex items-center gap-4 transition-all ${userShortcuts.includes(m.id) ? 'border-indigo-600 bg-indigo-50 shadow-md' : 'border-slate-100 bg-white grayscale opacity-50'}`}>
+                              <div className={`p-3 rounded-xl ${m.color} text-white`}><m.icon size={20}/></div>
+                              <div className="text-left">
+                                  <p className="font-black text-xs uppercase text-slate-800">{m.label}</p>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase">{m.category}</p>
+                              </div>
+                              {userShortcuts.includes(m.id) && <CheckCircle size={20} className="ml-auto text-indigo-600" />}
+                          </button>
+                      ))}
+                  </div>
+                  <div className="p-8 border-t border-slate-100 bg-slate-50 flex justify-end">
+                      <button onClick={() => setIsEditMode(false)} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all">Guardar Configuración</button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
