@@ -27,7 +27,7 @@ class SyncService {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
         if (this.vaultId) this.initFirebase();
 
-        // Listener para capturar peticiones de sincronización saliente (desde storage o POS)
+        // Listener para capturar peticiones de sincronización saliente
         window.addEventListener('ferrecloud_sync_out' as any, (e: CustomEvent) => {
             this.pushDelta(e.detail.type, e.detail.payload);
         });
