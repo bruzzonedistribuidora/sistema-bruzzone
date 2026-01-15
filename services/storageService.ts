@@ -1,10 +1,10 @@
 
 import { Product, SyncLogEntry } from '../types';
+import { syncService } from './syncService';
 
 const DB_NAME = 'ferrecloud_db';
 const DB_VERSION = 1;
 const PRODUCT_STORE = 'products';
-const LOG_STORE = 'product_logs';
 
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -16,9 +16,7 @@ const openDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(PRODUCT_STORE)) {
         const productStore = db.createObjectStore(PRODUCT_STORE, { keyPath: 'id' });
         productStore.createIndex('internalCodes', 'internalCodes', { multiEntry: true });
-      }
-      if (!db.objectStoreNames.contains(LOG_STORE)) {
-        db.createObjectStore(LOG_STORE, { keyPath: 'id' });
+        productStore.createIndex('name', 'name', { unique: false });
       }
     };
   });
@@ -36,6 +34,7 @@ export const productDB = {
     });
   },
 
+  // Fix: added getById method to retrieve a single product by its ID from IndexedDB
   async getById(id: string): Promise<Product | undefined> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -43,48 +42,6 @@ export const productDB = {
       const store = transaction.objectStore(PRODUCT_STORE);
       const request = store.get(id);
       request.onsuccess = () => resolve(request.result);
-    });
-  },
-
-  // Fix: Added delete method to productDB to resolve error in Inventory.tsx
-  async delete(id: string): Promise<void> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([PRODUCT_STORE, LOG_STORE], 'readwrite');
-      const store = transaction.objectStore(PRODUCT_STORE);
-      const logStore = transaction.objectStore(LOG_STORE);
-      
-      store.delete(id);
-      
-      const log: SyncLogEntry = {
-        id: `L${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        timestamp: new Date().toISOString(),
-        terminalName: localStorage.getItem('ferrecloud_terminal_name') || 'CAJA',
-        type: 'STOCK_ADJUST',
-        description: `Eliminado: ${id}`,
-        payload: { id, deleted: true }
-      };
-      logStore.add(log);
-
-      transaction.oncomplete = () => {
-        window.dispatchEvent(new Event('ferrecloud_products_updated'));
-        resolve();
-      };
-      transaction.onerror = () => reject(transaction.error);
-    });
-  },
-
-  // Fix: Added getPublished method to productDB to resolve error in Shop.tsx
-  async getPublished(): Promise<Product[]> {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(PRODUCT_STORE, 'readonly');
-      const store = transaction.objectStore(PRODUCT_STORE);
-      const request = store.getAll();
-      request.onsuccess = () => {
-        const results: Product[] = request.result;
-        resolve(results.filter(p => p.ecommerce?.isPublished));
-      };
       request.onerror = () => reject(request.error);
     });
   },
@@ -92,28 +49,39 @@ export const productDB = {
   async save(product: Product, isRemoteSync = false): Promise<void> {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction([PRODUCT_STORE, LOG_STORE], 'readwrite');
+      const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
       const store = transaction.objectStore(PRODUCT_STORE);
-      const logStore = transaction.objectStore(LOG_STORE);
       
       store.put(product);
       
-      if (!isRemoteSync) {
-        const log: SyncLogEntry = {
-          id: `L${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          timestamp: new Date().toISOString(),
-          terminalName: localStorage.getItem('ferrecloud_terminal_name') || 'CAJA',
-          type: 'STOCK_ADJUST',
-          description: `Actualizado: ${product.name}`,
-          payload: product
-        };
-        logStore.add(log);
-      }
-
       transaction.oncomplete = () => {
+        // Solo enviamos a Firebase si el cambio es local
+        if (!isRemoteSync) {
+            syncService.pushDelta('PRODUCT_UPDATE', product);
+        }
         window.dispatchEvent(new Event('ferrecloud_products_updated'));
         resolve();
       };
+      transaction.onerror = () => reject(transaction.error);
+    });
+  },
+
+  async delete(id: string, isRemoteSync = false): Promise<void> {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
+      const store = transaction.objectStore(PRODUCT_STORE);
+      
+      store.delete(id);
+      
+      transaction.oncomplete = () => {
+        if (!isRemoteSync) {
+            syncService.pushDelta('PRODUCT_DELETE', { id });
+        }
+        window.dispatchEvent(new Event('ferrecloud_products_updated'));
+        resolve();
+      };
+      transaction.onerror = () => reject(transaction.error);
     });
   },
 
@@ -148,6 +116,19 @@ export const productDB = {
     });
   },
 
+  async getPublished(): Promise<Product[]> {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const transaction = db.transaction(PRODUCT_STORE, 'readonly');
+      const store = transaction.objectStore(PRODUCT_STORE);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const results: Product[] = request.result;
+        resolve(results.filter(p => p.ecommerce?.isPublished));
+      };
+    });
+  },
+
   async getStats() {
     const db = await openDB();
     const transaction = db.transaction(PRODUCT_STORE, 'readonly');
@@ -157,26 +138,12 @@ export const productDB = {
     });
   },
 
-  async getPendingLogs(): Promise<SyncLogEntry[]> {
-    const db = await openDB();
-    return new Promise(resolve => {
-      const transaction = db.transaction(LOG_STORE, 'readonly');
-      const request = transaction.objectStore(LOG_STORE).getAll();
-      request.onsuccess = () => resolve(request.result);
-    });
-  },
-
-  async clearLogs() {
-    const db = await openDB();
-    const transaction = db.transaction(LOG_STORE, 'readwrite');
-    transaction.objectStore(LOG_STORE).clear();
-  },
-
   async clearAll() {
     const db = await openDB();
-    const transaction = db.transaction([PRODUCT_STORE, LOG_STORE], 'readwrite');
+    const transaction = db.transaction(PRODUCT_STORE, 'readwrite');
     transaction.objectStore(PRODUCT_STORE).clear();
-    transaction.objectStore(LOG_STORE).clear();
+    // Fix: Added <void> to the Promise constructor to allow calling resolve() without arguments
+    return new Promise<void>(resolve => transaction.oncomplete = () => resolve());
   }
 };
 
