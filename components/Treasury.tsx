@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Wallet, ArrowUpRight, ArrowDownLeft, ArrowRightLeft, CreditCard, 
@@ -7,7 +6,7 @@ import {
     Smartphone, Search, Filter, History, Truck, MoreVertical, 
     ArrowDownRight, Landmark, Receipt, Info, LogOut, LogIn, Download,
     RotateCcw, Send, Building, LockKeyhole, Unlock, CheckCircle2, XCircle,
-    Printer, Smartphone as ECheqIcon, ShieldCheck, Trash2
+    Printer, Smartphone as ECheqIcon, ShieldCheck, Trash2, ArrowRight
 } from 'lucide-react';
 import { CashRegister, Check, TreasuryMovement } from '../types';
 
@@ -19,7 +18,6 @@ const Treasury: React.FC = () => {
     return saved ? JSON.parse(saved) : [
       { id: '1', name: 'Caja Mostrador Principal', balance: 154200, isOpen: true },
       { id: '2', name: 'Caja Administración', balance: 45000, isOpen: true },
-      { id: '3', name: 'Caja Sucursal Norte', balance: 12000, isOpen: false },
     ];
   });
 
@@ -30,22 +28,122 @@ const Treasury: React.FC = () => {
 
   const [checks, setChecks] = useState<Check[]>([]);
 
-  const loadChecks = () => {
-      const saved = localStorage.getItem('ferrecloud_checks');
-      setChecks(saved ? JSON.parse(saved) : []);
-  };
+  // Estados para Nuevos Modales
+  const [isNewRegisterModalOpen, setIsNewRegisterModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
+  const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
+
+  // Formularios
+  const [newRegisterForm, setNewRegisterForm] = useState({ name: '', initialBalance: 0 });
+  const [transferForm, setTransferForm] = useState({ sourceId: '', destId: '', amount: 0, notes: '' });
+  const [manualForm, setManualForm] = useState<Partial<TreasuryMovement>>({
+      type: 'INCOME', subtype: 'GASTO_VARIO', paymentMethod: 'EFECTIVO', amount: 0, description: '', cashRegisterId: '1'
+  });
+  const [checkForm, setCheckForm] = useState<Partial<Check>>({
+      number: '', bank: '', issuer: '', amount: 0, dueDate: new Date().toISOString().split('T')[0], type: 'FISICO', status: 'PENDING'
+  });
+
+  const [checkFilter, setCheckFilter] = useState<'PENDING' | 'DEPOSITED' | 'REJECTED' | 'ALL'>('PENDING');
 
   useEffect(() => {
-    loadChecks();
-    window.addEventListener('storage', loadChecks);
-    return () => window.removeEventListener('storage', loadChecks);
+    const savedChecks = localStorage.getItem('ferrecloud_checks');
+    setChecks(savedChecks ? JSON.parse(savedChecks) : []);
   }, []);
 
   useEffect(() => {
     localStorage.setItem('ferrecloud_registers', JSON.stringify(registers));
     localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify(movements));
     localStorage.setItem('ferrecloud_checks', JSON.stringify(checks));
+    // Emitir evento para sincronización en la nube
+    window.dispatchEvent(new Event('ferrecloud_request_pulse'));
   }, [registers, movements, checks]);
+
+  const handleCreateRegister = () => {
+    if (!newRegisterForm.name) return;
+    const newReg: CashRegister = {
+        id: `reg-${Date.now()}`,
+        name: newRegisterForm.name.toUpperCase(),
+        balance: newRegisterForm.initialBalance,
+        isOpen: true
+    };
+    setRegisters([...registers, newReg]);
+    setIsNewRegisterModalOpen(false);
+    setNewRegisterForm({ name: '', initialBalance: 0 });
+
+    // Auditoría de creación
+    const log: TreasuryMovement = {
+        id: `LOG-NEW-${Date.now()}`,
+        date: new Date().toLocaleString(),
+        type: 'INCOME',
+        subtype: 'APERTURA',
+        paymentMethod: 'EFECTIVO',
+        amount: newRegisterForm.initialBalance,
+        description: `*** APERTURA NUEVA CAJA: ${newReg.name} ***`,
+        cashRegisterId: newReg.id
+    };
+    setMovements([log, ...movements]);
+  };
+
+  const handleTransfer = () => {
+    const { sourceId, destId, amount, notes } = transferForm;
+    if (!sourceId || !destId || amount <= 0) return;
+    if (sourceId === destId) {
+        alert("Origen y destino deben ser diferentes.");
+        return;
+    }
+
+    const source = registers.find(r => r.id === sourceId);
+    const dest = registers.find(r => r.id === destId);
+
+    if (!source?.isOpen || !dest?.isOpen) {
+        alert("Ambas cajas deben estar ABIERTAS para realizar la transferencia.");
+        return;
+    }
+
+    if (source.balance < amount) {
+        alert("Saldo insuficiente en la caja de origen.");
+        return;
+    }
+
+    const opId = `TR-${Date.now()}`;
+    const date = new Date().toLocaleString();
+
+    // 1. Actualizar saldos
+    setRegisters(prev => prev.map(r => {
+        if (r.id === sourceId) return { ...r, balance: r.balance - amount };
+        if (r.id === destId) return { ...r, balance: r.balance + amount };
+        return r;
+    }));
+
+    // 2. Registrar movimientos cruzados
+    const movSource: TreasuryMovement = {
+        id: `${opId}-S`,
+        date,
+        type: 'EXPENSE',
+        subtype: 'TRANSFERENCIA',
+        paymentMethod: 'EFECTIVO',
+        amount,
+        description: `TRASLADO A ${dest.name}. ${notes}`.toUpperCase(),
+        cashRegisterId: sourceId
+    };
+
+    const movDest: TreasuryMovement = {
+        id: `${opId}-D`,
+        date,
+        type: 'INCOME',
+        subtype: 'TRANSFERENCIA',
+        paymentMethod: 'EFECTIVO',
+        amount,
+        description: `INGRESO DESDE ${source.name}. ${notes}`.toUpperCase(),
+        cashRegisterId: destId
+    };
+
+    setMovements([movSource, movDest, ...movements]);
+    setIsTransferModalOpen(false);
+    setTransferForm({ sourceId: '', destId: '', amount: 0, notes: '' });
+    alert("✅ Transferencia realizada con éxito.");
+  };
 
   const toggleRegisterStatus = (id: string) => {
       const reg = registers.find(r => r.id === id);
@@ -73,18 +171,6 @@ const Treasury: React.FC = () => {
           return r;
       }));
   };
-
-  const [isManualEntryOpen, setIsManualEntryOpen] = useState(false);
-  const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
-  const [checkFilter, setCheckFilter] = useState<'PENDING' | 'DEPOSITED' | 'REJECTED' | 'ALL'>('PENDING');
-
-  const [manualForm, setManualForm] = useState<Partial<TreasuryMovement>>({
-      type: 'INCOME', subtype: 'GASTO_VARIO', paymentMethod: 'EFECTIVO', amount: 0, description: '', cashRegisterId: '1'
-  });
-
-  const [checkForm, setCheckForm] = useState<Partial<Check>>({
-      number: '', bank: '', issuer: '', amount: 0, dueDate: new Date().toISOString().split('T')[0], type: 'FISICO', status: 'PENDING'
-  });
 
   const handleAddMovement = () => {
       if (!manualForm.amount || !manualForm.description || !manualForm.cashRegisterId) {
@@ -138,13 +224,21 @@ const Treasury: React.FC = () => {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 h-full flex flex-col bg-slate-50 overflow-hidden font-sans">
       
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0 gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter flex items-center gap-3">
               <Wallet className="text-indigo-600"/> Tesorería y Fondos
           </h2>
+          <div className="flex gap-4 mt-2">
+            <button onClick={() => setIsNewRegisterModalOpen(true)} className="flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">
+                <Plus size={14}/> Nueva Caja
+            </button>
+            <button onClick={() => setIsTransferModalOpen(true)} className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">
+                <ArrowRightLeft size={14}/> Transferir
+            </button>
+          </div>
         </div>
-        <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
+        <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner w-full lg:w-auto overflow-x-auto no-scrollbar">
             <button onClick={() => setActiveTab('CAJAS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CAJAS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cajas</button>
             <button onClick={() => setActiveTab('CHEQUES')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'CHEQUES' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Cartera Valores</button>
             <button onClick={() => setActiveTab('MOVIMIENTOS')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'MOVIMIENTOS' ? 'bg-white text-slate-900 shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>Movimientos</button>
@@ -153,7 +247,7 @@ const Treasury: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
           {activeTab === 'CAJAS' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in pb-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in pb-10">
                   {registers.map(reg => (
                       <div key={reg.id} className={`bg-white rounded-[2.5rem] p-8 border transition-all duration-300 flex flex-col ${reg.isOpen ? 'border-gray-200 shadow-sm' : 'border-red-100 bg-red-50/20'}`}>
                           <div className="flex justify-between items-start mb-8">
@@ -164,7 +258,7 @@ const Treasury: React.FC = () => {
                                   {reg.isOpen ? 'OPERATIVA' : 'CERRADA'}
                               </span>
                           </div>
-                          <h4 className="font-black text-slate-800 uppercase tracking-tight text-lg leading-none mb-4">{reg.name}</h4>
+                          <h4 className="font-black text-slate-800 uppercase tracking-tight text-lg leading-none mb-4 truncate">{reg.name}</h4>
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Saldo en Caja</p>
                           <p className={`text-4xl font-black tracking-tighter mb-10 ${reg.isOpen ? 'text-slate-900' : 'text-slate-400'}`}>
                               ${reg.balance.toLocaleString('es-AR')}
@@ -177,6 +271,10 @@ const Treasury: React.FC = () => {
                           </div>
                       </div>
                   ))}
+                  <button onClick={() => setIsNewRegisterModalOpen(true)} className="border-4 border-dashed border-slate-200 rounded-[2.5rem] p-8 flex flex-col items-center justify-center gap-4 text-slate-300 hover:border-indigo-400 hover:text-indigo-500 hover:bg-white transition-all group min-h-[300px]">
+                      <Plus size={48} className="group-hover:rotate-90 transition-transform"/>
+                      <span className="font-black uppercase tracking-widest text-[10px]">Crear Nueva Caja</span>
+                  </button>
               </div>
           )}
 
@@ -190,9 +288,9 @@ const Treasury: React.FC = () => {
                       </div>
                       <div className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm flex flex-col justify-center gap-4">
                           <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Filtro de Estado</label>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 overflow-x-auto no-scrollbar">
                               {(['PENDING', 'DEPOSITED', 'REJECTED', 'ALL'] as const).map(f => (
-                                  <button key={f} onClick={() => setCheckFilter(f)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border transition-all ${checkFilter === f ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}>
+                                  <button key={f} onClick={() => setCheckFilter(f)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase border transition-all whitespace-nowrap ${checkFilter === f ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:bg-white'}`}>
                                       {f === 'PENDING' ? 'En Cartera' : f === 'DEPOSITED' ? 'Depositado' : f === 'REJECTED' ? 'Rechazado' : 'Todo'}
                                   </button>
                               ))}
@@ -264,7 +362,7 @@ const Treasury: React.FC = () => {
                   <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
                       <h3 className="font-black text-slate-800 uppercase tracking-tighter">Libro de Caja Unificado</h3>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto custom-scrollbar">
                       <table className="w-full text-left">
                           <thead className="bg-slate-900 text-white text-[9px] font-black uppercase tracking-[0.2em] sticky top-0">
                               <tr>
@@ -279,7 +377,7 @@ const Treasury: React.FC = () => {
                               {movements.map(m => (
                                   <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                                       <td className="px-8 py-5 text-[11px] font-bold text-slate-400">{m.date}</td>
-                                      <td className="px-8 py-5 text-[10px] font-black uppercase">
+                                      <td className="px-8 py-5 text-[10px] font-black uppercase truncate max-w-[150px]">
                                           {registers.find(r => r.id === m.cashRegisterId)?.name || 'S/D'}
                                       </td>
                                       <td className="px-8 py-5 font-black text-slate-800 uppercase text-[11px]">{m.description}</td>
@@ -296,6 +394,79 @@ const Treasury: React.FC = () => {
           )}
       </div>
 
+      {/* MODAL: NUEVA CAJA */}
+      {isNewRegisterModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                  <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg"><Plus size={24}/></div>
+                          <h3 className="font-black uppercase tracking-tighter text-xl">Nueva Caja</h3>
+                      </div>
+                      <button onClick={() => setIsNewRegisterModalOpen(false)}><X size={28}/></button>
+                  </div>
+                  <div className="p-10 space-y-6 bg-slate-50/50">
+                      <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Nombre Identificatorio</label>
+                          <input type="text" className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl outline-none font-black text-slate-800 uppercase focus:border-indigo-600 transition-all" placeholder="EJ: CAJA-05, TALLER, COBRO-WEB" value={newRegisterForm.name} onChange={e => setNewRegisterForm({...newRegisterForm, name: e.target.value})} />
+                      </div>
+                      <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-2">Saldo Inicial de Apertura ($)</label>
+                          <input type="number" className="w-full p-4 bg-white border-2 border-slate-200 rounded-2xl outline-none font-black text-2xl text-indigo-600 text-center" value={newRegisterForm.initialBalance || ''} onChange={e => setNewRegisterForm({...newRegisterForm, initialBalance: parseFloat(e.target.value) || 0})} />
+                      </div>
+                      <button onClick={handleCreateRegister} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase shadow-xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3">
+                          <Save size={20}/> Habilitar Caja
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL: TRANSFERENCIA */}
+      {isTransferModalOpen && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+              <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                  <div className="p-8 bg-emerald-600 text-white flex justify-between items-center">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-white/20 rounded-2xl shadow-lg"><ArrowRightLeft size={24}/></div>
+                          <h3 className="font-black uppercase tracking-tighter text-xl">Traslado de Fondos</h3>
+                      </div>
+                      <button onClick={() => setIsTransferModalOpen(false)}><X size={28}/></button>
+                  </div>
+                  <div className="p-10 space-y-6 bg-slate-50/50">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Caja Origen</label>
+                              <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-[10px] uppercase outline-none focus:ring-2 focus:ring-emerald-500" value={transferForm.sourceId} onChange={e => setTransferForm({...transferForm, sourceId: e.target.value})}>
+                                  <option value="">-- ORIGEN --</option>
+                                  {registers.map(r => <option key={r.id} value={r.id} disabled={!r.isOpen}>{r.name} - ${r.balance.toLocaleString()}</option>)}
+                              </select>
+                          </div>
+                          <div>
+                              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Caja Destino</label>
+                              <select className="w-full p-4 bg-white border border-gray-200 rounded-2xl font-black text-[10px] uppercase outline-none focus:ring-2 focus:ring-emerald-500" value={transferForm.destId} onChange={e => setTransferForm({...transferForm, destId: e.target.value})}>
+                                  <option value="">-- DESTINO --</option>
+                                  {registers.map(r => <option key={r.id} value={r.id} disabled={!r.isOpen}>{r.name} - ${r.balance.toLocaleString()}</option>)}
+                              </select>
+                          </div>
+                      </div>
+                      <div className="flex items-center justify-center p-4">
+                        <ArrowRight size={24} className="text-emerald-500 rotate-90 md:rotate-0"/>
+                      </div>
+                      <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Importe a Transferir ($)</label>
+                          <input type="number" className="w-full p-5 bg-white border-2 border-emerald-500 rounded-[2rem] font-black text-4xl text-center text-emerald-700 outline-none" placeholder="0.00" value={transferForm.amount || ''} onChange={e => setTransferForm({...transferForm, amount: parseFloat(e.target.value) || 0})} />
+                      </div>
+                      <div>
+                          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 ml-2">Notas (Opcional)</label>
+                          <input type="text" className="w-full p-4 bg-white border border-gray-200 rounded-2xl outline-none font-bold uppercase text-xs" placeholder="EJ: REFUERZO DE CAMBIO, PAGO PROVEEDOR..." value={transferForm.notes} onChange={e => setTransferForm({...transferForm, notes: e.target.value})} />
+                      </div>
+                      <button onClick={handleTransfer} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase shadow-2xl hover:bg-emerald-600 transition-all active:scale-95">Efectivizar Transferencia</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {isCheckModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
@@ -306,7 +477,7 @@ const Treasury: React.FC = () => {
                       </div>
                       <button onClick={() => setIsCheckModalOpen(false)}><X size={28}/></button>
                   </div>
-                  <div className="p-10 space-y-6 bg-slate-50/50">
+                  <div className="p-10 space-y-6 bg-slate-50/50 overflow-y-auto">
                       <div className="grid grid-cols-2 gap-4">
                           <button onClick={() => setCheckForm({...checkForm, type: 'FISICO'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${checkForm.type === 'FISICO' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>Cheque Físico</button>
                           <button onClick={() => setCheckForm({...checkForm, type: 'ECHEQ'})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${checkForm.type === 'ECHEQ' ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md' : 'border-gray-200 bg-white text-gray-400'}`}>E-Cheq Digital</button>
