@@ -66,7 +66,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.ANALYTICS]: { icon: BarChart3, label: "Panel Control", color: "bg-indigo-600" },
     [ViewState.INVENTORY]: { icon: Database, label: "Inventario", color: "bg-indigo-500" },
     [ViewState.PRICE_LISTS]: { icon: Tags, label: "Listas Precios", color: "bg-emerald-600" },
-    [ViewState.POS]: { icon: Receipt, label: "Caja (Venta)", color: "bg-emerald-500" },
+    [ViewState.POS]: { icon: Receipt, label: "Venta", color: "bg-emerald-500" },
     [ViewState.PURCHASES]: { icon: Truck, label: "Compras", color: "bg-blue-500" },
     [ViewState.TREASURY]: { icon: Wallet, label: "Finanzas", color: "bg-orange-500" },
     [ViewState.CLIENT_BALANCES]: { icon: DollarSign, label: "Ctas Ctes", color: "bg-emerald-600" },
@@ -74,8 +74,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.CLOUD_HUB]: { icon: Cloud, label: "Nube / Red", color: "bg-indigo-900" },
     [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop2, label: "Web Admin", color: "bg-pink-600" },
     [ViewState.ONLINE_SALES]: { icon: Globe2, label: "Hub Online", color: "bg-indigo-600" },
-    [ViewState.MARKETING]: { icon: Tag, label: "Marketing", color: "bg-purple-600" },
-    [ViewState.SHOP]: { icon: Globe, label: "Tienda Online", color: "bg-slate-800" },
+    [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-800" },
 };
 
 const App: React.FC = () => {
@@ -149,7 +148,7 @@ const App: React.FC = () => {
       case ViewState.POS: return <POS key={renderKey} initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
       case ViewState.PURCHASES: return <Purchases key={renderKey} />;
       case ViewState.TREASURY: return <Treasury key={renderKey} />;
-      case ViewState.CLIENTS: return <Clients key={renderKey} />;
+      case ViewState.CLIENTS: return <Clients key={renderKey} onOpenBalances={() => handleNavigate(ViewState.CLIENT_BALANCES)} />;
       case ViewState.CLIENT_BALANCES: return <ClientBalances key={renderKey} />;
       case ViewState.PROVIDER_BALANCES: return <ProviderBalances key={renderKey} />;
       case ViewState.REMITOS: return <Remitos key={renderKey} initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
@@ -157,6 +156,8 @@ const App: React.FC = () => {
       case ViewState.CLOUD_HUB: return <CloudHub key={renderKey} />;
       case ViewState.CONFIG_PANEL: return <ConfigPanel key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ACCOUNTING: return <Accounting key={renderKey} />;
+      case ViewState.REPORTS: return <Reports key={renderKey} />;
+      case ViewState.STATISTICS: return <Statistics key={renderKey} />;
       case ViewState.REPLENISHMENT: return <Replenishment key={renderKey} />;
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
@@ -165,7 +166,6 @@ const App: React.FC = () => {
       case ViewState.ONLINE_SALES: return <OnlineSales key={renderKey} />;
       case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin key={renderKey} />;
       case ViewState.SHOP: return <Shop key={renderKey} />;
-      
       case ViewState.COMPANY_SETTINGS: return <CompanySettings key={renderKey} />;
       case ViewState.AFIP_CONFIG: return <AfipConfig key={renderKey} />;
       case ViewState.USERS: return <UsersComponent key={renderKey} />;
@@ -176,7 +176,6 @@ const App: React.FC = () => {
       case ViewState.MASS_PRODUCT_UPDATE: return <MassProductUpdate key={renderKey} />;
       case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate key={renderKey} onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment key={renderKey} />;
-
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
@@ -209,20 +208,6 @@ const App: React.FC = () => {
                         </button>
                     );
                 })}
-            </div>
-            
-            <div className="flex items-center gap-4 px-4 h-full border-l border-white/10">
-                <div className="flex items-center gap-2 cursor-help group relative">
-                    <span className="text-[9px] font-black text-slate-500 uppercase">{localStorage.getItem('ferrecloud_terminal_name') || 'PC'}</span>
-                    <div className={`w-2 h-2 rounded-full ${cloudStatus === 'UP_TO_DATE' ? 'bg-green-500 animate-pulse' : cloudStatus === 'SYNCING' ? 'bg-indigo-500 animate-bounce' : 'bg-slate-700'}`}></div>
-                    <div className="absolute top-full right-0 mt-2 p-3 bg-slate-800 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 border border-white/10 z-[100]">
-                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1">Estado de Red</p>
-                        <p className="text-[10px] text-white font-medium">{cloudStatus === 'UP_TO_DATE' ? 'Sincronización Perfecta' : 'Actualizando datos...'}</p>
-                    </div>
-                </div>
-                <button onClick={() => handleNavigate(ViewState.CLOUD_HUB)} className="p-2 text-indigo-400 hover:text-white transition-colors">
-                    <Network size={18}/>
-                </button>
             </div>
         </header>
 
