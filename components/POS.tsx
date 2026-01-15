@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-    ShoppingCart, Printer, Trash2, Search, CheckCircle, 
-    Plus, Minus, X, RefreshCw, DollarSign, ShieldCheck, 
-    Receipt, User, CreditCard, Banknote, History
+    ShoppingCart, Trash2, Search, CheckCircle, 
+    Minus, Plus, RefreshCw
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CashRegister, CurrentAccountMovement } from '../types';
+import { InvoiceItem, Product, Client, CashRegister } from '../types';
 import { productDB } from '../services/storageService';
-import { syncService } from '../services/syncService';
 
 interface POSProps {
     initialCart?: InvoiceItem[];
     onCartUsed?: () => void;
-    // Fix: Added missing optional props used in SalesManagement.tsx
     onTransformToRemito?: (items: InvoiceItem[]) => void;
     onTransformToBudget?: (items: InvoiceItem[]) => void;
 }
 
-const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito, onTransformToBudget }) => {
+const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -64,7 +61,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         const saleId = `VEN-${Date.now().toString().slice(-6)}`;
         const date = new Date().toLocaleDateString();
 
-        // 1. IMPACTO EN STOCK
         for (const item of cart) {
             const p = await productDB.getById(item.product.id);
             if (p) {
@@ -74,7 +70,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             }
         }
 
-        // 2. IMPACTO EN CUENTA CORRIENTE (Si es CTACTE)
         if (paymentMethod === 'CTACTE' && selectedClient) {
             const allClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
             const updatedClients = allClients.map((c: Client) => 
@@ -96,7 +91,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
         }
 
-        // 3. IMPACTO EN TESORERIA (Si no es CTACTE)
         if (paymentMethod !== 'CTACTE') {
             const registers: CashRegister[] = JSON.parse(localStorage.getItem('ferrecloud_registers') || '[]');
             const activeReg = registers.find(r => r.isOpen);
@@ -106,13 +100,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             }
         }
 
-        // 4. REGISTRAR HISTORIAL DE VENTA
         const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
         history.unshift({ id: saleId, date, client: selectedClient?.name || 'Consumidor Final', total: cartTotal, method: paymentMethod });
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(history));
 
-        // 5. SINCRONIZAR CLOUD
-        await syncService.pushToCloud();
+        // Enviar pulso de sincronización mediante evento
+        window.dispatchEvent(new Event('ferrecloud_request_pulse'));
 
         setCart([]);
         setSelectedClient(null);
@@ -191,9 +184,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                         </td>
                                     </tr>
                                 ))}
-                                {cart.length === 0 && (
-                                    <tr><td colSpan={5} className="py-40 text-center text-slate-300 font-black uppercase tracking-widest opacity-30"><ShoppingCart size={64} className="mx-auto mb-4"/> Esperando Artículos</td></tr>
-                                )}
                             </tbody>
                         </table>
                     </div>
