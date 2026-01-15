@@ -1,10 +1,8 @@
-
 import { 
     collection, 
     addDoc, 
     onSnapshot, 
     query, 
-    where, 
     serverTimestamp, 
     orderBy, 
     limit 
@@ -28,6 +26,16 @@ class SyncService {
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
         if (this.vaultId) this.initFirebase();
+
+        // Listener para capturar peticiones de sincronización saliente (desde storage o POS)
+        window.addEventListener('ferrecloud_sync_out' as any, (e: CustomEvent) => {
+            this.pushDelta(e.detail.type, e.detail.payload);
+        });
+
+        // Listener para pulsos globales
+        window.addEventListener('ferrecloud_request_pulse' as any, () => {
+            this.pushToCloud();
+        });
     }
 
     private logActivity(type: 'IN' | 'OUT' | 'ERROR', description: string) {
@@ -55,19 +63,16 @@ class SyncService {
         if (!this.vaultId) return;
         if (this.unsubscribe) this.unsubscribe();
 
-        // Escuchar cambios de otras terminales (Deltas)
         const q = query(
             collection(db, "vaults", this.vaultId, "deltas"),
             orderBy("createdAt", "desc"),
-            limit(1) // Solo el último cambio para evitar sobrecarga inicial
+            limit(1)
         );
 
         this.unsubscribe = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
                 if (change.type === "added") {
                     const data = change.doc.data();
-                    
-                    // Si el cambio lo generó esta misma terminal, ignorarlo
                     if (data.sid === this.sessionId) return;
 
                     const { type, payload } = data;
@@ -75,7 +80,7 @@ class SyncService {
                     try {
                         switch (type) {
                             case 'PRODUCT_UPDATE':
-                                await productDB.save(payload, true); // true indica que es sync remoto
+                                await productDB.save(payload, true);
                                 this.logActivity('IN', `Actualizado: ${payload.name}`);
                                 break;
                             case 'PRODUCT_DELETE':
@@ -128,17 +133,14 @@ class SyncService {
         }
     }
 
-    // Fix: added pushToCloud method to trigger a global sync pulse across all connected terminals
     async pushToCloud() {
         if (!this.vaultId) return;
         await this.pushDelta('SYNC_PULSE', { timestamp: Date.now() });
     }
 
-    // Fix: added syncFromRemote method to manually trigger a data refresh from the cloud storage
     async syncFromRemote(): Promise<boolean> {
         if (!this.vaultId) return false;
         this.logActivity('IN', 'Sincronización manual solicitada...');
-        // Dispatching the pulse locally triggers components to reload their state from storage/IndexedDB
         window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
             detail: { status: 'OK', engine: 'FIREBASE' } 
         }));
