@@ -1,9 +1,9 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
 /**
- * Configuración oficial de Firebase para el sistema de gestión.
- * Estos datos habilitan la sincronización en tiempo real entre terminales.
+ * Configuración oficial de Firebase para el sistema 'sistemagestionbruzzone'.
+ * Se utiliza exportación directa para evitar errores de resolución en el build.
  */
 const firebaseConfig = {
   apiKey: "AIzaSyCzBPwTL4idkBKgDLVwOW3TlqjIpkZLULA",
@@ -15,6 +15,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db: Firestore = getFirestore(app);
 
-export { db };
+// Exportación directa para máxima compatibilidad con Vite/Rollup
+export const db = getFirestore(app);
