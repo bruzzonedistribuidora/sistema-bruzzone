@@ -82,6 +82,7 @@ const App: React.FC = () => {
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
+  const [selectedClientForPortal, setSelectedClientForPortal] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
   
@@ -163,7 +164,32 @@ const App: React.FC = () => {
         );
       case ViewState.PURCHASES: return <Purchases key={renderKey} />;
       case ViewState.TREASURY: return <Treasury key={renderKey} />;
-      case ViewState.CLIENTS: return <Clients key={renderKey} onOpenBalances={() => handleNavigate(ViewState.CLIENT_BALANCES)} />;
+      case ViewState.CLIENTS: 
+        return (
+            <Clients 
+                key={renderKey} 
+                onOpenBalances={() => handleNavigate(ViewState.CLIENT_BALANCES)} 
+                onOpenPortal={(client) => {
+                    setSelectedClientForPortal(client);
+                    handleNavigate(ViewState.CUSTOMER_PORTAL);
+                }}
+            />
+        );
+      case ViewState.CUSTOMER_PORTAL: 
+        if (!selectedClientForPortal) {
+            handleNavigate(ViewState.CLIENTS);
+            return null;
+        }
+        return (
+            <CustomerPortal 
+                key={renderKey} 
+                client={selectedClientForPortal} 
+                onLogout={() => {
+                    setSelectedClientForPortal(null);
+                    handleNavigate(ViewState.CLIENTS);
+                }} 
+            />
+        );
       case ViewState.CLIENT_BALANCES: return <ClientBalances key={renderKey} />;
       case ViewState.PROVIDER_BALANCES: return <ProviderBalances key={renderKey} />;
       case ViewState.REMITOS: return <Remitos key={renderKey} initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
