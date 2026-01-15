@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ShoppingCart, Trash2, Search, CheckCircle, 
-    Minus, Plus, RefreshCw
+    Minus, Plus, RefreshCw, PlusCircle, Package, Truck, Landmark, CreditCard, Banknote, FileText, Smartphone as ECheqIcon, X
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CashRegister } from '../types';
-import { productDB } from '../services/storageService';
+import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 interface POSProps {
     initialCart?: InvoiceItem[];
@@ -19,8 +20,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CTACTE'>('EFECTIVO');
+    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
+    
+    const [showManualModal, setShowManualModal] = useState(false);
+    const [manualForm, setManualForm] = useState({ name: '', price: '' });
 
     useEffect(() => {
         if (initialCart) {
@@ -54,6 +58,22 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         setSearchResults([]);
     };
 
+    const addManualItem = () => {
+        if (!manualForm.name || !manualForm.price) return;
+        const price = parseFloat(manualForm.price) || 0;
+        const mockProduct = {
+            id: `MANUAL-${Date.now()}`,
+            name: manualForm.name.toUpperCase(),
+            priceFinal: price,
+            internalCodes: ['NO-LISTADO'],
+            stock: 0,
+            costAfterDiscounts: price * 0.7
+        } as Product;
+        setCart(prev => [...prev, { product: mockProduct, quantity: 1, appliedPrice: price, subtotal: price }]);
+        setShowManualModal(false);
+        setManualForm({ name: '', price: '' });
+    };
+
     const handleFinalizeSale = async () => {
         if (cart.length === 0) return;
         setIsProcessing(true);
@@ -76,41 +96,17 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                 c.id === selectedClient.id ? { ...c, balance: c.balance + cartTotal } : c
             );
             localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
-
-            const movements = JSON.parse(localStorage.getItem('ferrecloud_movements') || '[]');
-            movements.push({
-                id: `MOV-${Date.now()}`,
-                clientId: selectedClient.id,
-                date,
-                voucherType: 'TICKET DE VENTA',
-                description: `Venta #${saleId} en Cuenta Corriente`,
-                debit: cartTotal,
-                credit: 0,
-                balance: (selectedClient.balance + cartTotal)
-            });
-            localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
-        }
-
-        if (paymentMethod !== 'CTACTE') {
-            const registers: CashRegister[] = JSON.parse(localStorage.getItem('ferrecloud_registers') || '[]');
-            const activeReg = registers.find(r => r.isOpen);
-            if (activeReg) {
-                activeReg.balance += cartTotal;
-                localStorage.setItem('ferrecloud_registers', JSON.stringify(registers));
-            }
         }
 
         const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
         history.unshift({ id: saleId, date, client: selectedClient?.name || 'Consumidor Final', total: cartTotal, method: paymentMethod });
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(history));
 
-        // Enviar pulso de sincronización mediante evento
         window.dispatchEvent(new Event('ferrecloud_request_pulse'));
-
         setCart([]);
         setSelectedClient(null);
         setIsProcessing(false);
-        alert(`✅ Venta #${saleId} finalizada con éxito.`);
+        alert(`✅ Venta #${saleId} finalizada exitosamente.`);
     };
 
     return (
@@ -131,7 +127,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                     <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 hover:bg-indigo-50 rounded-2xl flex justify-between items-center transition-colors border-b last:border-0">
                                         <div className="text-left">
                                             <p className="font-black text-xs uppercase">{p.name}</p>
-                                            <p className="text-[8px] font-bold text-indigo-500">REF: {p.internalCodes[0]} • STOCK: {p.stock}</p>
+                                            <p className="text-[8px] font-bold text-indigo-500">SKU: {p.internalCodes[0]} • STOCK: {p.stock}</p>
                                         </div>
                                         <p className="font-black text-indigo-600 text-sm">${p.priceFinal.toLocaleString()}</p>
                                     </button>
@@ -139,6 +135,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                             </div>
                         )}
                     </div>
+                    <button onClick={() => setShowManualModal(true)} className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-indigo-600 transition-all flex items-center gap-2 font-black text-xs uppercase">
+                        <PlusCircle size={20}/> Ítem Libre
+                    </button>
                     <select className="w-64 p-4 bg-white border-2 border-slate-200 rounded-2xl font-black text-xs uppercase" value={selectedClient?.id || ''} onChange={e => setSelectedClient(clients.find(c => c.id === e.target.value) || null)}>
                         <option value="">CONSUMIDOR FINAL</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -154,12 +153,12 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                     <th className="px-8 py-5 text-center">Cant.</th>
                                     <th className="px-8 py-5 text-right">Precio</th>
                                     <th className="px-8 py-5 text-right">Subtotal</th>
-                                    <th className="px-8 py-5 text-center w-10"></th>
+                                    <th className="px-8 py-5 text-center">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {cart.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={idx} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-8 py-4">
                                             <p className="font-black text-slate-800 text-xs uppercase">{item.product.name}</p>
                                             <p className="text-[9px] font-mono text-slate-400">SKU: {item.product.internalCodes[0]}</p>
@@ -180,7 +179,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                         <td className="px-8 py-4 text-right font-bold text-slate-400">${item.appliedPrice.toLocaleString()}</td>
                                         <td className="px-8 py-4 text-right font-black text-slate-900 text-base">${item.subtotal.toLocaleString()}</td>
                                         <td className="px-8 py-4">
-                                            <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                                            <div className="flex justify-center gap-2">
+                                                <button title="Enviar a Reposición" onClick={() => addToReplenishmentQueue(item.product)} className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"><Truck size={16}/></button>
+                                                <button onClick={() => setCart(cart.filter((_, i) => i !== idx))} className="p-2 text-slate-300 hover:text-red-500"><Trash2 size={16}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -192,12 +194,19 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
 
             <div className="w-96 flex flex-col gap-4">
                 <div className="bg-slate-950 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden flex-1 border-t-4 border-indigo-600">
-                    <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 border-b border-white/10 pb-6">Resumen de Caja</h3>
+                    <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 border-b border-white/10 pb-6">Resumen y Pago</h3>
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-2">
-                            {['EFECTIVO', 'TARJETA', 'TRANSFERENCIA', 'CTACTE'].map(m => (
-                                <button key={m} onClick={() => setPaymentMethod(m as any)} className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${paymentMethod === m ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'}`}>
-                                    {m}
+                            {[
+                                { id: 'EFECTIVO', icon: Banknote },
+                                { id: 'TARJETA', icon: CreditCard },
+                                { id: 'TRANSFERENCIA', icon: Landmark },
+                                { id: 'CTACTE', icon: FileText },
+                                { id: 'CHEQUE', icon: FileText },
+                                { id: 'ECHEQ', icon: ECheqIcon },
+                            ].map(m => (
+                                <button key={m.id} onClick={() => setPaymentMethod(m.id as any)} className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-2 ${paymentMethod === m.id ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'}`}>
+                                    <m.icon size={14}/> {m.id}
                                 </button>
                             ))}
                         </div>
@@ -210,11 +219,34 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                 <button 
                     onClick={handleFinalizeSale}
                     disabled={cart.length === 0 || isProcessing}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
+                    className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
                     {isProcessing ? <RefreshCw className="animate-spin"/> : <CheckCircle size={24}/>} 
-                    {isProcessing ? 'Finalizando...' : 'FINALIZAR COBRO'}
+                    {isProcessing ? 'Procesando...' : 'FINALIZAR VENTA'}
                 </button>
             </div>
+
+            {/* MODAL ARTÍCULO MANUAL */}
+            {showManualModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+                            <h3 className="font-black uppercase text-sm tracking-widest">Carga Manual</h3>
+                            <button onClick={() => setShowManualModal(false)}><X size={24}/></button>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Descripción del Ítem</label>
+                                <input type="text" className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none font-bold uppercase" value={manualForm.name} onChange={e => setManualForm({...manualForm, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 ml-1">Precio Final ($)</label>
+                                <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none font-black text-2xl text-indigo-600" value={manualForm.price} onChange={e => setManualForm({...manualForm, price: e.target.value})} />
+                            </div>
+                            <button onClick={addManualItem} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all">Añadir al Carrito</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
