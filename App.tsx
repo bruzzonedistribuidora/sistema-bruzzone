@@ -145,14 +145,29 @@ const App: React.FC = () => {
       case ViewState.ANALYTICS: return <AnalyticsDashboard key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory key={renderKey} />;
       case ViewState.PRICE_LISTS: return <PriceLists key={renderKey} />;
-      case ViewState.POS: return <POS key={renderKey} initialCart={itemsToBill || undefined} onCartUsed={() => setItemsToBill(null)} />;
+      case ViewState.POS: 
+        return (
+            <POS 
+                key={renderKey} 
+                initialCart={itemsToBill || undefined} 
+                onCartUsed={() => setItemsToBill(null)} 
+                onTransformToRemito={(items) => {
+                    setItemsToBill(items);
+                    handleNavigate(ViewState.REMITOS);
+                }}
+                onTransformToBudget={(items) => {
+                    setItemsToBill(items);
+                    handleNavigate(ViewState.PRESUPUESTOS);
+                }}
+            />
+        );
       case ViewState.PURCHASES: return <Purchases key={renderKey} />;
       case ViewState.TREASURY: return <Treasury key={renderKey} />;
       case ViewState.CLIENTS: return <Clients key={renderKey} onOpenBalances={() => handleNavigate(ViewState.CLIENT_BALANCES)} />;
       case ViewState.CLIENT_BALANCES: return <ClientBalances key={renderKey} />;
       case ViewState.PROVIDER_BALANCES: return <ProviderBalances key={renderKey} />;
       case ViewState.REMITOS: return <Remitos key={renderKey} initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos key={renderKey} />;
+      case ViewState.PRESUPUESTOS: return <Presupuestos key={renderKey} initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
       case ViewState.CLOUD_HUB: return <CloudHub key={renderKey} />;
       case ViewState.CONFIG_PANEL: return <ConfigPanel key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ACCOUNTING: return <Accounting key={renderKey} />;
