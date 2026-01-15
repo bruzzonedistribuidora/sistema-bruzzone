@@ -164,10 +164,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
             <nav className="flex-1 p-3 space-y-1">
                 <NavItem view={ViewState.DASHBOARD} label="Escritorio" icon={LayoutDashboard} active={activeView === ViewState.DASHBOARD} onClick={() => handleNav(ViewState.DASHBOARD)} />
                 <NavItem view={ViewState.CLOUD_HUB} label="Nube / Red LAN" icon={Network} active={activeView === ViewState.CLOUD_HUB} onClick={() => handleNav(ViewState.CLOUD_HUB)} />
-                <NavItem view={ViewState.ANALYTICS} label="Dashboard" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
+                <NavItem view={ViewState.ANALYTICS} label="Panel Control" icon={BarChart3} active={activeView === ViewState.ANALYTICS} onClick={() => handleNav(ViewState.ANALYTICS)} />
                 
-                <NavDropdown id="ventas" label="Ventas" icon={Receipt}>
-                    {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="Caja (POS)" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
+                <NavDropdown id="ventas" label="Comercial" icon={Receipt}>
+                    {isModuleEnabled(ViewState.POS) && <DropdownItem view={ViewState.POS} label="Venta" icon={Receipt} active={activeView === ViewState.POS} onClick={() => handleNav(ViewState.POS)} />}
                     {isModuleEnabled(ViewState.CLIENT_BALANCES) && <DropdownItem view={ViewState.CLIENT_BALANCES} label="Cuentas Ctes" icon={DollarSign} active={activeView === ViewState.CLIENT_BALANCES} onClick={() => handleNav(ViewState.CLIENT_BALANCES)} />}
                     {isModuleEnabled(ViewState.REMITOS) && <DropdownItem view={ViewState.REMITOS} label="Remitos" icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => handleNav(ViewState.REMITOS)} />}
                     {isModuleEnabled(ViewState.PRESUPUESTOS) && <DropdownItem view={ViewState.PRESUPUESTOS} label="Presupuestos" icon={FileSpreadsheet} active={activeView === ViewState.PRESUPUESTOS} onClick={() => handleNav(ViewState.PRESUPUESTOS)} />}
@@ -183,10 +183,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                 <NavDropdown id="inventario" label="Stock" icon={Database}>
                     {isModuleEnabled(ViewState.INVENTORY) && <DropdownItem view={ViewState.INVENTORY} label="Maestro Art." icon={Database} active={activeView === ViewState.INVENTORY} onClick={() => handleNav(ViewState.INVENTORY)} />}
                     {isModuleEnabled(ViewState.PRICE_LISTS) && <DropdownItem view={ViewState.PRICE_LISTS} label="Listas Precios" icon={Tags} active={activeView === ViewState.PRICE_LISTS} onClick={() => handleNav(ViewState.PRICE_LISTS)} />}
-                    {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Actualizar Excel" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
+                    {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Excel Stock" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
                     {isModuleEnabled(ViewState.STOCK_ADJUSTMENT) && <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajustes" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />}
                     {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos Prov." icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
-                    {isModuleEnabled(ViewState.PRICE_UPDATES) && <DropdownItem view={ViewState.PRICE_UPDATES} label="Actualizar Costos" icon={Layers} active={activeView === ViewState.PRICE_UPDATES} onClick={() => handleNav(ViewState.PRICE_UPDATES)} />}
                 </NavDropdown>
 
                 <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
@@ -201,14 +200,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                     <NavItem view={ViewState.CONFIG_PANEL} label="Ajustes Sistema" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => handleNav(ViewState.CONFIG_PANEL)} />
                 </div>
             </nav>
-
-            <div className="p-4 mt-auto">
-                <div className="bg-slate-900 rounded-2xl p-4 text-white relative overflow-hidden group cursor-pointer shadow-xl" onClick={() => handleNav(ViewState.SHOP)}>
-                    <div className="absolute top-0 right-0 p-2 opacity-10"><Globe size={40}/></div>
-                    <p className="text-[8px] font-black uppercase text-indigo-400 tracking-widest mb-1">Mi Tienda Online</p>
-                    <h4 className="text-[10px] font-black uppercase">Ver Web Propia</h4>
-                </div>
-            </div>
         </div>
     );
 };
