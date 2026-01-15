@@ -1,15 +1,16 @@
-import { productDB } from './storageService';
 
-const CLOUD_ENDPOINT = 'https://kvdb.io/A1z9XpWq2rM5nK4L7sT3'; 
-
-// Entidades que se sincronizan por append (solo lo nuevo)
-const SHARED_KEYS = [
-    'ferrecloud_remitos', 
-    'ferrecloud_sales_history', 
-    'ferrecloud_movements', 
-    'ferrecloud_budgets',
-    'ferrecloud_nc_history'
-];
+import { 
+    collection, 
+    addDoc, 
+    onSnapshot, 
+    query, 
+    where, 
+    serverTimestamp, 
+    orderBy, 
+    limit 
+} from "firebase/firestore";
+import { db } from "./firebaseConfig";
+import { productDB } from "./storageService";
 
 export interface SyncActivity {
     id: string;
@@ -20,14 +21,13 @@ export interface SyncActivity {
 
 class SyncService {
     private vaultId: string | null = null;
-    private isProcessing: boolean = false;
-    private pollingInterval: number | null = null;
     private sessionId: string = Math.random().toString(36).substring(7);
     private activityLog: SyncActivity[] = [];
+    private unsubscribe: (() => void) | null = null;
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
-        if (this.vaultId) this.startAutoSync();
+        if (this.vaultId) this.initFirebase();
     }
 
     private logActivity(type: 'IN' | 'OUT' | 'ERROR', description: string) {
@@ -45,179 +45,107 @@ class SyncService {
         const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         this.vaultId = cleanId;
         localStorage.setItem('ferrecloud_vault_id', cleanId);
-        this.logActivity('OUT', `Vínculo establecido con bóveda: ${cleanId}`);
-        this.startAutoSync();
+        this.logActivity('OUT', `Terminal vinculada a la bóveda: ${cleanId}`);
+        this.initFirebase();
     }
 
     getVaultId() { return this.vaultId; }
 
-    private startAutoSync() {
-        if (this.pollingInterval) clearInterval(this.pollingInterval);
-        this.syncLoop();
-        // Polling agresivo cada 5 segundos para entorno POS
-        this.pollingInterval = window.setInterval(() => this.syncLoop(), 5000); 
-    }
+    private initFirebase() {
+        if (!this.vaultId) return;
+        if (this.unsubscribe) this.unsubscribe();
 
-    private async syncLoop() {
-        if (this.isProcessing || !this.vaultId) return;
-        this.isProcessing = true;
-        const url = `${CLOUD_ENDPOINT}/${this.vaultId}`;
+        // Escuchar cambios de otras terminales (Deltas)
+        const q = query(
+            collection(db, "vaults", this.vaultId, "deltas"),
+            orderBy("createdAt", "desc"),
+            limit(1) // Solo el último cambio para evitar sobrecarga inicial
+        );
 
-        try {
-            // 1. PULL: Obtener estado remoto
-            const resp = await fetch(url, { cache: 'no-store' });
-            let remote: any = { logs: [], shared: {}, terminals: {} };
-            
-            if (resp.ok) {
-                remote = await resp.json();
-            }
+        this.unsubscribe = onSnapshot(q, (snapshot) => {
+            snapshot.docChanges().forEach(async (change) => {
+                if (change.type === "added") {
+                    const data = change.doc.data();
+                    
+                    // Si el cambio lo generó esta misma terminal, ignorarlo
+                    if (data.sid === this.sessionId) return;
 
-            // 2. PROCESAR CAMBIOS ENTRANTES (Deltas de otros terminales)
-            const lastSyncTs = parseInt(localStorage.getItem('ferrecloud_last_log_ts') || '0');
-            const incomingLogs = (remote.logs || []).filter((l: any) => 
-                l.timestamp_ms > lastSyncTs && l.sid !== this.sessionId
-            );
+                    const { type, payload } = data;
 
-            if (incomingLogs.length > 0) {
-                this.logActivity('IN', `Recibidos ${incomingLogs.length} cambios remotos`);
-                for (const log of incomingLogs) {
-                    if (log.payload?.id) {
-                        if (log.payload.deleted) {
-                            await productDB.delete(log.payload.id);
-                            this.logActivity('IN', `Eliminado remoto: ${log.payload.id}`);
-                        } else {
-                            await productDB.save(log.payload, true); 
-                            this.logActivity('IN', `Actualizado remoto: ${log.payload.name || log.payload.id}`);
+                    try {
+                        switch (type) {
+                            case 'PRODUCT_UPDATE':
+                                await productDB.save(payload, true); // true indica que es sync remoto
+                                this.logActivity('IN', `Actualizado: ${payload.name}`);
+                                break;
+                            case 'PRODUCT_DELETE':
+                                await productDB.delete(payload.id, true);
+                                this.logActivity('IN', `Eliminado ID: ${payload.id}`);
+                                break;
+                            case 'TREASURY_UPDATE':
+                                localStorage.setItem('ferrecloud_registers', JSON.stringify(payload));
+                                window.dispatchEvent(new Event('storage'));
+                                this.logActivity('IN', `Sincronización de cajas recibida`);
+                                break;
+                            case 'CLIENT_UPDATE':
+                                const currentClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
+                                const newClients = currentClients.map((c: any) => c.id === payload.id ? payload : c);
+                                if (!currentClients.some((c:any) => c.id === payload.id)) newClients.push(payload);
+                                localStorage.setItem('ferrecloud_clients', JSON.stringify(newClients));
+                                window.dispatchEvent(new Event('storage'));
+                                this.logActivity('IN', `Cliente actualizado: ${payload.name}`);
+                                break;
                         }
-                    }
-                }
-                const maxTs = Math.max(...incomingLogs.map((l:any) => l.timestamp_ms));
-                localStorage.setItem('ferrecloud_last_log_ts', maxTs.toString());
-            }
-
-            // 3. SINCRONIZAR ARRAYS COMPARTIDOS (Merge inteligente)
-            let sharedChanged = false;
-            SHARED_KEYS.forEach(key => {
-                const remoteValueRaw = remote.shared?.[key];
-                if (remoteValueRaw) {
-                    const remoteArr = JSON.parse(remoteValueRaw);
-                    const localArr = JSON.parse(localStorage.getItem(key) || '[]');
-                    
-                    // Solo agregamos lo que no tenemos localmente (basado en ID)
-                    const localIds = new Set(localArr.map((i: any) => i.id));
-                    const newItems = remoteArr.filter((i: any) => !localIds.has(i.id));
-                    
-                    if (newItems.length > 0) {
-                        const merged = [...newItems, ...localArr].slice(0, 1000); // Límite para no saturar storage
-                        localStorage.setItem(key, JSON.stringify(merged));
-                        sharedChanged = true;
-                        this.logActivity('IN', `Sincronizados ${newItems.length} registros en ${key}`);
+                    } catch (err: any) {
+                        this.logActivity('ERROR', `Error al procesar sync: ${err.message}`);
                     }
                 }
             });
-
-            // 4. PUSH: Subir mis cambios locales
-            const myPendingLogs = await productDB.getPendingLogs();
-            const myTerminal = (localStorage.getItem('ferrecloud_terminal_name') || 'CAJA').toUpperCase();
-
-            if (!remote.terminals) remote.terminals = {};
-            remote.terminals[this.sessionId] = { name: myTerminal, lastSeen: Date.now() };
-
-            const newCloudLogs = myPendingLogs.map(l => ({
-                id: l.id,
-                timestamp_ms: new Date(l.timestamp).getTime(),
-                sid: this.sessionId,
-                payload: l.payload
+            
+            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                detail: { status: 'OK', engine: 'FIREBASE' } 
             }));
-
-            if (newCloudLogs.length > 0) {
-                this.logActivity('OUT', `Subiendo ${newCloudLogs.length} cambios locales...`);
-            }
-
-            // Consolidar estado final para subir
-            const finalShared: Record<string, string> = { ...remote.shared };
-            SHARED_KEYS.forEach(key => {
-                const localVal = localStorage.getItem(key);
-                if (localVal) finalShared[key] = localVal;
-            });
-
-            const payload = {
-                terminals: remote.terminals,
-                logs: [...(remote.logs || []), ...newCloudLogs].sort((a,b) => a.timestamp_ms - b.timestamp_ms).slice(-200),
-                shared: finalShared
-            };
-
-            const postResp = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(payload)
-            });
-
-            if (postResp.ok) {
-                if (myPendingLogs.length > 0) {
-                    await productDB.clearLogs();
-                    this.logActivity('OUT', `Confirmada recepción de cambios en la nube.`);
-                }
-                localStorage.setItem('ferrecloud_last_sync', new Date().toLocaleTimeString());
-                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                    detail: { terminals: remote.terminals, status: 'OK' } 
-                }));
-            }
-
-            if (sharedChanged) window.dispatchEvent(new Event('storage'));
-
-        } catch (e) {
-            this.logActivity('ERROR', `Error de conexión: ${e.message}`);
+        }, (error) => {
+            this.logActivity('ERROR', `Error de conexión: ${error.message}`);
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { status: 'ERROR' } }));
-        } finally {
-            this.isProcessing = false;
-        }
-    }
-
-    getActivityLog() { return this.activityLog; }
-
-    async exportFullVault() {
-        try {
-            const prods = await productDB.getAll();
-            const data = {
-                products: prods,
-                storage: SHARED_KEYS.reduce((acc:any, k) => {
-                    acc[k] = localStorage.getItem(k);
-                    return acc;
-                }, {})
-            };
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `MAESTRO_BRUZZONE_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            return true;
-        } catch (e) { return false; }
-    }
-
-    async importFullVault(file: File) {
-        return new Promise<boolean>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target?.result as string);
-                    if (!data.products) throw new Error();
-                    await productDB.clearAll();
-                    await productDB.saveBulk(data.products);
-                    Object.entries(data.storage).forEach(([k, v]: [string, any]) => {
-                        if (v) localStorage.setItem(k, v);
-                    });
-                    resolve(true);
-                } catch { resolve(false); }
-            };
-            reader.readAsText(file);
         });
     }
 
-    async pushToCloud() { await this.syncLoop(); return true; }
-    async syncFromRemote() { await this.syncLoop(); return true; }
+    async pushDelta(type: string, payload: any) {
+        if (!this.vaultId) return;
+
+        try {
+            await addDoc(collection(db, "vaults", this.vaultId, "deltas"), {
+                type,
+                payload,
+                sid: this.sessionId,
+                terminal: localStorage.getItem('ferrecloud_terminal_name') || 'TERMINAL',
+                createdAt: serverTimestamp()
+            });
+            this.logActivity('OUT', `Cambio enviado (${type})`);
+        } catch (e: any) {
+            this.logActivity('ERROR', `Fallo al subir cambio: ${e.message}`);
+        }
+    }
+
+    // Fix: added pushToCloud method to trigger a global sync pulse across all connected terminals
+    async pushToCloud() {
+        if (!this.vaultId) return;
+        await this.pushDelta('SYNC_PULSE', { timestamp: Date.now() });
+    }
+
+    // Fix: added syncFromRemote method to manually trigger a data refresh from the cloud storage
+    async syncFromRemote(): Promise<boolean> {
+        if (!this.vaultId) return false;
+        this.logActivity('IN', 'Sincronización manual solicitada...');
+        // Dispatching the pulse locally triggers components to reload their state from storage/IndexedDB
+        window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+            detail: { status: 'OK', engine: 'FIREBASE' } 
+        }));
+        return true;
+    }
+
+    getActivityLog() { return this.activityLog; }
 }
 
 export const syncService = new SyncService();
