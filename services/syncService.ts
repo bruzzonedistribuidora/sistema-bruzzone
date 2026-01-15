@@ -60,7 +60,7 @@ class SyncService {
     getVaultId() { return this.vaultId; }
 
     private initFirebase() {
-        if (!this.vaultId) return;
+        if (!this.vaultId || !db) return;
         if (this.unsubscribe) this.unsubscribe();
 
         const q = query(
@@ -117,7 +117,7 @@ class SyncService {
     }
 
     async pushDelta(type: string, payload: any) {
-        if (!this.vaultId) return;
+        if (!this.vaultId || !db) return;
 
         try {
             await addDoc(collection(db, "vaults", this.vaultId, "deltas"), {
