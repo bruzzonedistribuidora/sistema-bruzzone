@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, CreditInstallment } from "../types";
 
@@ -8,13 +7,26 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
     const model = 'gemini-3-flash-preview';
     let prompt = `Busca las tasas de interés vigentes para cobros con tarjeta en "${platformName}" Argentina (Planes 1, 3, 6, 12 cuotas).`;
     if (targetUrl) prompt += ` Prioriza esta URL: ${targetUrl}`;
-    prompt += ` Devuelve JSON: [{ "installments": número, "surcharge": porcentaje, "label": "Descripción" }]`;
 
-    const response = await ai.models.generateContent({
+    // Fix: Remove responseMimeType and responseSchema when using googleSearch tool as per guidelines
+    const searchResponse = await ai.models.generateContent({
       model,
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }],
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const searchResultText = searchResponse.text || "";
+    const sources = searchResponse.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
+
+    // Fix: Perform a secondary call without search to safely format the grounded text into JSON
+    const formatResponse = await ai.models.generateContent({
+      model,
+      contents: `Extrae las cuotas y recargos del siguiente texto y devuelve exclusivamente un JSON array con objetos { "installments": número, "surcharge": porcentaje, "label": "Descripción" }.\n\nTexto:\n${searchResultText}`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -31,11 +43,7 @@ export const fetchLatestFinancingRates = async (platformName: string, targetUrl?
       }
     });
 
-    const installments = JSON.parse(response.text || "[]");
-    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-      ?.filter(chunk => chunk.web)
-      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
-
+    const installments = JSON.parse(formatResponse.text || "[]");
     return { installments: installments.map((inst: any) => ({ ...inst, id: `ai-${Math.random()}` })), sources };
   } catch (error) {
     console.error("Error AI Rates:", error);
@@ -164,13 +172,28 @@ export const askAssistant = async (history: string[], question: string): Promise
 export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina. Devuelve estrictamente JSON con razonSocial, domicilio y condicionIva.`;
+    const model = 'gemini-3-flash-preview';
+    const prompt = `Realiza una búsqueda profunda en Google para encontrar los datos fiscales del CUIT: "${cuit}" en Argentina.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+    // Fix: Remove responseMimeType and responseSchema when using googleSearch tool as per guidelines
+    const searchResponse = await ai.models.generateContent({
+      model,
       contents: prompt,
       config: { 
-        tools: [{ googleSearch: {} }],
+        tools: [{ googleSearch: {} }]
+      }
+    });
+
+    const searchResultText = searchResponse.text || "";
+    const sources = searchResponse.candidates?.[0]?.groundingMetadata?.groundingChunks
+      ?.filter(chunk => chunk.web)
+      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
+
+    // Fix: Perform a secondary call without search to safely format the grounded text into JSON
+    const formatResponse = await ai.models.generateContent({
+      model,
+      contents: `Extrae los datos fiscales (razonSocial, domicilio, condicionIva) del siguiente texto y devuelve estrictamente JSON.\n\nTexto:\n${searchResultText}`,
+      config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -184,11 +207,7 @@ export const fetchCompanyByCuit = async (cuit: string): Promise<any> => {
       }
     });
 
-    const result = JSON.parse(response.text || '{}');
-    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks
-      ?.filter(chunk => chunk.web)
-      ?.map(chunk => ({ title: String(chunk.web?.title || 'Fuente'), uri: String(chunk.web?.uri) })) || [];
-
+    const result = JSON.parse(formatResponse.text || '{}');
     if (!result.razonSocial) return null;
     return { ...result, sources };
   } catch (error) { 
