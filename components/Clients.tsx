@@ -23,7 +23,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal, onOpen
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
   const [isSearchingCuit, setIsSearchingCuit] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  // Fix: added missing state for editingClient
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [modalTab, setModalTab] = useState<'GENERAL' | 'CLIENT' | 'CONTACTS' | 'MOVEMENTS'>('GENERAL');
   
@@ -70,13 +69,12 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal, onOpen
                     />
                 </div>
             </div>
-            {/* Fix: Clear editingClient when starting a new client addition */}
             <button onClick={() => { setEditingClient(null); setIsEditing(false); setIsNewClientModalOpen(true); }} className="bg-indigo-600 text-white px-8 py-3.5 rounded-2xl flex items-center gap-3 font-black shadow-xl hover:bg-indigo-700 transition-all uppercase text-xs tracking-widest">
                 <Plus size={20} /> Nuevo Cliente
             </button>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 hidden flex flex-col">
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <table className="w-full text-left">
                     <thead className="bg-slate-900 text-[10px] text-slate-300 uppercase font-black tracking-widest sticky top-0 z-10">
@@ -87,7 +85,16 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal, onOpen
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {filteredClients.map(client => (
+                        {filteredClients.length === 0 ? (
+                            <tr>
+                                <td colSpan={3} className="py-32 text-center">
+                                    <div className="flex flex-col items-center opacity-20">
+                                        <Users size={64} strokeWidth={1} className="mb-4" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest">No hay clientes registrados</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : filteredClients.map(client => (
                             <tr key={client.id} className="hover:bg-slate-50 transition-colors group">
                                 <td className="px-8 py-5">
                                     <div className="font-black text-slate-800 text-sm uppercase leading-none mb-1.5">{client.name}</div>
@@ -100,7 +107,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal, onOpen
                                     <div className="flex justify-center gap-2">
                                         <button onClick={onOpenBalances} title="Ver Cuenta Corriente" className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all"><DollarSign size={18}/></button>
                                         <button onClick={() => onOpenPortal?.(client)} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all"><Globe size={18}/></button>
-                                        {/* Fix: changed setEditingUser to setEditingClient */}
                                         <button onClick={() => { setEditingClient(client); setIsEditing(true); setIsNewClientModalOpen(true); }} className="p-3 bg-slate-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all"><Pencil size={18}/></button>
                                     </div>
                                 </td>
@@ -110,7 +116,6 @@ const Clients: React.FC<ClientsProps> = ({ initialClientId, onOpenPortal, onOpen
                 </table>
             </div>
         </div>
-        {/* ... (Modal de nuevo cliente se mantiene similar) */}
     </div>
   );
 };
