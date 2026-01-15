@@ -2,7 +2,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ShoppingCart, Trash2, Search, CheckCircle, 
-    Minus, Plus, RefreshCw, PlusCircle, Package, Truck, Landmark, CreditCard, Banknote, FileText, Smartphone as ECheqIcon, X
+    Minus, Plus, RefreshCw, PlusCircle, Package, Truck, Landmark, 
+    CreditCard, Banknote, FileText, Smartphone as ECheqIcon, X,
+    Receipt, FileSpreadsheet, ClipboardList, Printer, Zap
 } from 'lucide-react';
 import { InvoiceItem, Product, Client, CashRegister } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
@@ -14,7 +16,7 @@ interface POSProps {
     onTransformToBudget?: (items: InvoiceItem[]) => void;
 }
 
-const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
+const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito, onTransformToBudget }) => {
     const [cart, setCart] = useState<InvoiceItem[]>(initialCart || []);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -23,7 +25,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
     const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
     
+    // Estados Modales
     const [showManualModal, setShowManualModal] = useState(false);
+    const [showFinishModal, setShowFinishModal] = useState(false);
     const [manualForm, setManualForm] = useState({ name: '', price: '' });
 
     useEffect(() => {
@@ -74,11 +78,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         setManualForm({ name: '', price: '' });
     };
 
-    const handleFinalizeSale = async () => {
+    const handleFinalizeSaleDirect = async (isInvoice: boolean = false) => {
         if (cart.length === 0) return;
         setIsProcessing(true);
 
-        const saleId = `VEN-${Date.now().toString().slice(-6)}`;
+        const saleId = `${isInvoice ? 'FAC' : 'TKT'}-${Date.now().toString().slice(-6)}`;
         const date = new Date().toLocaleDateString();
 
         for (const item of cart) {
@@ -99,14 +103,15 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
         }
 
         const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
-        history.unshift({ id: saleId, date, client: selectedClient?.name || 'Consumidor Final', total: cartTotal, method: paymentMethod });
+        history.unshift({ id: saleId, date, client: selectedClient?.name || 'Consumidor Final', total: cartTotal, method: paymentMethod, type: isInvoice ? 'FACTURA' : 'TICKET' });
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(history));
 
         window.dispatchEvent(new Event('ferrecloud_request_pulse'));
         setCart([]);
         setSelectedClient(null);
         setIsProcessing(false);
-        alert(`✅ Venta #${saleId} finalizada exitosamente.`);
+        setShowFinishModal(false);
+        alert(`✅ ${isInvoice ? 'Factura' : 'Venta'} #${saleId} generada exitosamente.`);
     };
 
     return (
@@ -217,11 +222,10 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                     </div>
                 </div>
                 <button 
-                    onClick={handleFinalizeSale}
+                    onClick={() => setShowFinishModal(true)}
                     disabled={cart.length === 0 || isProcessing}
                     className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
-                    {isProcessing ? <RefreshCw className="animate-spin"/> : <CheckCircle size={24}/>} 
-                    {isProcessing ? 'Procesando...' : 'FINALIZAR VENTA'}
+                    <CheckCircle size={24}/> FINALIZAR VENTA
                 </button>
             </div>
 
@@ -243,6 +247,77 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed }) => {
                                 <input type="number" className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl outline-none font-black text-2xl text-indigo-600" value={manualForm.price} onChange={e => setManualForm({...manualForm, price: e.target.value})} />
                             </div>
                             <button onClick={addManualItem} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black uppercase tracking-widest hover:bg-indigo-600 transition-all">Añadir al Carrito</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: CONSOLA DE FINALIZACIÓN */}
+            {showFinishModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
+                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/20"><Zap size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-tighter leading-none">Cierre de Operación</h3>
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Seleccione el destino de los documentos</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowFinishModal(false)}><X size={28}/></button>
+                        </div>
+
+                        <div className="p-10 space-y-10 bg-slate-50/50">
+                            <div className="text-center">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Total a Procesar</p>
+                                <h2 className="text-6xl font-black text-slate-900 tracking-tighter">${cartTotal.toLocaleString('es-AR')}</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <button 
+                                    onClick={() => handleFinalizeSaleDirect(true)}
+                                    className="p-8 bg-indigo-600 text-white rounded-[2rem] flex flex-col items-center gap-4 hover:bg-indigo-700 transition-all shadow-xl active:scale-95 group">
+                                    <div className="p-4 bg-white/20 rounded-2xl group-hover:scale-110 transition-transform"><Printer size={32}/></div>
+                                    <div className="text-center">
+                                        <p className="font-black uppercase text-sm tracking-widest">Facturar (ARCA)</p>
+                                        <p className="text-[9px] font-bold text-indigo-200 mt-1 uppercase">Emite Factura Electrónica A/B</p>
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={() => handleFinalizeSaleDirect(false)}
+                                    className="p-8 bg-slate-900 text-white rounded-[2rem] flex flex-col items-center gap-4 hover:bg-slate-800 transition-all shadow-xl active:scale-95 group">
+                                    <div className="p-4 bg-white/10 rounded-2xl group-hover:scale-110 transition-transform"><Receipt size={32}/></div>
+                                    <div className="text-center">
+                                        <p className="font-black uppercase text-sm tracking-widest">Ticket / Venta</p>
+                                        <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">Registro directo de salida de stock</p>
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={() => onTransformToRemito?.(cart)}
+                                    className="p-8 bg-white border-2 border-indigo-100 text-indigo-600 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-indigo-50 transition-all active:scale-95 group">
+                                    <div className="p-4 bg-indigo-50 rounded-2xl group-hover:scale-110 transition-transform"><ClipboardList size={32}/></div>
+                                    <div className="text-center">
+                                        <p className="font-black uppercase text-sm tracking-widest">Convertir a Remito</p>
+                                        <p className="text-[9px] font-bold text-indigo-400 mt-1 uppercase">Entrega pendiente o Cta Cte</p>
+                                    </div>
+                                </button>
+
+                                <button 
+                                    onClick={() => onTransformToBudget?.(cart)}
+                                    className="p-8 bg-white border-2 border-emerald-100 text-emerald-600 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-emerald-50 transition-all active:scale-95 group">
+                                    <div className="p-4 bg-emerald-50 rounded-2xl group-hover:scale-110 transition-transform"><FileSpreadsheet size={32}/></div>
+                                    <div className="text-center">
+                                        <p className="font-black uppercase text-sm tracking-widest">Guardar Presupuesto</p>
+                                        <p className="text-[9px] font-bold text-emerald-400 mt-1 uppercase">Reserva de precios por tiempo limitado</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-white border-t border-slate-100 flex justify-center">
+                            <button onClick={() => setShowFinishModal(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors">Volver a la edición del carrito</button>
                         </div>
                     </div>
                 </div>
