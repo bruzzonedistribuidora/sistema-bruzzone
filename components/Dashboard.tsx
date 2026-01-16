@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Receipt, ShoppingCart, Package, Users, Truck, Wallet, 
@@ -24,6 +23,7 @@ interface ShortcutConfig {
 const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.POS, label: "Venta (POS)", category: "Ventas", icon: Receipt, color: "bg-indigo-500" },
     { id: ViewState.INVENTORY, label: "Maestro Art.", category: "Inventario", icon: Package, color: "bg-slate-700" },
+    { id: ViewState.MASS_PRODUCT_UPDATE, label: "Cambios Masivos", category: "Inventario", icon: Layers, color: "bg-slate-800" },
     { id: ViewState.STOCK_ADJUSTMENT, label: "Ajuste Existencias", category: "Inventario", icon: Settings2, color: "bg-slate-800" },
     { id: ViewState.SHORTAGES, label: "Faltantes", category: "Logística", icon: AlertTriangle, color: "bg-orange-600" },
     { id: ViewState.REPLENISHMENT, label: "Armar Pedido", category: "Logística", icon: PackagePlus, color: "bg-emerald-600" },
@@ -40,7 +40,7 @@ const ALL_MODULES: ShortcutConfig[] = [
 
 const DEFAULT_SHORTCUTS = [
     ViewState.POS, ViewState.INVENTORY, ViewState.CLOUD_HUB, 
-    ViewState.REPLENISHMENT, ViewState.TREASURY, ViewState.REPORTS
+    ViewState.REPLENISHMENT, ViewState.TREASURY, ViewState.MASS_PRODUCT_UPDATE
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
