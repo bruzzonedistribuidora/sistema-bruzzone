@@ -1,307 +1,344 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
-    FileUp, FileSpreadsheet, CheckCircle, ArrowRight, 
-    RefreshCw, Boxes, Info, X, Settings2, Database,
-    Search, AlertTriangle, Save, Table as TableIcon,
-    Download
+    Search, Save, X, Layers, CheckCircle, Trash2, Filter, 
+    ArrowRight, Info, AlertTriangle, Package, Tag, Building2, 
+    Percent, DollarSign, RefreshCw, Smartphone, Plus, CheckSquare, Square,
+    ChevronRight, Boxes, ListFilter, Zap, ChevronUp, ChevronDown,
+    Calculator, Trash, Check as CheckIcon
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, Brand, Category, Provider } from '../types';
 import { productDB } from '../services/storageService';
 
-interface MassStockUpdateProps {
-    onComplete: () => void;
-}
+const MassProductUpdate: React.FC = () => {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [brands] = useState<Brand[]>(() => JSON.parse(localStorage.getItem('ferrecloud_brands') || '[]'));
+    const [categories] = useState<Category[]>(() => JSON.parse(localStorage.getItem('ferrecloud_categories') || '[]'));
+    const [providers] = useState<Provider[]>(() => JSON.parse(localStorage.getItem('ferrecloud_providers') || '[]'));
 
-const MassStockUpdate: React.FC<MassStockUpdateProps> = ({ onComplete }) => {
-    const [step, setStep] = useState<1 | 2 | 3>(1);
-    const [fileRows, setFileRows] = useState<string[][]>([]);
-    const [headers, setHeaders] = useState<string[]>([]);
-    const [mapping, setMapping] = useState<Record<string, number>>({});
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [progress, setProgress] = useState(0);
-    const [stats, setStats] = useState({ updated: 0, notFound: 0, total: 0 });
-    const [updateMode, setUpdateMode] = useState<'OVERWRITE' | 'SUM'>('OVERWRITE');
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // Filtros de búsqueda (Bloque Superior)
+    const [searchName, setSearchName] = useState('');
+    const [searchCode, setSearchCode] = useState('');
+    const [searchBrand, setSearchBrand] = useState('');
+    const [searchCategory, setSearchCategory] = useState('');
+    const [searchProvider, setSearchProvider] = useState('');
+    
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [tempChanges, setTempChanges] = useState<Record<string, Partial<Product>>>({});
 
-    const stockFields = [
-        { key: 'identifier', label: 'Identificador (SKU / Barras / Nombre)', required: true },
-        { key: 'stockPrincipal', label: 'Stock Local / Mostrador', required: false },
-        { key: 'stockDeposito', label: 'Stock Depósito', required: false },
-        { key: 'stockSucursal', label: 'Stock Sucursal', required: false },
-    ];
+    // Atributos a cambiar (Bloque Medio)
+    const [massForm, setMassForm] = useState({
+        brand: '',
+        category: '',
+        provider: '',
+        reorderPoint: '',
+        stockMaximo: '',
+        profitMargin: '',
+        vatRate: '',
+        purchasePackageQuantity: ''
+    });
 
-    const parseNumber = (val: any, defaultValue: number): number => {
-        if (val === undefined || val === null || val.toString().trim() === '') return defaultValue;
-        const cleanVal = val.toString().replace(/[\s]/g, '').replace(',', '.');
-        const parsed = parseFloat(cleanVal);
-        return isNaN(parsed) ? defaultValue : parsed;
+    const [isApplying, setIsApplying] = useState(false);
+
+    const loadProducts = async () => {
+        const all = await productDB.getAll();
+        setProducts(all);
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    useEffect(() => {
+        loadProducts();
+        const handleUpdate = () => loadProducts();
+        window.addEventListener('ferrecloud_products_updated', handleUpdate);
+        return () => window.removeEventListener('ferrecloud_products_updated', handleUpdate);
+    }, []);
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const content = event.target?.result as string;
-            const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
-            if (lines.length < 1) return;
+    const filteredProducts = useMemo(() => {
+        return products.filter(p => {
+            const matchName = !searchName || p.name.toLowerCase().includes(searchName.toLowerCase());
+            const matchCode = !searchCode || 
+                (p.internalCodes && p.internalCodes.some(c => c.toLowerCase().includes(searchCode.toLowerCase())));
+            const matchBrand = !searchBrand || p.brand === searchBrand;
+            const matchCategory = !searchCategory || p.category === searchCategory;
+            const matchProvider = !searchProvider || p.provider === searchProvider;
+            
+            return matchName && matchCode && matchBrand && matchCategory && matchProvider;
+        });
+    }, [products, searchName, searchCode, searchBrand, searchCategory, searchProvider]);
 
-            // Detectar separador común
-            const separator = lines[0].includes(';') ? ';' : lines[0].includes('\t') ? '\t' : ',';
-            const parsedRows = lines.map(line => line.split(separator).map(cell => cell.trim().replace(/^"|"$/g, '')));
-            
-            setHeaders(parsedRows[0]);
-            setFileRows(parsedRows.slice(1));
-            
-            // Auto-mapeo inteligente por nombre de columna
-            const autoMap: Record<string, number> = {};
-            stockFields.forEach(field => {
-                const index = parsedRows[0].findIndex(h => {
-                    const header = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    const target = field.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    const key = field.key.toLowerCase();
-                    return header === target || header.includes(target) || header.includes(key);
-                });
-                if (index !== -1) autoMap[field.key] = index;
-            });
-            setMapping(autoMap);
-            setStep(2);
-        };
-        reader.readAsText(file);
+    const toggleSelectAll = () => {
+        if (selectedIds.size === filteredProducts.length && filteredProducts.length > 0) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+        }
     };
 
-    const processStockUpdate = async () => {
-        if (mapping.identifier === undefined) {
-            alert("Debe seleccionar la columna del Identificador (SKU, Barras o Nombre).");
+    const toggleSelectOne = (id: string) => {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedIds(next);
+    };
+
+    const handleApplyMassChanges = () => {
+        if (selectedIds.size === 0) {
+            alert("Seleccione al menos un artículo en la grilla.");
             return;
         }
 
-        setIsProcessing(true);
-        setProgress(0);
-        
-        // Carga rápida en memoria
-        const allProducts = await productDB.getAll();
-        
-        const skuMap = new Map<string, Product>();
-        const barcodeMap = new Map<string, Product>();
-        const nameMap = new Map<string, Product>();
+        const nextTemp = { ...tempChanges };
+        selectedIds.forEach(id => {
+            const p = products.find(prod => prod.id === id);
+            if (!p) return;
 
-        allProducts.forEach(p => {
-            if (p.internalCodes && p.internalCodes[0]) skuMap.set(p.internalCodes[0].toUpperCase(), p);
-            if (p.barcodes) p.barcodes.forEach(b => barcodeMap.set(b.toUpperCase(), p));
-            if (p.name) nameMap.set(p.name.toUpperCase(), p);
+            const updates: any = {};
+            if (massForm.brand) updates.brand = massForm.brand;
+            if (massForm.category) updates.category = massForm.category;
+            if (massForm.provider) updates.provider = massForm.provider;
+            if (massForm.reorderPoint !== '') updates.reorderPoint = parseFloat(massForm.reorderPoint);
+            if (massForm.stockMaximo !== '') updates.stockMaximo = parseFloat(massForm.stockMaximo);
+            if (massForm.profitMargin !== '') updates.profitMargin = parseFloat(massForm.profitMargin);
+            if (massForm.vatRate !== '') updates.vatRate = parseFloat(massForm.vatRate);
+            if (massForm.purchasePackageQuantity !== '') updates.purchasePackageQuantity = parseFloat(massForm.purchasePackageQuantity);
+
+            nextTemp[id] = { ...(nextTemp[id] || {}), ...updates };
         });
 
-        const CHUNK_SIZE = 5000;
-        let index = 0;
-        let updatedCount = 0;
-        let notFoundCount = 0;
-
-        const processChunk = async () => {
-            const limit = Math.min(index + CHUNK_SIZE, fileRows.length);
-            const chunkToUpdate: Product[] = [];
-
-            for (let i = index; i < limit; i++) {
-                const row = fileRows[i];
-                const idValue = row[mapping.identifier]?.toString().toUpperCase();
-                if (!idValue) continue;
-
-                let product = skuMap.get(idValue) || barcodeMap.get(idValue) || nameMap.get(idValue);
-
-                if (product) {
-                    const updatedProduct = { ...product };
-                    
-                    const excelLocal = mapping.stockPrincipal !== undefined ? parseNumber(row[mapping.stockPrincipal], -1) : -1;
-                    const excelDepo = mapping.stockDeposito !== undefined ? parseNumber(row[mapping.stockDeposito], -1) : -1;
-                    const excelSuc = mapping.stockSucursal !== undefined ? parseNumber(row[mapping.stockSucursal], -1) : -1;
-
-                    if (excelLocal !== -1) {
-                        updatedProduct.stockPrincipal = updateMode === 'OVERWRITE' ? excelLocal : (updatedProduct.stockPrincipal || 0) + excelLocal;
-                    }
-                    if (excelDepo !== -1) {
-                        updatedProduct.stockDeposito = updateMode === 'OVERWRITE' ? excelDepo : (updatedProduct.stockDeposito || 0) + excelDepo;
-                    }
-                    if (excelSuc !== -1) {
-                        updatedProduct.stockSucursal = updateMode === 'OVERWRITE' ? excelSuc : (updatedProduct.stockSucursal || 0) + excelSuc;
-                    }
-
-                    updatedProduct.stock = (updatedProduct.stockPrincipal || 0) + (updatedProduct.stockDeposito || 0) + (updatedProduct.stockSucursal || 0);
-                    
-                    chunkToUpdate.push(updatedProduct);
-                    updatedCount++;
-                } else {
-                    notFoundCount++;
-                }
-            }
-
-            if (chunkToUpdate.length > 0) {
-                await productDB.saveBulk(chunkToUpdate);
-            }
-
-            index = limit;
-            setProgress(Math.round((index / fileRows.length) * 100));
-
-            if (index < fileRows.length) {
-                setTimeout(processChunk, 1);
-            } else {
-                setStats({ updated: updatedCount, notFound: notFoundCount, total: fileRows.length });
-                setIsProcessing(false);
-                setStep(3);
-            }
-        };
-
-        processChunk();
+        setTempChanges(nextTemp);
+        alert(`Aplicado a ${selectedIds.size} ítems. Presione 'Guardar' para persistir.`);
     };
 
-    const downloadTemplate = () => {
-        const headersStr = "Identificador;Stock Local;Stock Deposito;Stock Sucursal\n";
-        const rowsStr = "SKU-001;10;50;0\n7791234567890;5;20;2\nARTICULO EJEMPLO;0;10;0";
-        const blob = new Blob([headersStr + rowsStr], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'plantilla_stock.csv';
-        a.click();
+    const handleSaveToDB = async () => {
+        const idsToUpdate = Object.keys(tempChanges);
+        if (idsToUpdate.length === 0) {
+            alert("No hay cambios pendientes para guardar.");
+            return;
+        }
+
+        setIsApplying(true);
+        const updatedProducts = products.filter(p => idsToUpdate.includes(p.id)).map(p => {
+            const updates = tempChanges[p.id];
+            const updated = { ...p, ...updates };
+            
+            // Recalcular precios si cambió el margen o el IVA
+            if (updates.profitMargin || updates.vatRate) {
+                const priceNeto = updated.costAfterDiscounts * (1 + (updated.profitMargin || 0) / 100);
+                const priceFinal = priceNeto * (1 + (updated.vatRate || 21) / 100);
+                updated.priceNeto = parseFloat(priceNeto.toFixed(2));
+                updated.priceFinal = parseFloat(priceFinal.toFixed(2));
+            }
+            
+            return updated;
+        });
+
+        await productDB.saveBulk(updatedProducts);
+        setTempChanges({});
+        await loadProducts();
+        setIsApplying(false);
+        alert("✅ Cambios guardados exitosamente en la base de datos.");
     };
 
     return (
-        <div className="p-4 h-full flex flex-col space-y-4 bg-slate-100 font-sans overflow-hidden">
-            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex items-center gap-6 shrink-0">
-                <div className="p-4 bg-emerald-600 text-white rounded-3xl shadow-xl"><Boxes size={32}/></div>
-                <div>
-                    <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Actualizador de Stock Masivo</h2>
-                    <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest mt-1">Corrección de Existencias (CSV / EXCEL)</p>
+        <div className="h-full bg-slate-300 p-2 flex flex-col space-y-2 font-sans overflow-hidden border-4 border-slate-400">
+            
+            {/* BLOQUE 1: FILTROS DE BUSQUEDA */}
+            <div className="bg-slate-200 border border-slate-500 p-3 rounded shadow-sm">
+                <div className="flex items-center gap-2 mb-2 border-b border-slate-400 pb-1">
+                    <span className="text-[10px] font-black uppercase text-slate-600">Filtros de busqueda</span>
                 </div>
-                {step === 2 && (
-                    <div className="ml-auto flex items-center gap-4">
-                        <div className="flex bg-slate-100 p-1 rounded-xl border">
-                            <button 
-                                onClick={() => setUpdateMode('OVERWRITE')}
-                                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${updateMode === 'OVERWRITE' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>
-                                Reemplazar
-                            </button>
-                            <button 
-                                onClick={() => setUpdateMode('SUM')}
-                                className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${updateMode === 'SUM' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}>
-                                Sumar
-                            </button>
-                        </div>
-                        <button onClick={processStockUpdate} disabled={isProcessing} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 hover:bg-emerald-600 transition-all active:scale-95 disabled:opacity-50">
-                             {isProcessing ? <RefreshCw className="animate-spin" size={14}/> : <CheckCircle size={14}/>} {isProcessing ? `Procesando ${progress}%` : 'Ejecutar Cambios'}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Nombre:</label>
+                        <input className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Codigo:</label>
+                        <input className="flex-1 border border-slate-400 bg-white p-1 text-xs" value={searchCode} onChange={e => setSearchCode(e.target.value)} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Marca:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchBrand} onChange={e => setSearchBrand(e.target.value)}>
+                            <option value="">TODAS</option>
+                            {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Rubro:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchCategory} onChange={e => setSearchCategory(e.target.value)}>
+                            <option value="">TODOS</option>
+                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Proveedor:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchProvider} onChange={e => setSearchProvider(e.target.value)}>
+                            <option value="">TODOS</option>
+                            {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-4 col-span-2 pl-24">
+                        <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Sincroniza Online</label>
+                        <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Tiene Foto</label>
+                        <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Con Stock</label>
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={loadProducts} className="bg-slate-100 border-2 border-slate-500 px-6 py-1 font-bold text-xs hover:bg-slate-200 flex items-center gap-2">
+                            <Search size={14}/> Buscar
                         </button>
                     </div>
-                )}
-                {step === 1 && (
-                    <button onClick={downloadTemplate} className="ml-auto text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 hover:underline">
-                        <Download size={14}/> Descargar Plantilla
-                    </button>
-                )}
+                </div>
             </div>
 
-            {step === 1 && (
-                <div className="flex-1 flex items-center justify-center animate-fade-in">
-                    <div className="max-w-xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-8">
-                        <FileSpreadsheet size={64} className="text-slate-100 mx-auto" />
-                        <div className="space-y-2">
-                            <h3 className="text-xl font-black uppercase text-slate-800 tracking-tight">Sincronizar Stock</h3>
-                            <p className="text-xs text-slate-400 font-medium">Sube tu archivo para actualizar existencias masivamente</p>
-                        </div>
-                        
-                        <div className="group border-4 border-dashed border-slate-100 rounded-[3rem] p-16 hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer relative" onClick={() => fileInputRef.current?.click()}>
-                            <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.txt" onChange={handleFileUpload} />
-                            <FileUp size={48} className="text-slate-200 mx-auto mb-4 group-hover:text-emerald-500 group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-emerald-600">Click para seleccionar archivo</span>
-                        </div>
-                    </div>
+            {/* BLOQUE 2: ATRIBUTOS A CAMBIAR */}
+            <div className="bg-slate-200 border border-slate-500 p-3 rounded shadow-sm">
+                <div className="flex items-center gap-2 mb-2 border-b border-slate-400 pb-1">
+                    <span className="text-[10px] font-black uppercase text-slate-600">Seleccione los productos y atributos a cambiar</span>
                 </div>
-            )}
-
-            {step === 2 && (
-                <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden animate-fade-in">
-                    <div className="lg:col-span-4 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-                        <div className="flex items-center gap-3 mb-6 border-b pb-4 shrink-0">
-                            <Settings2 size={18} className="text-emerald-600"/>
-                            <h3 className="text-xs font-black uppercase tracking-widest">Asignar Columnas</h3>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 space-y-3">
-                            {stockFields.map(field => (
-                                <div key={field.key} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-2 group hover:bg-white transition-all">
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-2 h-2 rounded-full ${field.required ? 'bg-red-500' : 'bg-slate-300'}`}></div>
-                                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{field.label}</label>
-                                    </div>
-                                    <select 
-                                        className="w-full p-3 bg-white border rounded-xl text-[10px] font-bold outline-none focus:border-emerald-600 shadow-sm"
-                                        value={mapping[field.key] ?? ""}
-                                        onChange={e => setMapping({...mapping, [field.key]: e.target.value === "" ? undefined : parseInt(e.target.value)})}
-                                    >
-                                        <option value="">-- No incluir --</option>
-                                        {headers.map((h, i) => <option key={i} value={i}>{h || `Columna ${i + 1}`}</option>)}
-                                    </select>
-                                </div>
-                            ))}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-2">
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Marca:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.brand} onChange={e => setMassForm({...massForm, brand: e.target.value})}>
+                            <option value="">-- NO CAMBIAR --</option>
+                            {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Rubro:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.category} onChange={e => setMassForm({...massForm, category: e.target.value})}>
+                            <option value="">-- NO CAMBIAR --</option>
+                            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Proveedor:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.provider} onChange={e => setMassForm({...massForm, provider: e.target.value})}>
+                            <option value="">-- NO CAMBIAR --</option>
+                            {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">IVA:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs" value={massForm.vatRate} onChange={e => setMassForm({...massForm, vatRate: e.target.value})}>
+                            <option value="">-- NO CAMBIAR --</option>
+                            <option value="21">21.0%</option>
+                            <option value="10.5">10.5%</option>
+                            <option value="0">EXENTO</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">P.Pedido:</label>
+                        <div className="flex items-center gap-1 flex-1">
+                             <input type="checkbox" className="w-3 h-3" />
+                             <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})} />
                         </div>
                     </div>
-
-                    <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                        <div className="p-5 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><TableIcon size={14}/> Previsualización ({fileRows.length.toLocaleString()} filas)</h3>
-                            <span className="text-[10px] font-black text-emerald-400">Listo</span>
-                        </div>
-                        <div className="overflow-auto flex-1 custom-scrollbar">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-slate-50 sticky top-0 z-10 border-b">
-                                    <tr>
-                                        {headers.map((h, i) => (
-                                            <th key={i} className={`px-4 py-3 text-[9px] font-black uppercase tracking-widest border-r whitespace-nowrap ${Object.values(mapping).includes(i) ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400'}`}>
-                                                {h || `Col ${i+1}`}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {fileRows.slice(0, 100).map((row, i) => (
-                                        <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                            {row.map((cell, j) => <td key={j} className={`px-4 py-2 text-[10px] font-medium border-r truncate max-w-[200px] ${Object.values(mapping).includes(j) ? 'bg-emerald-50/30 text-emerald-700 font-bold' : 'text-slate-500'}`}>{cell}</td>)}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">Stock Des.:</label>
+                        <div className="flex items-center gap-1 flex-1">
+                             <input type="checkbox" className="w-3 h-3" />
+                             <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})} />
                         </div>
                     </div>
-                </div>
-            )}
-
-            {step === 3 && (
-                <div className="h-full flex items-center justify-center animate-fade-in">
-                    <div className="max-w-2xl w-full bg-white p-12 rounded-[4rem] border border-slate-200 shadow-sm text-center space-y-10">
-                        <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner"><CheckCircle size={48}/></div>
-                        <div className="space-y-2">
-                            <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Stock Sincronizado</h3>
-                            <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Resumen del proceso</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">Sincronizados</p>
-                                <p className="text-5xl font-black text-emerald-600 tracking-tighter">{stats.updated.toLocaleString()}</p>
-                            </div>
-                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] font-black text-slate-400 uppercase mb-2">No Encontrados</p>
-                                <p className="text-5xl font-black text-red-400 tracking-tighter">{stats.notFound.toLocaleString()}</p>
-                            </div>
-                        </div>
-
-                        <button onClick={onComplete} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3 active:scale-95">
-                            Ir al Inventario Maestro <ArrowRight size={20}/>
+                    <div className="flex items-center gap-2">
+                        <label className="w-20 text-right text-[11px] font-bold">% Ganancia:</label>
+                        <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right text-indigo-700 font-bold" value={massForm.profitMargin} onChange={e => setMassForm({...massForm, profitMargin: e.target.value})} />
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={handleApplyMassChanges} className="bg-slate-100 border-2 border-green-700 text-green-800 px-6 py-1 font-black text-xs hover:bg-green-50 flex items-center gap-2 shadow-sm">
+                            <CheckIcon size={14}/> Aplicar
                         </button>
                     </div>
                 </div>
-            )}
+            </div>
+
+            {/* BLOQUE 3: GRILLA RESULTADOS */}
+            <div className="flex-1 bg-white border border-slate-500 overflow-hidden flex flex-col rounded-sm">
+                <div className="overflow-auto flex-1 custom-scrollbar">
+                    <table className="w-full text-left border-collapse min-w-max">
+                        <thead className="bg-slate-800 text-white text-[10px] font-black uppercase sticky top-0 z-10">
+                            <tr className="divide-x divide-slate-600">
+                                <th className="p-2 w-10 text-center">
+                                    <button onClick={toggleSelectAll} className="w-4 h-4 bg-white border border-slate-400 rounded flex items-center justify-center">
+                                        {selectedIds.size > 0 && <div className="w-2 h-2 bg-indigo-600"></div>}
+                                    </button>
+                                </th>
+                                <th className="p-2">Codigo</th>
+                                <th className="p-2">Nombre</th>
+                                <th className="p-2 text-center">Stock Cal.</th>
+                                <th className="p-2 text-center">Pto.Pedido</th>
+                                <th className="p-2 text-center">Stock Deseado</th>
+                                <th className="p-2">Marca</th>
+                                <th className="p-2">Rubro</th>
+                                <th className="p-2">Proveedor</th>
+                                <th className="p-2 text-right">Ganancia</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-[11px] divide-y divide-slate-200">
+                            {filteredProducts.map(p => {
+                                const changes = tempChanges[p.id] || {};
+                                return (
+                                    <tr key={p.id} className={`hover:bg-yellow-50 transition-colors divide-x divide-slate-100 ${selectedIds.has(p.id) ? 'bg-blue-50' : ''}`}>
+                                        <td className="p-2 text-center">
+                                            <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelectOne(p.id)} />
+                                        </td>
+                                        <td className="p-2 font-bold text-indigo-700">{p.internalCodes[0]}</td>
+                                        <td className="p-2 font-bold uppercase truncate max-w-[300px]">{p.name}</td>
+                                        <td className="p-2 text-center font-black text-slate-500">{p.stock}</td>
+                                        <td className="p-2 text-center font-bold">
+                                            {changes.reorderPoint !== undefined ? <span className="text-green-600">{changes.reorderPoint}</span> : p.reorderPoint}
+                                        </td>
+                                        <td className="p-2 text-center font-bold">
+                                            {changes.stockMaximo !== undefined ? <span className="text-green-600">{changes.stockMaximo}</span> : p.stockMaximo}
+                                        </td>
+                                        <td className={`p-2 uppercase font-bold ${changes.brand ? 'text-green-600' : 'text-slate-400'}`}>
+                                            {changes.brand || p.brand}
+                                        </td>
+                                        <td className={`p-2 uppercase font-bold ${changes.category ? 'text-green-600' : 'text-slate-400'}`}>
+                                            {changes.category || p.category}
+                                        </td>
+                                        <td className={`p-2 uppercase font-bold ${changes.provider ? 'text-green-600' : 'text-slate-400'}`}>
+                                            {changes.provider || p.provider}
+                                        </td>
+                                        <td className={`p-2 text-right font-black ${changes.profitMargin ? 'text-green-600' : 'text-slate-900'}`}>
+                                            {changes.profitMargin || p.profitMargin}%
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {filteredProducts.length === 0 && (
+                                <tr><td colSpan={10} className="p-20 text-center text-slate-300 font-black uppercase tracking-widest">No hay artículos para los filtros seleccionados</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* BARRA DE ACCIONES INFERIOR */}
+            <div className="bg-slate-200 border-t-2 border-slate-500 p-2 flex justify-between items-center shrink-0">
+                <button 
+                    onClick={() => { if(confirm('¿Eliminar seleccionados?')) setSelectedIds(new Set()); }}
+                    className="flex items-center gap-2 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded font-bold text-[10px] uppercase hover:bg-red-200"
+                >
+                    <Trash size={14}/> Eliminar productos seleccionados
+                </button>
+                
+                <div className="flex gap-2">
+                    <button 
+                        onClick={handleSaveToDB} 
+                        disabled={isApplying || Object.keys(tempChanges).length === 0}
+                        className="bg-slate-800 text-white border-b-4 border-slate-900 px-10 py-2 rounded font-black text-xs uppercase flex items-center gap-2 hover:bg-slate-700 active:translate-y-1 transition-all disabled:opacity-30 shadow-lg"
+                    >
+                        {isApplying ? <RefreshCw className="animate-spin" size={14}/> : <Save size={16}/>} Guardar
+                    </button>
+                    <button 
+                        onClick={() => { setTempChanges({}); setSelectedIds(new Set()); }}
+                        className="bg-slate-100 border-2 border-slate-500 px-8 py-2 rounded font-black text-xs uppercase hover:bg-slate-200 shadow-sm"
+                    >
+                        <X size={16}/> Cancelar
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
 
-export default MassStockUpdate;
+export default MassProductUpdate;
