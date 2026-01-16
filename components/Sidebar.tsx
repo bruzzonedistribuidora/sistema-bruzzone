@@ -6,7 +6,7 @@ import {
     Settings, ChevronDown, LogOut, Laptop2, Network,
     Boxes as BoxesIcon, Tags, UserSearch, ListOrdered,
     AlertTriangle, PackagePlus, BarChart3, ArrowLeftRight,
-    FileText, Landmark
+    FileText, Landmark, Cloud, Wifi
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
@@ -45,10 +45,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
     const [license, setLicense] = useState<SystemLicense | null>(null);
 
     const loadConfig = () => {
-        const savedSync = localStorage.getItem('ferrecloud_file_sync');
+        const savedSync = localStorage.getItem('ferrecloud_vault_id');
         const savedCompany = JSON.parse(localStorage.getItem('company_config') || '{}');
         const savedLicense = JSON.parse(localStorage.getItem('ferrecloud_license') || 'null');
-        setSyncStatus(savedSync === 'ACTIVE' ? 'ONLINE' : 'OFFLINE');
+        setSyncStatus(savedSync ? 'ONLINE' : 'OFFLINE');
         setCompanyConfig(savedCompany);
         setLicense(savedLicense);
     };
@@ -105,8 +105,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                     <NavItem view={ViewState.POS} label="Facturación (POS)" icon={Receipt} active={activeView === ViewState.POS} onClick={() => onNavigate(ViewState.POS)} />}
                 {isModuleEnabled(ViewState.ONLINE_SALES) && 
                     <NavItem view={ViewState.ONLINE_SALES} label="Ventas Online" icon={Globe} active={activeView === ViewState.ONLINE_SALES} onClick={() => onNavigate(ViewState.ONLINE_SALES)} />}
-                {isModuleEnabled(ViewState.SALES_ORDERS) && 
-                    <NavItem view={ViewState.SALES_ORDERS} label="Órdenes de Pedido" icon={ListOrdered} active={activeView === ViewState.SALES_ORDERS} onClick={() => onNavigate(ViewState.SALES_ORDERS)} />}
                 {isModuleEnabled(ViewState.REMITOS) && 
                     <NavItem view={ViewState.REMITOS} label="Remitos / Cta. Cte." icon={ClipboardList} active={activeView === ViewState.REMITOS} onClick={() => onNavigate(ViewState.REMITOS)} />}
                 {isModuleEnabled(ViewState.CLIENT_BALANCES) && 
@@ -137,8 +135,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                 {isModuleEnabled(ViewState.STOCK_TRANSFERS) && 
                     <NavItem view={ViewState.STOCK_TRANSFERS} label="Movimientos Stock" icon={ArrowLeftRight} active={activeView === ViewState.STOCK_TRANSFERS} onClick={() => onNavigate(ViewState.STOCK_TRANSFERS)} />}
 
+                {/* SECCIÓN SISTEMA */}
+                <CategoryHeader label="Sistema" color="bg-slate-400" />
+                {isModuleEnabled(ViewState.CLOUD_HUB) && 
+                    <NavItem view={ViewState.CLOUD_HUB} label="Sincronización Cloud" icon={Network} active={activeView === ViewState.CLOUD_HUB} onClick={() => onNavigate(ViewState.CLOUD_HUB)} />}
+                <NavItem view={ViewState.CONFIG_PANEL} label="Ajustes Sistema" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => onNavigate(ViewState.CONFIG_PANEL)} />
+
                 <div className="mt-8 mb-10 px-4 space-y-1 border-t border-slate-800/50 pt-4">
-                    <NavItem view={ViewState.CONFIG_PANEL} label="Ajustes Sistema" icon={Settings} active={activeView === ViewState.CONFIG_PANEL} onClick={() => onNavigate(ViewState.CONFIG_PANEL)} />
                     <button 
                         onClick={onLogout}
                         className="w-full flex items-center gap-4 px-6 py-3 text-red-400 hover:bg-red-500/10 transition-all rounded-xl text-[12px] font-bold mt-4"
