@@ -188,7 +188,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                     {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos Prov." icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
                 </NavDropdown>
 
-                <NavItem view={ViewState.PURCHASES} label="Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />
+                <NavDropdown id="compras" label="Compras" icon={Truck}>
+                    {isModuleEnabled(ViewState.PURCHASES) && <DropdownItem view={ViewState.PURCHASES} label="Gestión Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />}
+                    {isModuleEnabled(ViewState.PROVIDERS) && <DropdownItem view={ViewState.PROVIDERS} label="Fichero Prov." icon={Users} active={activeView === ViewState.PROVIDERS} onClick={() => handleNav(ViewState.PROVIDERS)} />}
+                    {isModuleEnabled(ViewState.PROVIDER_BALANCES) && <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Ctas Ctes Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />}
+                </NavDropdown>
                 
                 <NavDropdown id="finanzas" label="Finanzas" icon={Calculator}>
                     {isModuleEnabled(ViewState.ACCOUNTING) && <DropdownItem view={ViewState.ACCOUNTING} label="Contabilidad" icon={TrendingUp} active={activeView === ViewState.ACCOUNTING} onClick={() => handleNav(ViewState.ACCOUNTING)} />}
