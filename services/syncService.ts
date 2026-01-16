@@ -1,3 +1,4 @@
+
 import { 
     collection, 
     addDoc, 
@@ -5,7 +6,8 @@ import {
     query, 
     serverTimestamp, 
     orderBy, 
-    limit 
+    where,
+    Timestamp
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { productDB } from "./storageService";
@@ -22,19 +24,20 @@ class SyncService {
     private sessionId: string = Math.random().toString(36).substring(7);
     private activityLog: SyncActivity[] = [];
     private unsubscribe: (() => void) | null = null;
+    private connectionTime: Date = new Date();
 
     constructor() {
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
         if (this.vaultId) this.initFirebase();
 
-        // Listener para capturar peticiones de sincronización saliente
+        // Escuchar cambios locales para subirlos a la nube
         window.addEventListener('ferrecloud_sync_out' as any, (e: CustomEvent) => {
             this.pushDelta(e.detail.type, e.detail.payload);
         });
 
-        // Listener para pulsos globales
+        // Listener para pulsos globales de sincronización manual
         window.addEventListener('ferrecloud_request_pulse' as any, () => {
-            this.pushToCloud();
+            this.pushDelta('SYNC_PULSE', { timestamp: Date.now() });
         });
     }
 
@@ -51,9 +54,12 @@ class SyncService {
 
     setVaultId(id: string) {
         const cleanId = id.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!cleanId) return;
+        
         this.vaultId = cleanId;
         localStorage.setItem('ferrecloud_vault_id', cleanId);
-        this.logActivity('OUT', `Terminal vinculada a la bóveda: ${cleanId}`);
+        this.logActivity('OUT', `Vínculo establecido con bóveda: ${cleanId}`);
+        this.connectionTime = new Date(); // Reset connection time to now
         this.initFirebase();
     }
 
@@ -61,18 +67,28 @@ class SyncService {
 
     private initFirebase() {
         if (!this.vaultId || !db) return;
-        if (this.unsubscribe) this.unsubscribe();
+        
+        // Limpiar suscripción previa si existe
+        if (this.unsubscribe) {
+            this.unsubscribe();
+        }
 
+        this.logActivity('IN', 'Iniciando escucha de cambios en tiempo real...');
+
+        // Escuchamos todos los cambios creados DESPUÉS de que esta sesión inició
+        // Esto evita procesar miles de registros antiguos del historial
         const q = query(
             collection(db, "vaults", this.vaultId, "deltas"),
-            orderBy("createdAt", "desc"),
-            limit(1)
+            where("createdAt", ">", Timestamp.fromDate(this.connectionTime)),
+            orderBy("createdAt", "asc")
         );
 
         this.unsubscribe = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
                 if (change.type === "added") {
                     const data = change.doc.data();
+                    
+                    // IMPORTANTE: Ignorar si el cambio fue originado por esta misma terminal
                     if (data.sid === this.sessionId) return;
 
                     const { type, payload } = data;
@@ -81,16 +97,16 @@ class SyncService {
                         switch (type) {
                             case 'PRODUCT_UPDATE':
                                 await productDB.save(payload, true);
-                                this.logActivity('IN', `Actualizado: ${payload.name}`);
+                                this.logActivity('IN', `Sinc: ${payload.name} actualizado`);
                                 break;
                             case 'PRODUCT_DELETE':
                                 await productDB.delete(payload.id, true);
-                                this.logActivity('IN', `Eliminado ID: ${payload.id}`);
+                                this.logActivity('IN', `Sinc: Eliminado ID ${payload.id}`);
                                 break;
                             case 'TREASURY_UPDATE':
                                 localStorage.setItem('ferrecloud_registers', JSON.stringify(payload));
                                 window.dispatchEvent(new Event('storage'));
-                                this.logActivity('IN', `Sincronización de cajas recibida`);
+                                this.logActivity('IN', `Sinc: Saldos de cajas actualizados`);
                                 break;
                             case 'CLIENT_UPDATE':
                                 const currentClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
@@ -98,20 +114,38 @@ class SyncService {
                                 if (!currentClients.some((c:any) => c.id === payload.id)) newClients.push(payload);
                                 localStorage.setItem('ferrecloud_clients', JSON.stringify(newClients));
                                 window.dispatchEvent(new Event('storage'));
-                                this.logActivity('IN', `Cliente actualizado: ${payload.name}`);
+                                this.logActivity('IN', `Sinc: Cliente ${payload.name} actualizado`);
+                                break;
+                            // Added handler for REMITOS_SYNC to enable real-time updates of remitos
+                            case 'REMITOS_SYNC':
+                                localStorage.setItem('ferrecloud_remitos', JSON.stringify(payload));
+                                window.dispatchEvent(new Event('storage'));
+                                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                                    detail: { status: 'OK', engine: 'FIREBASE' } 
+                                }));
+                                this.logActivity('IN', `Sinc: Libro de remitos actualizado`);
+                                break;
+                            case 'SYNC_PULSE':
+                                // Solo dispara un refresco visual de componentes
+                                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                                    detail: { status: 'OK', engine: 'FIREBASE' } 
+                                }));
                                 break;
                         }
                     } catch (err: any) {
-                        this.logActivity('ERROR', `Error al procesar sync: ${err.message}`);
+                        console.error("Sync Error:", err);
+                        this.logActivity('ERROR', `Fallo al procesar cambio entrante`);
                     }
                 }
             });
             
+            // Emitir pulso de conexión exitosa
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
                 detail: { status: 'OK', engine: 'FIREBASE' } 
             }));
         }, (error) => {
-            this.logActivity('ERROR', `Error de conexión: ${error.message}`);
+            console.error("Firestore error:", error);
+            this.logActivity('ERROR', `Conexión perdida: ${error.message}`);
             window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { status: 'ERROR' } }));
         });
     }
@@ -120,30 +154,31 @@ class SyncService {
         if (!this.vaultId || !db) return;
 
         try {
+            // Añadimos a la subcolección deltas de la bóveda específica
             await addDoc(collection(db, "vaults", this.vaultId, "deltas"), {
                 type,
                 payload,
                 sid: this.sessionId,
-                terminal: localStorage.getItem('ferrecloud_terminal_name') || 'TERMINAL',
+                terminal: localStorage.getItem('ferrecloud_terminal_name') || 'PC-DESCONOCIDA',
                 createdAt: serverTimestamp()
             });
-            this.logActivity('OUT', `Cambio enviado (${type})`);
+            this.logActivity('OUT', `Paquete enviado: ${type}`);
         } catch (e: any) {
-            this.logActivity('ERROR', `Fallo al subir cambio: ${e.message}`);
+            console.error("Push Delta Error:", e);
+            this.logActivity('ERROR', `Error al transmitir: ${e.message}`);
         }
     }
 
+    // Fixed: Added pushToCloud method to fix "Property 'pushToCloud' does not exist on type 'SyncService'" error in Remitos.tsx
     async pushToCloud() {
-        if (!this.vaultId) return;
-        await this.pushDelta('SYNC_PULSE', { timestamp: Date.now() });
+        const remitos = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
+        await this.pushDelta('REMITOS_SYNC', remitos);
     }
 
     async syncFromRemote(): Promise<boolean> {
         if (!this.vaultId) return false;
-        this.logActivity('IN', 'Sincronización manual solicitada...');
-        window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-            detail: { status: 'OK', engine: 'FIREBASE' } 
-        }));
+        this.connectionTime = new Date(Date.now() - 3600000); // Intenta traer cambios de la última hora
+        this.initFirebase();
         return true;
     }
 
