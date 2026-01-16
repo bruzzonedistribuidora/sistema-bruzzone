@@ -109,8 +109,15 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
     setShowSearchResults(false);
   };
 
-  const updateQuantity = (idx: number, newQty: number) => {
-    setCart(prev => prev.map((item, i) => i === idx ? { ...item, quantity: Math.max(0, newQty) } : item));
+  const normalizeQuantity = (val: string): number => {
+    const normalized = val.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const updateQuantity = (idx: number, newVal: string | number) => {
+    const q = typeof newVal === 'string' ? normalizeQuantity(newVal) : Math.max(0, newVal);
+    setCart(prev => prev.map((item, i) => i === idx ? { ...item, quantity: q } : item));
   };
 
   const handleCreateRemito = async () => {
@@ -257,11 +264,11 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                                         <div className="flex items-center justify-center gap-3 bg-slate-50 border rounded-xl p-1.5 w-fit mx-auto shadow-inner">
                                             <button onClick={() => updateQuantity(i, item.quantity - 1)} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
                                             <input 
-                                                type="number" 
-                                                step="any"
+                                                type="text" 
+                                                inputMode="decimal"
                                                 className="font-black w-16 text-center bg-transparent outline-none text-slate-800 border-none focus:ring-0" 
-                                                value={item.quantity}
-                                                onChange={(e) => updateQuantity(i, parseFloat(e.target.value) || 0)}
+                                                value={item.quantity.toString().replace('.', ',')}
+                                                onChange={(e) => updateQuantity(i, e.target.value)}
                                             />
                                             <button onClick={() => updateQuantity(i, item.quantity + 1)} className="text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                         </div>
