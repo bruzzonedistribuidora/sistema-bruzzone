@@ -5,7 +5,7 @@ import {
     FileSpreadsheet, AlertTriangle, Settings2, CheckCircle,
     ShoppingBag, Laptop, PackagePlus, Globe, Key, Network,
     Tag, Laptop2, Globe2, BarChart3, Activity, DollarSign,
-    Tags, Boxes as BoxesIcon, UserSearch, Search
+    Tags, Boxes as BoxesIcon, UserSearch, Search, Cloud
 } from 'lucide-react';
 import { ViewState, SystemLicense } from '../types';
 
@@ -35,6 +35,7 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.MASS_STOCK_UPDATE, label: "Excel Stock", category: "Inventario", icon: BoxesIcon, color: "bg-cyan-700" },
     { id: ViewState.MASS_PRODUCT_UPDATE, label: "Cambios Masivos", category: "Inventario", icon: Layers, color: "bg-slate-800" },
     { id: ViewState.STOCK_ADJUSTMENT, label: "Ajuste Existencias", category: "Inventario", icon: Settings2, color: "bg-slate-800" },
+    { id: ViewState.STOCK_TRANSFERS, label: "Traslados Stock", category: "Inventario", icon: Activity, color: "bg-indigo-600" },
     
     // COMPRAS Y LOGISTICA
     { id: ViewState.PURCHASES, label: "Gestión Compras", category: "Compras", icon: Truck, color: "bg-blue-500" },
@@ -56,7 +57,8 @@ const ALL_MODULES: ShortcutConfig[] = [
     { id: ViewState.MARKETING, label: "Marketing/Puntos", category: "E-Commerce", icon: Tag, color: "bg-pink-500" },
     
     // SISTEMA
-    { id: ViewState.CLOUD_HUB, label: "Nube / Red LAN", category: "Sistema", icon: Network, color: "bg-indigo-800" },
+    { id: ViewState.CLOUD_HUB, label: "Nube / Red LAN", category: "Sistema", icon: Network, color: "bg-orange-600" },
+    { id: ViewState.CONFIG_PANEL, label: "Configuración", category: "Sistema", icon: Settings2, color: "bg-slate-500" },
 ];
 
 const DEFAULT_SHORTCUTS = [
@@ -103,7 +105,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     <div className="h-full bg-slate-50 flex flex-col overflow-y-auto custom-scrollbar font-sans relative">
       <div className="p-10 md:p-16 flex-1 flex flex-col items-center justify-center max-w-7xl mx-auto w-full min-h-screen">
         <div className="text-center mb-16 space-y-4 animate-fade-in">
-            <h1 className="text-5xl md:text-7xl font-black text-slate-900 uppercase tracking-tighter leading-none">Mi Escritorio</h1>
+            <h1 className="text-5xl md:text-7xl font-black text-slate-900 uppercase tracking-tighter leading-none">Escritorio</h1>
             <p className="text-sm font-black text-slate-400 uppercase tracking-[0.6em]">Bruzzone Cloud Launcher</p>
         </div>
         
@@ -132,7 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 className="bg-slate-100/50 border-4 border-dashed border-slate-200 p-8 rounded-[3rem] flex flex-col items-center justify-center gap-4 text-slate-300 hover:border-indigo-300 hover:text-indigo-400 hover:bg-white transition-all group min-h-[180px]"
             >
                 <Plus size={48} className="group-hover:rotate-90 transition-transform duration-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Personalizar Panel</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Personalizar</span>
             </button>
         </div>
       </div>
@@ -144,8 +146,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                       <div className="flex items-center gap-4">
                         <div className="p-3 bg-indigo-600 rounded-2xl"><Layers size={24}/></div>
                         <div>
-                            <h3 className="text-xl font-black uppercase tracking-widest leading-none">Personalizar Accesos Directos</h3>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Seleccione los módulos que desea ver en su pantalla principal</p>
+                            <h3 className="text-xl font-black uppercase tracking-widest leading-none">Configurar Accesos</h3>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Seleccione los módulos para su pantalla principal</p>
                         </div>
                       </div>
                       <button onClick={() => setIsEditMode(false)} className="p-2 hover:bg-white/10 rounded-full transition-all"><X size={28}/></button>
@@ -172,8 +174,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </div>
                   
                   <div className="p-8 border-t border-slate-100 bg-white flex justify-between items-center shrink-0">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Se han seleccionado {userShortcuts.length} módulos</p>
-                      <button onClick={() => setIsEditMode(false)} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-indigo-600">Finalizar Edición</button>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{userShortcuts.length} Módulos anclados</p>
+                      <button onClick={() => setIsEditMode(false)} className="bg-slate-900 text-white px-12 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-indigo-600">Guardar Cambios</button>
                   </div>
               </div>
           </div>
@@ -182,7 +184,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   );
 };
 
-// Componente auxiliar para el check del modal
 const CheckIcon: React.FC<{ size: number, strokeWidth: number }> = ({ size, strokeWidth }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
         <polyline points="20 6 9 17 4 12" />
