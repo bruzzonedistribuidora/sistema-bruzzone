@@ -154,7 +154,7 @@ export interface CloudConfig { enabled: boolean; vaultId: string; lastSync: stri
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
 export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
-export interface Position { x: number; y: number; visible: boolean; width?: number; height?: number; }
+export interface Position { x: number; y: number; visible: boolean; width?: number; height?: number; fontSize?: number; }
 export interface PrintTemplate { 
     id: string; 
     name: string; 
@@ -199,6 +199,7 @@ export interface PaymentAccount { id: string; type: 'BANK' | 'VIRTUAL_WALLET'; b
 export interface PaymentSystem { id: string; name: string; debitSurcharge: number; ratesUrl: string; creditInstallments: CreditInstallment[]; }
 export interface CreditInstallment { id: string; installments: number; surcharge: number; label: string; }
 export interface LoyaltyConfig { enabled: boolean; pointsPerPeso: number; minPointsToRedeem: number; valuePerPoint: number; }
+export interface CompanyConfig { name: string; fantasyName: string; cuit: string; taxCondition: TaxCondition; iibb: string; startDate: string; address: string; city: string; zipCode: string; phone: string; email: string; web: string; logo: string | null; slogan: string; whatsappNumber: string; defaultProfitMargin: number; paymentAccounts: PaymentAccount[]; paymentMethods: string[]; paymentSystems: PaymentSystem[]; loyalty?: LoyaltyConfig; currencies?: CurrencyQuote[]; headerDisplayMode?: 'LOGO' | 'NAME' | 'BOTH'; }
 export interface CurrencyQuote { id: string; name: string; code: string; value: number; lastUpdate: string; }
 export interface PriceList { id: string; name: string; type: 'BASE' | 'DERIVED'; fixedMargin?: number; baseListId?: string; adjustmentPercentage?: number; active: boolean; }
 export interface ReplenishmentItem { product: Product; quantity: number; selectedProviderId: string; selectedProviderName: string; }
