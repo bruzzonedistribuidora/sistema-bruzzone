@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     Truck, Plus, Search, FileText, X, Save, RefreshCw, 
@@ -6,15 +5,15 @@ import {
     CheckCircle, Wand2, Sparkles, PlusCircle, Calculator,
     Receipt, Tag, Store, DollarSign, ArrowRight, History, Info, Minus
 } from 'lucide-react';
-import { Purchase, Provider, Product, PurchaseItem, CompanyConfig } from '../types';
+import { Purchase, Provider, Product, PurchaseItem, CompanyConfig, ViewState } from '../types';
 import { analyzeInvoice, searchVirtualInventory } from '../services/geminiService';
 
 interface PurchasesProps {
   defaultTab?: string;
-  onNavigateToPrices?: () => void;
+  onNavigate?: (view: ViewState) => void;
 }
 
-const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigateToPrices }) => {
+const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavigate }) => {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [isNewPurchaseModalOpen, setIsNewPurchaseModalOpen] = useState(false);
@@ -181,7 +180,11 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                             <p className="text-lg font-black">{providers.length} Entidades</p>
                         </div>
                     </div>
-                    <button className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">Administrar Fichero</button>
+                    <button 
+                        onClick={() => onNavigate?.(ViewState.PROVIDERS)}
+                        className="w-full bg-white/10 hover:bg-white/20 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                        Administrar Fichero
+                    </button>
                 </div>
           </div>
 
@@ -239,7 +242,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
                   <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50/50 custom-scrollbar">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
-                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2">Proveedor</label>
+                              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-2 block mb-2">Proveedor</label>
                               <select className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-indigo-600 outline-none font-bold uppercase text-xs" value={selectedProvider} onChange={e => setSelectedProvider(e.target.value)}>
                                   <option value="">{purchaseMode === 'IA' ? aiResult?.nombreEmisor : '-- SELECCIONE PROVEEDOR --'}</option>
                                   {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
