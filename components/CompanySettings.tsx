@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     Save, Building2, CreditCard, Plus, Trash2, CheckCircle, 
@@ -324,7 +323,7 @@ const CompanySettings: React.FC = () => {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {formData.paymentAccounts?.map(acc => (
-                            <div key={acc.id} className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 relative group">
+                            <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-200 relative group">
                                 <button onClick={() => setFormData(prev => ({...prev, paymentAccounts: prev.paymentAccounts.filter(a => a.id !== acc.id)}))} className="absolute top-6 right-6 p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={20}/></button>
                                 <div className="grid grid-cols-1 gap-4">
                                     <div className="flex gap-4 mb-4">
@@ -403,6 +402,15 @@ const CompanySettings: React.FC = () => {
                             </div>
                         )}
                     </div>
+                    
+                    <div className="bg-indigo-600 p-6 rounded-3xl text-white shadow-xl">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <Info size={14}/> Ayuda: Configuración
+                        </h4>
+                        <p className="text-[11px] leading-relaxed font-medium">
+                            Los planes de cuotas que definas aquí aparecerán automáticamente en la caja (POS) cuando selecciones el método <strong>Crédito</strong>. El interés se sumará al total de la venta.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="lg:col-span-2">
@@ -433,14 +441,14 @@ const CompanySettings: React.FC = () => {
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center mb-2">
-                                        <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Planes de Crédito</h4>
+                                        <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-widest">Planes de Crédito (Cuotas)</h4>
                                         <button onClick={() => addInstallment(selectedSystemId)} className="text-[9px] font-black text-indigo-600 uppercase flex items-center gap-1 hover:underline"><Plus size={12}/> Añadir Plan</button>
                                     </div>
                                     <div className="space-y-3">
                                         {formData.paymentSystems?.find(s => s.id === selectedSystemId)?.creditInstallments.map(plan => (
                                             <div key={plan.id} className="bg-white p-4 border border-slate-200 rounded-2xl flex items-center gap-4 group">
                                                 <div className="w-16">
-                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Cuotas</label>
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Cant.</label>
                                                     <input type="number" className="w-full p-1 bg-slate-50 border rounded font-black text-center" value={plan.installments} onChange={e => updateInstallment(selectedSystemId, plan.id, {installments: parseInt(e.target.value)||1})} />
                                                 </div>
                                                 <div className="flex-1">
@@ -448,7 +456,7 @@ const CompanySettings: React.FC = () => {
                                                     <input type="number" className="w-full p-1 bg-slate-50 border rounded font-black text-indigo-600" value={plan.surcharge} onChange={e => updateInstallment(selectedSystemId, plan.id, {surcharge: parseFloat(e.target.value)||0})} />
                                                 </div>
                                                 <div className="flex-1">
-                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Etiqueta</label>
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase block mb-1">Nombre</label>
                                                     <input type="text" className="w-full p-1 bg-slate-50 border rounded font-bold text-[9px] uppercase" value={plan.label} onChange={e => updateInstallment(selectedSystemId, plan.id, {label: e.target.value})} />
                                                 </div>
                                                 <button onClick={() => deleteInstallment(selectedSystemId, plan.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={16}/></button>
