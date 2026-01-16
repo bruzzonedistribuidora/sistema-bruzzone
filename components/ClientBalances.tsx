@@ -7,7 +7,7 @@ import {
     PieChart, UserCheck, UserX, X, Save, Banknote, Smartphone as ECheqIcon,
     Landmark, CreditCard, FileText, RefreshCw
 } from 'lucide-react';
-import { Client, CurrentAccountMovement, Check } from '../types';
+import { Client, CurrentAccountMovement, Check, CompanyConfig } from '../types';
 
 interface ClientBalancesProps {
     onNavigateToHistory?: (client: Client) => void;
@@ -18,6 +18,11 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
     const [isSyncing, setIsSyncing] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
 
+    const companyConfig: CompanyConfig = useMemo(() => {
+        const saved = localStorage.getItem('company_config');
+        return saved ? JSON.parse(saved) : { fantasyName: 'Ferretería' };
+    }, []);
+
     const loadClients = () => {
         const saved = localStorage.getItem('ferrecloud_clients');
         setClients(saved ? JSON.parse(saved) : []);
@@ -27,7 +32,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
 
     useEffect(() => {
         loadClients();
-        // Escuchar cambios de red o de otros componentes
         window.addEventListener('storage', loadClients);
         window.addEventListener('ferrecloud_sync_pulse', loadClients);
         return () => {
@@ -49,14 +53,12 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
 
     const [filterType, setFilterType] = useState<'ALL_DEBT' | 'HIGH_DEBT'>('ALL_DEBT');
 
-    // Lógica de filtrado corregida: Si hay búsqueda, ignora el filtro de deuda mayor a cero para poder encontrar a cualquiera
     const filteredClients = useMemo(() => {
         return clients.filter(c => {
             const matchesSearch = (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                                  (c.cuit || '').includes(searchTerm) ||
                                  (c.dni || '').includes(searchTerm);
             
-            // Si no está buscando, aplicar filtros de segmentación de deuda
             if (searchTerm.trim() === '') {
                 if (filterType === 'HIGH_DEBT') return c.balance > 100000;
                 return c.balance > 0;
@@ -70,6 +72,22 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
         clients.reduce((acc, curr) => acc + (curr.balance || 0), 0), 
     [clients]);
 
+    const handleWhatsAppReminder = (client: Client) => {
+        if (!client.phone) {
+            alert("El cliente no tiene un número de teléfono registrado.");
+            return;
+        }
+
+        const cleanPhone = client.phone.replace(/\D/g, '');
+        const businessName = companyConfig.fantasyName || 'la ferretería';
+        const amount = client.balance.toLocaleString('es-AR', { minimumFractionDigits: 2 });
+        
+        const message = `Hola ${client.name}, te contactamos de ${businessName} referente a tu cuenta corriente. Tu saldo pendiente actual es de $${amount}. ¿Podrías confirmarnos cuándo podrías regularizarlo? ¡Muchas gracias!`;
+        
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');
+    };
+
     const handleSaveReceipt = () => {
         if (!selectedClientForReceipt || !receiptForm.amount) return;
         const amountNum = parseFloat(receiptForm.amount);
@@ -77,12 +95,10 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
         const newBalance = (selectedClientForReceipt.balance || 0) - amountNum;
         const receiptId = `REC-${Date.now().toString().slice(-6)}`;
         
-        // 1. Actualizar saldo del cliente
         const updatedClients = clients.map(c => c.id === selectedClientForReceipt.id ? { ...c, balance: newBalance } : c);
         setClients(updatedClients);
         localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
 
-        // 2. Registrar movimiento en cuenta corriente
         const movements: CurrentAccountMovement[] = JSON.parse(localStorage.getItem('ferrecloud_movements') || '[]');
         movements.push({
             id: receiptId,
@@ -96,7 +112,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
         });
         localStorage.setItem('ferrecloud_movements', JSON.stringify(movements));
 
-        // 3. Si es cheque, registrar en cartera
         if (receiptForm.method === 'CHEQUE' || receiptForm.method === 'E-CHEQ') {
             const checks: Check[] = JSON.parse(localStorage.getItem('ferrecloud_checks') || '[]');
             const newCheck: Check = {
@@ -116,7 +131,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
         setSelectedClientForReceipt(null);
         setReceiptForm({ amount: '', method: 'EFECTIVO', notes: '', checkNumber: '', checkBank: '', checkDueDate: new Date().toISOString().split('T')[0] });
         
-        // Notificar cambio a la nube
         window.dispatchEvent(new Event('ferrecloud_request_pulse'));
         alert("✅ Recibo emitido y saldo actualizado correctamente.");
     };
@@ -152,7 +166,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase italic px-2">Escribe para encontrar cualquier cliente, incluso sin deuda.</p>
                     </div>
 
                     <div className="space-y-3 pt-6">
@@ -198,7 +211,7 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                         <p className="font-black text-slate-800 text-sm uppercase tracking-tight leading-none mb-1.5 group-hover:text-indigo-600 transition-colors">{client.name}</p>
                                         <div className="flex gap-4">
                                             <p className="text-[10px] text-slate-400 font-mono font-bold tracking-tighter uppercase">ID: {client.id.slice(-6)}</p>
-                                            {client.cuit && <p className="text-[10px] text-slate-400 font-mono font-bold tracking-tighter uppercase">CUIT: {client.cuit}</p>}
+                                            {client.phone && <p className="text-[10px] text-slate-400 font-mono font-bold tracking-tighter uppercase flex items-center gap-1"><Phone size={10}/> {client.phone}</p>}
                                         </div>
                                     </td>
                                     <td className={`px-10 py-6 text-right font-black text-2xl tracking-tighter ${client.balance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -211,6 +224,14 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                                 className="bg-emerald-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all flex items-center gap-2 active:scale-95">
                                                 <CheckCircle size={16}/> Cobrar
                                             </button>
+                                            {client.balance > 0 && (
+                                                <button 
+                                                    onClick={() => handleWhatsAppReminder(client)}
+                                                    title="Reclamar deuda por WhatsApp"
+                                                    className="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all border border-green-100 shadow-sm">
+                                                    <MessageCircle size={18}/>
+                                                </button>
+                                            )}
                                             <button onClick={() => onNavigateToHistory?.(client)} className="p-2.5 bg-slate-100 text-slate-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
                                                 <History size={18}/>
                                             </button>
@@ -218,16 +239,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                     </td>
                                 </tr>
                             ))}
-                            {filteredClients.length === 0 && (
-                                <tr>
-                                    <td colSpan={3} className="py-40 text-center">
-                                        <div className="flex flex-col items-center opacity-20">
-                                            <Users size={64} strokeWidth={1} className="mb-4" />
-                                            <p className="text-[11px] font-black uppercase tracking-widest">No se encontraron clientes para la búsqueda</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
@@ -287,10 +298,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                     </h4>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Nº Cheque</label>
-                                            <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" placeholder="Ej: 887221" value={receiptForm.checkNumber} onChange={e => setReceiptForm({...receiptForm, checkNumber: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
                                             <label className="text-[8px] font-black text-slate-400 uppercase ml-1">Entidad Emisora</label>
                                             <input className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-xs uppercase" placeholder="Ej: Banco Nación" value={receiptForm.checkBank} onChange={e => setReceiptForm({...receiptForm, checkBank: e.target.value})} />
                                         </div>
@@ -316,7 +323,6 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                 <button onClick={handleSaveReceipt} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all active:scale-95 text-xs">
                                     <Save size={20}/> Procesar Recibo Pro
                                 </button>
-                                <p className="text-center text-[9px] text-slate-400 mt-4 font-bold uppercase tracking-widest">El saldo del cliente se actualizará en tiempo real en todas las cajas</p>
                             </div>
                         </div>
                     </div>
