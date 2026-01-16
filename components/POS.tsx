@@ -21,7 +21,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
+    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'CREDITO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
     
     // Configuración de Empresa para Cuotas
@@ -233,8 +233,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 { id: 'EFECTIVO', icon: Banknote },
-                                { id: 'DEBITO', label: 'DÉBITO', icon: CreditCard },
-                                { id: 'CREDITO', label: 'CRÉDITO', icon: CreditCard },
+                                { id: 'CREDITO', label: 'TARJETA', icon: CreditCard },
                                 { id: 'TRANSFERENCIA', icon: Landmark },
                                 { id: 'CTACTE', icon: FileText },
                                 { id: 'CHEQUE', icon: FileText },
