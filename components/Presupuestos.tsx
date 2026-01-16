@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, Trash2, Save, FileText, X, 
@@ -55,7 +54,13 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
   };
 
   const updateQuantity = (productId: string, newQty: number) => {
-    setCart(prev => prev.map(item => item.product.id === productId ? { ...item, quantity: newQty, subtotal: newQty * item.appliedPrice } : item));
+    setCart(prev => prev.map(item => {
+        if (item.product.id === productId) {
+            const q = Math.max(0, newQty);
+            return { ...item, quantity: q, subtotal: q * item.appliedPrice };
+        }
+        return item;
+    }));
   };
 
   const handleSaveBudget = () => {
@@ -143,14 +148,14 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
                                     <tr key={idx} className="hover:bg-gray-50">
                                         <td className="px-8 py-5"><p className="font-black text-slate-800 uppercase text-xs mb-1">{item.product.name}</p></td>
                                         <td className="px-6 py-5">
-                                            <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto">
-                                                <button onClick={() => updateQuantity(item.product.id, Math.max(0, item.quantity - 0.1))}><Minus size={14}/></button>
+                                            <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto shadow-inner">
+                                                <button onClick={() => updateQuantity(item.product.id, item.quantity - 0.1)}><Minus size={14}/></button>
                                                 <input 
                                                     type="number" 
-                                                    step="0.001"
-                                                    className="font-black w-14 text-center bg-transparent outline-none" 
+                                                    step="any"
+                                                    className="font-black w-16 text-center bg-transparent outline-none border-none focus:ring-0" 
                                                     value={item.quantity}
-                                                    onChange={(e) => updateQuantity(item.product.id, parseFloat(e.target.value.replace(',', '.')) || 0)}
+                                                    onChange={(e) => updateQuantity(item.product.id, parseFloat(e.target.value) || 0)}
                                                 />
                                                 <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)}><Plus size={14}/></button>
                                             </div>
