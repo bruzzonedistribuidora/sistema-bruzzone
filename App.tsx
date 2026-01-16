@@ -98,7 +98,7 @@ const App: React.FC = () => {
       case ViewState.CUSTOMER_PORTAL: 
         if (!selectedClientForPortal) { handleNavigate(ViewState.CLIENTS); return null; }
         return <CustomerPortal client={selectedClientForPortal} onLogout={() => { setSelectedClientForPortal(null); handleNavigate(ViewState.CLIENTS); }} />;
-      case ViewState.CLIENT_BALANCES: return <ClientBalances />;
+      case ViewState.CLIENT_BALANCES: return <ClientBalances onNavigateToHistory={() => handleNavigate(ViewState.CLIENT_BALANCES)} />;
       case ViewState.PROVIDER_BALANCES: return <ProviderBalances />;
       case ViewState.REMITOS: return <Remitos initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
       case ViewState.PRESUPUESTOS: return <Presupuestos initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
