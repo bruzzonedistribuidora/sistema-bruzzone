@@ -53,10 +53,16 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
     setShowSearchResults(false);
   };
 
-  const updateQuantity = (productId: string, newQty: number) => {
+  const normalizeQuantity = (val: string): number => {
+    const normalized = val.replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const updateQuantity = (productId: string, newVal: string | number) => {
+    const q = typeof newVal === 'string' ? normalizeQuantity(newVal) : Math.max(0, newVal);
     setCart(prev => prev.map(item => {
         if (item.product.id === productId) {
-            const q = Math.max(0, newQty);
             return { ...item, quantity: q, subtotal: q * item.appliedPrice };
         }
         return item;
@@ -151,11 +157,11 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
                                             <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto shadow-inner">
                                                 <button onClick={() => updateQuantity(item.product.id, item.quantity - 0.1)}><Minus size={14}/></button>
                                                 <input 
-                                                    type="number" 
-                                                    step="any"
+                                                    type="text" 
+                                                    inputMode="decimal"
                                                     className="font-black w-16 text-center bg-transparent outline-none border-none focus:ring-0" 
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateQuantity(item.product.id, parseFloat(e.target.value) || 0)}
+                                                    value={item.quantity.toString().replace('.', ',')}
+                                                    onChange={(e) => updateQuantity(item.product.id, e.target.value)}
                                                 />
                                                 <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)}><Plus size={14}/></button>
                                             </div>
