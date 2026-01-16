@@ -2,9 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Search, Save, X, Layers, CheckCircle, Trash2, Filter, 
     ArrowRight, Info, AlertTriangle, Package, Tag, Building2, 
-    Percent, DollarSign, RefreshCw, Smartphone, Plus, CheckSquare, Square,
-    ChevronRight, Boxes, ListFilter, Zap, ChevronUp, ChevronDown,
-    Calculator, Trash, Check as CheckIcon
+    Percent, DollarSign, RefreshCw, Plus, CheckSquare, Square,
+    Check as CheckIcon, Calculator, Trash
 } from 'lucide-react';
 import { Product, Brand, Category, Provider } from '../types';
 import { productDB } from '../services/storageService';
@@ -40,15 +39,14 @@ const MassProductUpdate: React.FC = () => {
     const [isApplying, setIsApplying] = useState(false);
 
     const loadProducts = async () => {
+        setIsApplying(true);
         const all = await productDB.getAll();
         setProducts(all);
+        setIsApplying(false);
     };
 
     useEffect(() => {
         loadProducts();
-        const handleUpdate = () => loadProducts();
-        window.addEventListener('ferrecloud_products_updated', handleUpdate);
-        return () => window.removeEventListener('ferrecloud_products_updated', handleUpdate);
     }, []);
 
     const filteredProducts = useMemo(() => {
@@ -98,24 +96,23 @@ const MassProductUpdate: React.FC = () => {
             if (massForm.stockMaximo !== '') updates.stockMaximo = parseFloat(massForm.stockMaximo);
             if (massForm.profitMargin !== '') updates.profitMargin = parseFloat(massForm.profitMargin);
             if (massForm.vatRate !== '') updates.vatRate = parseFloat(massForm.vatRate);
-            if (massForm.purchasePackageQuantity !== '') updates.purchasePackageQuantity = parseFloat(massForm.purchasePackageQuantity);
 
             nextTemp[id] = { ...(nextTemp[id] || {}), ...updates };
         });
 
         setTempChanges(nextTemp);
-        alert(`Aplicado a ${selectedIds.size} ítems. Presione 'Guardar' para persistir.`);
+        alert(`Cambios aplicados temporalmente a ${selectedIds.size} ítems. Presione 'Guardar' para finalizar.`);
     };
 
     const handleSaveToDB = async () => {
         const idsToUpdate = Object.keys(tempChanges);
         if (idsToUpdate.length === 0) {
-            alert("No hay cambios pendientes para guardar.");
+            alert("No hay cambios pendientes.");
             return;
         }
 
         setIsApplying(true);
-        const updatedProducts = products.filter(p => idsToUpdate.includes(p.id)).map(p => {
+        const productsToSave = products.filter(p => idsToUpdate.includes(p.id)).map(p => {
             const updates = tempChanges[p.id];
             const updated = { ...p, ...updates };
             
@@ -126,98 +123,99 @@ const MassProductUpdate: React.FC = () => {
                 updated.priceNeto = parseFloat(priceNeto.toFixed(2));
                 updated.priceFinal = parseFloat(priceFinal.toFixed(2));
             }
-            
             return updated;
         });
 
-        await productDB.saveBulk(updatedProducts);
+        await productDB.saveBulk(productsToSave);
         setTempChanges({});
+        setSelectedIds(new Set());
         await loadProducts();
         setIsApplying(false);
-        alert("✅ Cambios guardados exitosamente en la base de datos.");
+        alert("✅ Cambios guardados permanentemente.");
     };
 
     return (
-        <div className="h-full bg-slate-300 p-2 flex flex-col space-y-2 font-sans overflow-hidden border-4 border-slate-400">
+        <div className="h-full bg-[#d4d0c8] p-1 flex flex-col space-y-1 font-sans overflow-hidden border-2 border-slate-400">
             
-            {/* BLOQUE 1: FILTROS DE BUSQUEDA */}
-            <div className="bg-slate-200 border border-slate-500 p-3 rounded shadow-sm">
-                <div className="flex items-center gap-2 mb-2 border-b border-slate-400 pb-1">
-                    <span className="text-[10px] font-black uppercase text-slate-600">Filtros de busqueda</span>
+            {/* PANEL 1: FILTROS */}
+            <div className="bg-[#d4d0c8] border border-slate-500 p-2 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase text-slate-800 bg-[#c0c0c0] px-2 border-x border-t border-slate-500 -mb-px">Filtros de busqueda</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-1 border border-slate-500 p-2 pt-3">
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Nombre:</label>
-                        <input className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchName} onChange={e => setSearchName(e.target.value)} />
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Nombre:</label>
+                        <input className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={searchName} onChange={e => setSearchName(e.target.value)} />
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Codigo:</label>
-                        <input className="flex-1 border border-slate-400 bg-white p-1 text-xs" value={searchCode} onChange={e => setSearchCode(e.target.value)} />
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Codigo:</label>
+                        <input className="flex-1 border border-slate-400 bg-white p-0.5 text-xs" value={searchCode} onChange={e => setSearchCode(e.target.value)} />
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Marca:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchBrand} onChange={e => setSearchBrand(e.target.value)}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Marca:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={searchBrand} onChange={e => setSearchBrand(e.target.value)}>
                             <option value="">TODAS</option>
                             {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Rubro:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchCategory} onChange={e => setSearchCategory(e.target.value)}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Rubro:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={searchCategory} onChange={e => setSearchCategory(e.target.value)}>
                             <option value="">TODOS</option>
                             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Proveedor:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={searchProvider} onChange={e => setSearchProvider(e.target.value)}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Proveedor:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={searchProvider} onChange={e => setSearchProvider(e.target.value)}>
                             <option value="">TODOS</option>
                             {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                         </select>
                     </div>
-                    <div className="flex items-center gap-4 col-span-2 pl-24">
+                    <div className="flex items-center gap-3 col-span-2">
                         <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Sincroniza Online</label>
                         <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Tiene Foto</label>
                         <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Con Stock</label>
+                        <label className="flex items-center gap-1 text-[10px] font-bold"><input type="checkbox" className="w-3 h-3" /> Usa Balanza</label>
                     </div>
                     <div className="flex justify-end">
-                        <button onClick={loadProducts} className="bg-slate-100 border-2 border-slate-500 px-6 py-1 font-bold text-xs hover:bg-slate-200 flex items-center gap-2">
-                            <Search size={14}/> Buscar
+                        <button onClick={loadProducts} className="bg-[#e1e1e1] border border-slate-500 px-4 py-0.5 font-bold text-xs hover:bg-white shadow-sm flex items-center gap-1">
+                            <Search size={12}/> Buscar
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* BLOQUE 2: ATRIBUTOS A CAMBIAR */}
-            <div className="bg-slate-200 border border-slate-500 p-3 rounded shadow-sm">
-                <div className="flex items-center gap-2 mb-2 border-b border-slate-400 pb-1">
-                    <span className="text-[10px] font-black uppercase text-slate-600">Seleccione los productos y atributos a cambiar</span>
+            {/* PANEL 2: ATRIBUTOS A CAMBIAR */}
+            <div className="bg-[#d4d0c8] border border-slate-500 p-2 shadow-inner">
+                <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase text-slate-800 bg-[#c0c0c0] px-2 border-x border-t border-slate-500 -mb-px">Seleccione los productos y atributos a cambiar</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-2 border border-slate-500 p-2 pt-3">
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Marca:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.brand} onChange={e => setMassForm({...massForm, brand: e.target.value})}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Marca:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={massForm.brand} onChange={e => setMassForm({...massForm, brand: e.target.value})}>
                             <option value="">-- NO CAMBIAR --</option>
                             {brands.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Rubro:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.category} onChange={e => setMassForm({...massForm, category: e.target.value})}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Rubro:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={massForm.category} onChange={e => setMassForm({...massForm, category: e.target.value})}>
                             <option value="">-- NO CAMBIAR --</option>
                             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Proveedor:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs uppercase" value={massForm.provider} onChange={e => setMassForm({...massForm, provider: e.target.value})}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Proveedor:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs uppercase" value={massForm.provider} onChange={e => setMassForm({...massForm, provider: e.target.value})}>
                             <option value="">-- NO CAMBIAR --</option>
                             {providers.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">IVA:</label>
-                        <select className="flex-1 border border-slate-400 bg-white p-1 text-xs" value={massForm.vatRate} onChange={e => setMassForm({...massForm, vatRate: e.target.value})}>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">IVA:</label>
+                        <select className="flex-1 border border-slate-400 bg-white p-0.5 text-xs" value={massForm.vatRate} onChange={e => setMassForm({...massForm, vatRate: e.target.value})}>
                             <option value="">-- NO CAMBIAR --</option>
                             <option value="21">21.0%</option>
                             <option value="10.5">10.5%</option>
@@ -225,115 +223,114 @@ const MassProductUpdate: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">P.Pedido:</label>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">P.Pedido:</label>
                         <div className="flex items-center gap-1 flex-1">
-                             <input type="checkbox" className="w-3 h-3" />
-                             <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})} />
+                             <input type="checkbox" className="w-3 h-3" checked={massForm.reorderPoint !== ''} readOnly />
+                             <input type="number" className="flex-1 border border-slate-400 bg-white p-0.5 text-xs text-right" value={massForm.reorderPoint} onChange={e => setMassForm({...massForm, reorderPoint: e.target.value})} />
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">Stock Des.:</label>
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">Stock Des.:</label>
                         <div className="flex items-center gap-1 flex-1">
-                             <input type="checkbox" className="w-3 h-3" />
-                             <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})} />
+                             <input type="checkbox" className="w-3 h-3" checked={massForm.stockMaximo !== ''} readOnly />
+                             <input type="number" className="flex-1 border border-slate-400 bg-white p-0.5 text-xs text-right" value={massForm.stockMaximo} onChange={e => setMassForm({...massForm, stockMaximo: e.target.value})} />
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="w-20 text-right text-[11px] font-bold">% Ganancia:</label>
-                        <input type="number" className="flex-1 border border-slate-400 bg-white p-1 text-xs text-right text-indigo-700 font-bold" value={massForm.profitMargin} onChange={e => setMassForm({...massForm, profitMargin: e.target.value})} />
+                        <label className="w-16 text-right text-[11px] font-bold text-slate-700">% Ganancia:</label>
+                        <input type="number" className="flex-1 border border-slate-400 bg-white p-0.5 text-xs text-right text-indigo-800 font-black" value={massForm.profitMargin} onChange={e => setMassForm({...massForm, profitMargin: e.target.value})} />
                     </div>
-                    <div className="flex justify-end">
-                        <button onClick={handleApplyMassChanges} className="bg-slate-100 border-2 border-green-700 text-green-800 px-6 py-1 font-black text-xs hover:bg-green-50 flex items-center gap-2 shadow-sm">
+                    <div className="flex justify-end items-center">
+                        <button onClick={handleApplyMassChanges} className="bg-[#e1e1e1] border border-slate-500 px-6 py-1 font-black text-xs text-green-700 hover:bg-green-50 shadow-sm flex items-center gap-1">
                             <CheckIcon size={14}/> Aplicar
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* BLOQUE 3: GRILLA RESULTADOS */}
-            <div className="flex-1 bg-white border border-slate-500 overflow-hidden flex flex-col rounded-sm">
+            {/* GRILLA DE ARTICULOS */}
+            <div className="flex-1 bg-white border border-slate-500 overflow-hidden flex flex-col shadow-inner">
                 <div className="overflow-auto flex-1 custom-scrollbar">
                     <table className="w-full text-left border-collapse min-w-max">
-                        <thead className="bg-slate-800 text-white text-[10px] font-black uppercase sticky top-0 z-10">
+                        <thead className="bg-[#000000] text-white text-[10px] font-black uppercase sticky top-0 z-10">
                             <tr className="divide-x divide-slate-600">
-                                <th className="p-2 w-10 text-center">
-                                    <button onClick={toggleSelectAll} className="w-4 h-4 bg-white border border-slate-400 rounded flex items-center justify-center">
-                                        {selectedIds.size > 0 && <div className="w-2 h-2 bg-indigo-600"></div>}
+                                <th className="p-1.5 w-10 text-center">
+                                    <button onClick={toggleSelectAll} className="w-4 h-4 bg-white border border-slate-400 rounded-sm flex items-center justify-center">
+                                        {/* Fix: Replaced undefined 'filteredAndSorted' with 'filteredProducts' */}
+                                        {selectedIds.size === filteredProducts.length && filteredProducts.length > 0 && <div className="w-2 h-2 bg-indigo-600"></div>}
                                     </button>
                                 </th>
-                                <th className="p-2">Codigo</th>
-                                <th className="p-2">Nombre</th>
-                                <th className="p-2 text-center">Stock Cal.</th>
-                                <th className="p-2 text-center">Pto.Pedido</th>
-                                <th className="p-2 text-center">Stock Deseado</th>
-                                <th className="p-2">Marca</th>
-                                <th className="p-2">Rubro</th>
-                                <th className="p-2">Proveedor</th>
-                                <th className="p-2 text-right">Ganancia</th>
+                                <th className="p-1.5">dadStock</th>
+                                <th className="p-1.5">Anterior</th>
+                                <th className="p-1.5">Codigo</th>
+                                <th className="p-1.5">Nombre</th>
+                                <th className="p-1.5 text-center">StockCalculado</th>
+                                <th className="p-1.5 text-center">Punto Pedido</th>
+                                <th className="p-1.5 text-center">Stock Deseado</th>
+                                <th className="p-1.5">Marca</th>
+                                <th className="p-1.5">Rubro</th>
+                                <th className="p-1.5">Proveedor</th>
                             </tr>
                         </thead>
                         <tbody className="text-[11px] divide-y divide-slate-200">
+                            {/* Fix: Replaced undefined 'filteredAndSorted' with 'filteredProducts' */}
                             {filteredProducts.map(p => {
                                 const changes = tempChanges[p.id] || {};
                                 return (
-                                    <tr key={p.id} className={`hover:bg-yellow-50 transition-colors divide-x divide-slate-100 ${selectedIds.has(p.id) ? 'bg-blue-50' : ''}`}>
-                                        <td className="p-2 text-center">
+                                    <tr key={p.id} className={`hover:bg-[#fff9c4] transition-colors divide-x divide-slate-100 ${selectedIds.has(p.id) ? 'bg-[#e3f2fd]' : ''}`}>
+                                        <td className="p-1 text-center">
                                             <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelectOne(p.id)} />
                                         </td>
-                                        <td className="p-2 font-bold text-indigo-700">{p.internalCodes[0]}</td>
-                                        <td className="p-2 font-bold uppercase truncate max-w-[300px]">{p.name}</td>
-                                        <td className="p-2 text-center font-black text-slate-500">{p.stock}</td>
-                                        <td className="p-2 text-center font-bold">
-                                            {changes.reorderPoint !== undefined ? <span className="text-green-600">{changes.reorderPoint}</span> : p.reorderPoint}
+                                        <td className="p-1 text-center">{p.purchasePackageQuantity || 1}</td>
+                                        <td className="p-1 text-slate-400">---</td>
+                                        <td className="p-1 font-bold text-indigo-700">{p.internalCodes[0]}</td>
+                                        <td className="p-1 font-black uppercase truncate max-w-[250px]">{p.name}</td>
+                                        <td className="p-1 text-center font-bold text-slate-600">{p.stock}</td>
+                                        <td className="p-1 text-center">
+                                            {changes.reorderPoint !== undefined ? <span className="text-green-700 font-black">{changes.reorderPoint}</span> : p.reorderPoint}
                                         </td>
-                                        <td className="p-2 text-center font-bold">
-                                            {changes.stockMaximo !== undefined ? <span className="text-green-600">{changes.stockMaximo}</span> : p.stockMaximo}
+                                        <td className="p-1 text-center">
+                                            {changes.stockMaximo !== undefined ? <span className="text-green-700 font-black">{changes.stockMaximo}</span> : p.stockMaximo}
                                         </td>
-                                        <td className={`p-2 uppercase font-bold ${changes.brand ? 'text-green-600' : 'text-slate-400'}`}>
+                                        <td className={`p-1 uppercase ${changes.brand ? 'text-green-700 font-black' : 'text-slate-500 font-bold'}`}>
                                             {changes.brand || p.brand}
                                         </td>
-                                        <td className={`p-2 uppercase font-bold ${changes.category ? 'text-green-600' : 'text-slate-400'}`}>
+                                        <td className={`p-1 uppercase ${changes.category ? 'text-green-700 font-black' : 'text-slate-500 font-bold'}`}>
                                             {changes.category || p.category}
                                         </td>
-                                        <td className={`p-2 uppercase font-bold ${changes.provider ? 'text-green-600' : 'text-slate-400'}`}>
+                                        <td className={`p-1 uppercase ${changes.provider ? 'text-green-700 font-black' : 'text-slate-500 font-bold'}`}>
                                             {changes.provider || p.provider}
-                                        </td>
-                                        <td className={`p-2 text-right font-black ${changes.profitMargin ? 'text-green-600' : 'text-slate-900'}`}>
-                                            {changes.profitMargin || p.profitMargin}%
                                         </td>
                                     </tr>
                                 );
                             })}
-                            {filteredProducts.length === 0 && (
-                                <tr><td colSpan={10} className="p-20 text-center text-slate-300 font-black uppercase tracking-widest">No hay artículos para los filtros seleccionados</td></tr>
-                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            {/* BARRA DE ACCIONES INFERIOR */}
-            <div className="bg-slate-200 border-t-2 border-slate-500 p-2 flex justify-between items-center shrink-0">
+            {/* BOTONES DE ACCION INFERIOR */}
+            <div className="bg-[#d4d0c8] border-t border-slate-500 p-2 flex justify-between items-center shrink-0">
                 <button 
-                    onClick={() => { if(confirm('¿Eliminar seleccionados?')) setSelectedIds(new Set()); }}
-                    className="flex items-center gap-2 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded font-bold text-[10px] uppercase hover:bg-red-200"
+                    onClick={() => { if(confirm('¿Eliminar seleccionados del listado actual?')) setSelectedIds(new Set()); }}
+                    className="flex items-center gap-1 bg-[#f8d7da] border border-red-400 text-red-700 px-3 py-1 font-bold text-[10px] uppercase hover:bg-red-200"
                 >
-                    <Trash size={14}/> Eliminar productos seleccionados
+                    <Trash size={12}/> Eliminar productos seleccionados
                 </button>
                 
                 <div className="flex gap-2">
                     <button 
                         onClick={handleSaveToDB} 
                         disabled={isApplying || Object.keys(tempChanges).length === 0}
-                        className="bg-slate-800 text-white border-b-4 border-slate-900 px-10 py-2 rounded font-black text-xs uppercase flex items-center gap-2 hover:bg-slate-700 active:translate-y-1 transition-all disabled:opacity-30 shadow-lg"
+                        className="bg-[#e1e1e1] border border-slate-800 px-8 py-1.5 font-black text-xs uppercase flex items-center gap-2 hover:bg-white active:bg-slate-200 transition-all disabled:opacity-30 shadow-sm"
                     >
-                        {isApplying ? <RefreshCw className="animate-spin" size={14}/> : <Save size={16}/>} Guardar
+                        {isApplying ? <RefreshCw className="animate-spin" size={14}/> : <CheckCircle size={14}/>} Guardar
                     </button>
                     <button 
                         onClick={() => { setTempChanges({}); setSelectedIds(new Set()); }}
-                        className="bg-slate-100 border-2 border-slate-500 px-8 py-2 rounded font-black text-xs uppercase hover:bg-slate-200 shadow-sm"
+                        className="bg-[#e1e1e1] border border-slate-500 px-6 py-1.5 font-bold text-xs uppercase hover:bg-white shadow-sm flex items-center gap-1"
                     >
-                        <X size={16}/> Cancelar
+                        <X size={14}/> Cancelar
                     </button>
                 </div>
             </div>
