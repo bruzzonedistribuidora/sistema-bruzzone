@@ -1,14 +1,7 @@
-
-import { 
-    collection, 
-    addDoc, 
-    onSnapshot, 
-    query, 
-    serverTimestamp, 
-    orderBy, 
-    where,
-    Timestamp
-} from "firebase/firestore";
+// Added comment above the fix
+// Migrated to Firebase v8 syntax to fix 'no exported member' errors (collection, addDoc, etc.) in the modular imports
+import firebase from "firebase/app";
+import "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { productDB } from "./storageService";
 
@@ -75,15 +68,12 @@ class SyncService {
 
         this.logActivity('IN', 'Iniciando escucha de cambios en tiempo real...');
 
-        // Escuchamos todos los cambios creados DESPUÉS de que esta sesión inició
-        // Esto evita procesar miles de registros antiguos del historial
-        const q = query(
-            collection(db, "vaults", this.vaultId, "deltas"),
-            where("createdAt", ">", Timestamp.fromDate(this.connectionTime)),
-            orderBy("createdAt", "asc")
-        );
+        // Updated to v8 style query: doc().collection().where().orderBy()
+        const q = db.collection("vaults").doc(this.vaultId).collection("deltas")
+            .where("createdAt", ">", firebase.firestore.Timestamp.fromDate(this.connectionTime))
+            .orderBy("createdAt", "asc");
 
-        this.unsubscribe = onSnapshot(q, (snapshot) => {
+        this.unsubscribe = q.onSnapshot((snapshot) => {
             snapshot.docChanges().forEach(async (change) => {
                 if (change.type === "added") {
                     const data = change.doc.data();
@@ -154,13 +144,13 @@ class SyncService {
         if (!this.vaultId || !db) return;
 
         try {
-            // Añadimos a la subcolección deltas de la bóveda específica
-            await addDoc(collection(db, "vaults", this.vaultId, "deltas"), {
+            // v8 style collection.add instead of modular addDoc
+            await db.collection("vaults").doc(this.vaultId).collection("deltas").add({
                 type,
                 payload,
                 sid: this.sessionId,
                 terminal: localStorage.getItem('ferrecloud_terminal_name') || 'PC-DESCONOCIDA',
-                createdAt: serverTimestamp()
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             this.logActivity('OUT', `Paquete enviado: ${type}`);
         } catch (e: any) {
