@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     LayoutDashboard, Database, Receipt, ClipboardList, 
@@ -185,6 +184,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
                     {isModuleEnabled(ViewState.PRICE_LISTS) && <DropdownItem view={ViewState.PRICE_LISTS} label="Listas Precios" icon={Tags} active={activeView === ViewState.PRICE_LISTS} onClick={() => handleNav(ViewState.PRICE_LISTS)} />}
                     {isModuleEnabled(ViewState.MASS_STOCK_UPDATE) && <DropdownItem view={ViewState.MASS_STOCK_UPDATE} label="Excel Stock" icon={BoxesIcon} active={activeView === ViewState.MASS_STOCK_UPDATE} onClick={() => handleNav(ViewState.MASS_STOCK_UPDATE)} />}
                     {isModuleEnabled(ViewState.STOCK_ADJUSTMENT) && <DropdownItem view={ViewState.STOCK_ADJUSTMENT} label="Ajustes" icon={Settings2} active={activeView === ViewState.STOCK_ADJUSTMENT} onClick={() => handleNav(ViewState.STOCK_ADJUSTMENT)} />}
+                    {isModuleEnabled(ViewState.SHORTAGES) && <DropdownItem view={ViewState.SHORTAGES} label="Faltantes" icon={AlertTriangle} active={activeView === ViewState.SHORTAGES} onClick={() => handleNav(ViewState.SHORTAGES)} />}
                     {isModuleEnabled(ViewState.REPLENISHMENT) && <DropdownItem view={ViewState.REPLENISHMENT} label="Pedidos Prov." icon={PackagePlus} active={activeView === ViewState.REPLENISHMENT} onClick={() => handleNav(ViewState.REPLENISHMENT)} />}
                 </NavDropdown>
 
