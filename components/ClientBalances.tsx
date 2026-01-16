@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, DollarSign, MessageCircle, Mail, History, Filter, 
@@ -277,7 +276,7 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
-                                {['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'E-CHEQ', 'TARJETA'].map(m => (
+                                {['EFECTIVO', 'TRANSFERENCIA', 'DEBITO', 'CREDITO', 'CHEQUE', 'E-CHEQ'].map(m => (
                                     <button 
                                         key={m}
                                         onClick={() => setReceiptForm({...receiptForm, method: m})}
@@ -286,7 +285,8 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                                         {m === 'TRANSFERENCIA' && <Landmark size={16}/>}
                                         {m === 'CHEQUE' && <FileText size={16}/>}
                                         {m === 'E-CHEQ' && <ECheqIcon size={16}/>}
-                                        {m.replace('_', ' ')}
+                                        {m === 'DEBITO' || m === 'CREDITO' ? <CreditCard size={16}/> : null}
+                                        {m === 'DEBITO' ? 'DÉBITO' : m === 'CREDITO' ? 'CRÉDITO' : m.replace('_', ' ')}
                                     </button>
                                 ))}
                             </div>
