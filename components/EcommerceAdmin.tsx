@@ -10,7 +10,7 @@ import {
     CheckSquare, Square, Zap, Power, List, CloudUpload,
     CloudDownload, ShieldAlert, ExternalLink
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, ViewState } from '../types';
 import { productDB } from '../services/storageService';
 
 // --- SUBCOMPONENTES AUXILIARES (Definidos antes para evitar errores de hoisting) ---
@@ -54,7 +54,7 @@ function QuickBadge({ active, onClick, label, icon: Icon, color }: { active?: bo
 
 type EcommerceFolder = 'ALL' | 'PUBLISHED' | 'OFFERS' | 'FEATURED';
 
-const EcommerceAdmin: React.FC = () => {
+const EcommerceAdmin: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ onNavigate }) => {
     const [products, setProducts] = useState<Product[]>([]);
     const [activeFolder, setActiveFolder] = useState<EcommerceFolder>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
@@ -198,7 +198,11 @@ const EcommerceAdmin: React.FC = () => {
     };
 
     const openStore = () => {
-        window.open(window.location.origin + '/shop', '_blank');
+        if (onNavigate) {
+            onNavigate(ViewState.SHOP);
+        } else {
+            window.open(window.location.origin + '/shop', '_blank');
+        }
     };
 
     return (
@@ -334,7 +338,7 @@ const EcommerceAdmin: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap justify-center gap-3">
-                        <button onClick={() => handleBulkPlatformUpdate('ALL', true)} disabled={isApplying} className="bg-indigo-500 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all active:scale-95 shadow-xl shadow-indigo-500/20">
+                        <button onClick={() => handleBulkPlatformUpdate('ALL', true)} disabled={isApplying} className="bg-indigo-50 text-white px-8 py-3 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-400 transition-all active:scale-95 shadow-xl shadow-indigo-500/20">
                             {isApplying ? <RefreshCw className="animate-spin" size={16}/> : <CloudUpload size={16}/>}
                             Sincronizar Canales
                         </button>
