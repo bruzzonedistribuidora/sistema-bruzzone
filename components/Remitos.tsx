@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, CheckSquare, Square, FileText, 
@@ -37,7 +36,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   const [existingRemitos, setExistingRemitos] = useState<Remito[]>(() => JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]'));
   const [companyConfig] = useState<CompanyConfig>(() => JSON.parse(localStorage.getItem('company_config') || '{}'));
 
-  // CARGAR DATOS CUANDO HAY UN PULSO DE RED O EVENTO EXTERNO
   const loadDataFromStorage = () => {
     const raw = localStorage.getItem('ferrecloud_remitos');
     if (raw) {
@@ -48,19 +46,16 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         setAllClients(JSON.parse(rawClients));
     }
     
-    // Feedback visual de que los datos se actualizaron por red
     setIsSyncing(true);
     setTimeout(() => setIsSyncing(false), 1000);
   };
 
   useEffect(() => {
-    // Escuchar cambios de otros componentes o de la red sincronizada
     window.addEventListener('ferrecloud_sync_pulse', loadDataFromStorage);
     window.addEventListener('storage', (e) => {
         if (e.key === 'ferrecloud_remitos') loadDataFromStorage();
     });
     
-    // Al montar el componente, asegurar que tenemos lo último
     loadDataFromStorage();
 
     return () => {
@@ -115,7 +110,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
   };
 
   const updateQuantity = (idx: number, newQty: number) => {
-    setCart(prev => prev.map((item, i) => i === idx ? { ...item, quantity: newQty } : item));
+    setCart(prev => prev.map((item, i) => i === idx ? { ...item, quantity: Math.max(0, newQty) } : item));
   };
 
   const handleCreateRemito = async () => {
@@ -133,7 +128,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         status: 'PENDING'
     };
 
-    // 1. Obtener historial actual para no pisar nada (merge local previo)
     const currentOnStorage = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
     let updatedRemitos;
     
@@ -143,11 +137,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         updatedRemitos = [newRemito, ...currentOnStorage];
     }
 
-    // 2. Guardar Local
     setExistingRemitos(updatedRemitos);
     localStorage.setItem('ferrecloud_remitos', JSON.stringify(updatedRemitos));
 
-    // 3. DISPARAR SINCRONIZACIÓN INMEDIATA CON BROADCAST
     await syncService.pushToCloud();
     
     setCart([]);
@@ -263,13 +255,13 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                                     </td>
                                     <td className="px-8 py-4">
                                         <div className="flex items-center justify-center gap-3 bg-slate-50 border rounded-xl p-1.5 w-fit mx-auto shadow-inner">
-                                            <button onClick={() => updateQuantity(i, Math.max(0, item.quantity - 1))} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
+                                            <button onClick={() => updateQuantity(i, item.quantity - 1)} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
                                             <input 
                                                 type="number" 
-                                                step="0.001"
-                                                className="font-black w-16 text-center bg-transparent outline-none text-slate-800" 
+                                                step="any"
+                                                className="font-black w-16 text-center bg-transparent outline-none text-slate-800 border-none focus:ring-0" 
                                                 value={item.quantity}
-                                                onChange={(e) => updateQuantity(i, parseFloat(e.target.value.replace(',', '.')) || 0)}
+                                                onChange={(e) => updateQuantity(i, parseFloat(e.target.value) || 0)}
                                             />
                                             <button onClick={() => updateQuantity(i, item.quantity + 1)} className="text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                         </div>
@@ -381,7 +373,6 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
             </div>
         </div>
       )}
-      {/* ... (Modal de impresión se mantiene igual) */}
     </div>
   );
 };
