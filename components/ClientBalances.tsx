@@ -162,7 +162,7 @@ const ClientBalances: React.FC<ClientBalancesProps> = ({ onNavigateToHistory }) 
                             <ChevronRight size={14}/>
                         </button>
                         <button onClick={() => setFilterType('HIGH_DEBT')} className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${filterType === 'HIGH_DEBT' ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-md' : 'border-slate-50 bg-white text-slate-400'}`}>
-                            <span className="text-[10px] font-black uppercase">Deudas > $100.000</span>
+                            <span className="text-[10px] font-black uppercase">Deudas &gt; $100.000</span>
                             <ChevronRight size={14}/>
                         </button>
                     </div>
