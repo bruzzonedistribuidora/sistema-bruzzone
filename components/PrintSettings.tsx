@@ -9,7 +9,6 @@ import {
     RotateCcw, Maximize2, Settings2, Trash2, Eye as EyeIcon, 
     ToggleLeft, ToggleRight, DollarSign, List, PencilLine,
     Columns, FileCode, Monitor, Smartphone, RefreshCcw, Box,
-    // Fix: Added missing CheckCircle2 import to resolve name not found error
     CheckCircle2
 } from 'lucide-react';
 import { PrintTemplate, DocumentType, PaperSize, Position, CompanyConfig } from '../types';
@@ -73,15 +72,15 @@ const PrintSettings: React.FC = () => {
               showVoucherTitle: true,
               showVoucherNumber: true,
               positions: {
-                  logo: { x: 10, y: 10, visible: true, width: 40, height: 25 },
-                  docLetter: { x: 105, y: 8, visible: true, width: 12, height: 14 }, 
-                  header: { x: 10, y: 35, visible: true, width: 85 },
-                  voucherInfo: { x: 130, y: 15, visible: true, width: 65 }, 
-                  client: { x: 10, y: 55, visible: true, width: 190 },
-                  table: { x: 10, y: 90, visible: true, width: 190 },
-                  totals: { x: 140, y: 240, visible: true, width: 65 },
-                  footer: { x: 10, y: 285, visible: true, width: 190 },
-                  qr: { x: 10, y: 240, visible: true, width: 16, height: 16 }
+                  logo: { x: 10, y: 10, visible: true, width: 40, height: 25, fontSize: 10 },
+                  docLetter: { x: 105, y: 8, visible: true, width: 12, height: 14, fontSize: 32 }, 
+                  header: { x: 10, y: 35, visible: true, width: 85, fontSize: 12 },
+                  voucherInfo: { x: 130, y: 15, visible: true, width: 65, fontSize: 18 }, 
+                  client: { x: 10, y: 55, visible: true, width: 190, fontSize: 10 },
+                  table: { x: 10, y: 90, visible: true, width: 190, fontSize: 10 },
+                  totals: { x: 140, y: 240, visible: true, width: 65, fontSize: 12 },
+                  footer: { x: 10, y: 285, visible: true, width: 190, fontSize: 8 },
+                  qr: { x: 10, y: 240, visible: true, width: 16, height: 16, fontSize: 10 }
               }
           };
       });
@@ -144,34 +143,45 @@ const PrintSettings: React.FC = () => {
 
       return (
           <div className="space-y-6 animate-fade-in">
-              {/* Controles de Tamaño Universales */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-inner space-y-4">
+              {/* Controles de Tamaño y Estilo Universales */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-inner space-y-6">
                   <h4 className="text-[9px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-2">
-                      <Maximize size={12}/> Dimensiones Elemento
+                      <Maximize size={12}/> Geometría y Estilo
                   </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                      <div>
-                          <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Ancho (mm)</label>
-                          <input 
-                            type="range" min="5" max={dims.w} step="1"
-                            className="w-full"
-                            value={pos.width || 10} 
-                            onChange={e => updatePosition(activeElement, { width: parseInt(e.target.value) })} 
-                          />
-                          <div className="text-right text-[9px] font-black text-slate-600">{pos.width || '-'} mm</div>
-                      </div>
-                      {pos.height !== undefined && (
+                  <div className="space-y-5">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Ancho (mm)</label>
+                              <input 
+                                type="range" min="5" max={dims.w} step="1"
+                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                value={pos.width || 10} 
+                                onChange={e => updatePosition(activeElement, { width: parseInt(e.target.value) })} 
+                              />
+                              <div className="text-right text-[9px] font-black text-slate-600 mt-1">{pos.width || '-'} mm</div>
+                          </div>
                           <div>
                             <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Alto (mm)</label>
                             <input 
                                 type="range" min="5" max={dims.h} step="1"
-                                className="w-full"
-                                value={pos.height} 
+                                className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                value={pos.height || 10} 
                                 onChange={e => updatePosition(activeElement, { height: parseInt(e.target.value) })} 
                             />
-                            <div className="text-right text-[9px] font-black text-slate-600">{pos.height} mm</div>
+                            <div className="text-right text-[9px] font-black text-slate-600 mt-1">{pos.height || '-'} mm</div>
                           </div>
-                      )}
+                      </div>
+
+                      <div>
+                          <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Tamaño Fuente / Escala</label>
+                          <input 
+                            type="range" min="6" max="72" step="1"
+                            className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            value={pos.fontSize || 12} 
+                            onChange={e => updatePosition(activeElement, { fontSize: parseInt(e.target.value) })} 
+                          />
+                          <div className="text-right text-[9px] font-black text-slate-600 mt-1">{pos.fontSize || '12'} px</div>
+                      </div>
                   </div>
               </div>
 
@@ -183,7 +193,7 @@ const PrintSettings: React.FC = () => {
                       </div>
                       <div>
                           <label className="text-[8px] font-black uppercase text-slate-400">Sub-cabecera (Dirección/Fiscal)</label>
-                          <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-20 resize-none" value={currentTemplate.subHeaderText} onChange={e => updateTemplate({subHeaderText: e.target.value})} />
+                          <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-20 resize-none font-bold" value={currentTemplate.subHeaderText} onChange={e => updateTemplate({subHeaderText: e.target.value})} />
                       </div>
                   </div>
               )}
@@ -197,8 +207,8 @@ const PrintSettings: React.FC = () => {
                         <SubFieldToggle label="CUIT Emisor" active={currentTemplate.showVoucherCuit} onClick={() => updateTemplate({showVoucherCuit: !currentTemplate.showVoucherCuit})} />
                       </div>
                       <div className="pt-2 border-t border-slate-200">
-                          <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Título Personalizado</label>
-                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold" value={currentTemplate.titleText} onChange={e => updateTemplate({titleText: e.target.value})} />
+                          <label className="text-[8px] font-black uppercase text-slate-400 block mb-1">Texto Título Principal</label>
+                          <input className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-xs font-black uppercase" value={currentTemplate.titleText} onChange={e => updateTemplate({titleText: e.target.value})} />
                       </div>
                   </div>
               )}
@@ -219,7 +229,7 @@ const PrintSettings: React.FC = () => {
               {activeElement === 'footer' && (
                   <div>
                       <label className="text-[8px] font-black uppercase text-slate-400">Texto de Pie de Página</label>
-                      <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-24 resize-none" value={currentTemplate.footerText} onChange={e => updateTemplate({footerText: e.target.value})} />
+                      <textarea className="w-full p-2 bg-slate-100 border border-slate-200 rounded-lg text-[10px] h-24 resize-none font-bold" value={currentTemplate.footerText} onChange={e => updateTemplate({footerText: e.target.value})} />
                   </div>
               )}
           </div>
@@ -236,14 +246,14 @@ const PrintSettings: React.FC = () => {
                     <h2 className="text-xl font-black flex items-center gap-2 uppercase tracking-tighter leading-none">
                         <Printer className="text-indigo-400" size={20}/> Diseño Imprenta
                     </h2>
-                    <p className="text-[9px] text-slate-400 mt-1 font-bold uppercase tracking-widest">Configuración de Comprobantes</p>
+                    <p className="text-[9px] text-slate-400 mt-1 font-bold uppercase tracking-widest">Editor de Maquetación ARCA</p>
                 </div>
-                <button onClick={() => alert('Cambios aplicados.')} className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all shadow-lg active:scale-95"><Save size={18}/></button>
+                <button onClick={() => alert('Diseño de imprenta guardado en memoria local.')} className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition-all shadow-lg active:scale-95"><Save size={18}/></button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar pb-20">
                 <div className="bg-slate-900 p-5 rounded-[2rem] text-white shadow-xl">
-                    <label className="block text-[9px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Documento a Personalizar</label>
+                    <label className="block text-[9px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Documento activo</label>
                     <select 
                         className="w-full p-3 bg-white/5 border border-white/10 rounded-xl font-black text-xs uppercase outline-none focus:bg-white/10"
                         value={selectedType}
@@ -255,13 +265,13 @@ const PrintSettings: React.FC = () => {
 
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
                     <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                        <Maximize2 size={14} className="text-indigo-600"/> Ajustes de Página
+                        <Maximize2 size={14} className="text-indigo-600"/> Ajustes del Papel
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="col-span-2">
-                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Formato</label>
+                            <label className="block text-[8px] font-black text-slate-400 uppercase mb-1">Medida</label>
                             <select className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold text-xs uppercase" value={currentTemplate.paperSize} onChange={e => updateTemplate({ paperSize: e.target.value as PaperSize })}>
-                                <option value="A4">A4</option><option value="A5">A5</option><option value="TICKET_80MM">Ticket 80mm</option>
+                                <option value="A4">A4 (210x297)</option><option value="A5">A5 (148x210)</option><option value="TICKET_80MM">Ticketera 80mm</option>
                             </select>
                         </div>
                         <button onClick={() => updateTemplate({ orientation: 'VERTICAL' })} className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${currentTemplate.orientation === 'VERTICAL' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400'}`}>Vertical</button>
@@ -271,13 +281,13 @@ const PrintSettings: React.FC = () => {
 
                 <div className={`p-6 rounded-[2.5rem] transition-all border-2 ${activeElement ? 'bg-indigo-50 border-indigo-200 shadow-lg' : 'bg-slate-50 border-slate-100 opacity-50'}`}>
                     <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 mb-6">
-                        <PencilLine size={16}/> {activeElement ? `Editando: ${activeElement.toUpperCase()}` : 'Seleccione un bloque'}
+                        <PencilLine size={16}/> {activeElement ? `Editor: ${activeElement.toUpperCase()}` : 'Seleccione un bloque'}
                     </h3>
                     {renderElementEditor()}
                 </div>
 
                 <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={14}/> Orden de Capas</h3>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={14}/> Capas del Diseño</h3>
                     <div className="grid grid-cols-1 gap-1">
                         {Object.keys(currentTemplate.positions).map(key => (
                             <div key={key} className={`flex items-center justify-between p-3 rounded-xl transition-all ${activeElement === key ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-slate-50'}`}>
@@ -314,6 +324,9 @@ const PrintSettings: React.FC = () => {
                 className="bg-white shadow-[0_45px_70px_-15px_rgba(0,0,0,0.4)] relative flex-shrink-0 border border-slate-300 transition-all duration-500 overflow-hidden"
                 style={{ width: `${dims.w}mm`, height: `${dims.h}mm` }}
             >
+                {/* REGLA MILIMÉTRICA OPCIONAL (VISUAL) */}
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{backgroundImage: 'radial-gradient(#000 0.5px, transparent 0.5px)', backgroundSize: '5mm 5mm'}}></div>
+
                 {currentTemplate.positions.logo?.visible && (
                     <div 
                         onMouseDown={(e) => handleMouseDown(e, 'logo')}
@@ -326,11 +339,11 @@ const PrintSettings: React.FC = () => {
                         }}
                     >
                         {companyConfig.logo ? (
-                            <img src={companyConfig.logo} alt="Logo" className="max-w-full max-h-full object-contain p-2" />
+                            <img src={companyConfig.logo} alt="Logo" className="max-w-full max-h-full object-contain" />
                         ) : (
-                            <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center">
-                                <ImageIcon size={20} className="text-slate-300"/>
-                                <span className="text-[6px] font-black uppercase text-slate-400">LOGO</span>
+                            <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center rounded-sm">
+                                <ImageIcon size={24} className="text-slate-300"/>
+                                <span className="text-[6px] font-black uppercase text-slate-400 mt-1">EMBLEMA</span>
                             </div>
                         )}
                     </div>
@@ -348,7 +361,7 @@ const PrintSettings: React.FC = () => {
                             marginLeft: `-${(currentTemplate.positions.docLetter.width || 0) / 2}mm`
                         }}
                     >
-                        <span className="text-3xl font-black leading-none">{currentTemplate.docLetterText}</span>
+                        <span className="font-black leading-none" style={{ fontSize: `${currentTemplate.positions.docLetter.fontSize || 32}px` }}>{currentTemplate.docLetterText}</span>
                         <span className="text-[6px] font-black uppercase mt-1 tracking-tighter">{currentTemplate.docCodeText}</span>
                     </div>
                 )}
@@ -363,8 +376,12 @@ const PrintSettings: React.FC = () => {
                             width: `${currentTemplate.positions.voucherInfo.width}mm`
                         }}
                     >
-                        {currentTemplate.showVoucherTitle && <h2 className="text-xl font-black text-slate-800 uppercase text-center mb-3 tracking-[0.1em]">{currentTemplate.titleText}</h2>}
-                        <div className="space-y-1 text-[9px] font-bold text-slate-700">
+                        {currentTemplate.showVoucherTitle && (
+                            <h2 className="font-black text-slate-800 uppercase text-center mb-3 tracking-[0.1em]" style={{ fontSize: `${currentTemplate.positions.voucherInfo.fontSize}px` }}>
+                                {currentTemplate.titleText}
+                            </h2>
+                        )}
+                        <div className="space-y-1 font-bold text-slate-700" style={{ fontSize: '9px' }}>
                             {currentTemplate.showVoucherNumber && <p>Nº {currentTemplate.voucherPointOfSale} - {currentTemplate.voucherNumber}</p>}
                             {currentTemplate.showVoucherDate && <p>Fecha: {new Date().toLocaleDateString()}</p>}
                             {currentTemplate.showVoucherCuit && <p>C.U.I.T.: {currentTemplate.voucherCuitEmisor}</p>}
@@ -382,7 +399,9 @@ const PrintSettings: React.FC = () => {
                             width: `${currentTemplate.positions.header.width}mm`
                         }}
                     >
-                        <p className="text-xs font-black uppercase leading-none text-slate-800 mb-2">{currentTemplate.headerText}</p>
+                        <p className="font-black uppercase leading-none text-slate-800 mb-2" style={{ fontSize: `${currentTemplate.positions.header.fontSize}px` }}>
+                            {currentTemplate.headerText}
+                        </p>
                         <div className="text-[8px] font-bold text-slate-400 uppercase italic whitespace-pre-line leading-relaxed">
                             {currentTemplate.subHeaderText}
                         </div>
@@ -399,11 +418,11 @@ const PrintSettings: React.FC = () => {
                             width: `${currentTemplate.positions.client.width}mm`
                         }}
                     >
-                        <div className="text-[9px] space-y-1 font-medium">
+                        <div className="space-y-1 font-medium" style={{ fontSize: `${currentTemplate.positions.client.fontSize}px` }}>
                             <p><strong>Sr/es:</strong> CLIENTE EJEMPLO S.A.</p>
                             <p><strong>CUIT:</strong> 30-11223344-5</p>
                         </div>
-                        <div className="text-[9px] space-y-1 font-medium text-right">
+                        <div className="space-y-1 font-medium text-right" style={{ fontSize: `${currentTemplate.positions.client.fontSize}px` }}>
                             <p><strong>IVA:</strong> Responsable Inscripto</p>
                         </div>
                     </div>
@@ -420,7 +439,7 @@ const PrintSettings: React.FC = () => {
                         }}
                     >
                         <table className="w-full text-left border-t border-b border-slate-800">
-                            <thead className="text-[9px] font-black uppercase bg-slate-50">
+                            <thead className="font-black uppercase bg-slate-50" style={{ fontSize: '9px' }}>
                                 <tr>
                                     <th className="py-2 px-1">Cód</th>
                                     <th className="py-2">Detalle</th>
@@ -428,7 +447,7 @@ const PrintSettings: React.FC = () => {
                                     {currentTemplate.showPrices && <th className="py-2 text-right pr-1">Total</th>}
                                 </tr>
                             </thead>
-                            <tbody className="text-[9px] font-medium text-slate-700">
+                            <tbody className="font-medium text-slate-700" style={{ fontSize: `${currentTemplate.positions.table.fontSize}px` }}>
                                 <tr className="border-b border-slate-100">
                                     <td className="py-2 px-1 font-mono">X01</td>
                                     <td className="py-2 uppercase font-bold">ARTÍCULO DE PRUEBA DISEÑO</td>
@@ -450,12 +469,27 @@ const PrintSettings: React.FC = () => {
                             width: `${currentTemplate.positions.totals.width}mm`
                         }}
                     >
-                        <div className="p-2 space-y-1 text-[9px] font-bold text-slate-700 bg-white">
+                        <div className="p-2 space-y-1 font-bold text-slate-700 bg-white" style={{ fontSize: '9px' }}>
                             <div className="flex justify-between items-center bg-slate-900 text-white p-2">
-                                <span className="text-[8px] uppercase tracking-widest">{currentTemplate.totalsLabel}</span>
-                                <span className="font-black">$5.000,00</span>
+                                <span className="uppercase tracking-widest" style={{ fontSize: `${currentTemplate.positions.totals.fontSize}px` }}>{currentTemplate.totalsLabel}</span>
+                                <span className="font-black" style={{ fontSize: `${currentTemplate.positions.totals.fontSize}px` }}>$5.000,00</span>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {currentTemplate.positions.footer?.visible && (
+                    <div 
+                        onMouseDown={(e) => handleMouseDown(e, 'footer')}
+                        className={`absolute cursor-move text-center font-bold text-slate-400 uppercase italic ${activeElement === 'footer' ? 'ring-2 ring-indigo-500' : ''}`}
+                        style={{ 
+                            left: `${currentTemplate.positions.footer.x}mm`, 
+                            top: `${currentTemplate.positions.footer.y}mm`,
+                            width: `${currentTemplate.positions.footer.width}mm`,
+                            fontSize: `${currentTemplate.positions.footer.fontSize}px`
+                        }}
+                    >
+                        {currentTemplate.footerText}
                     </div>
                 )}
 
