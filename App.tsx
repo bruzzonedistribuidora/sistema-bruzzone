@@ -75,6 +75,8 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.ECOMMERCE_ADMIN]: { icon: Laptop2, label: "Web Admin", color: "bg-pink-600" },
     [ViewState.ONLINE_SALES]: { icon: Globe2, label: "Hub Online", color: "bg-indigo-600" },
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-800" },
+    [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Faltantes", color: "bg-orange-600" },
+    [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Reposición", color: "bg-emerald-600" },
 };
 
 const App: React.FC = () => {
