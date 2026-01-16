@@ -3,7 +3,9 @@ import {
     LayoutDashboard, Database, 
     Receipt, Truck, Wallet, Bot, Settings, Layers,
     DollarSign, Activity, Cloud, Laptop2, Globe2, BarChart3,
-    AlertTriangle, PackagePlus, Tags
+    AlertTriangle, PackagePlus, Tags, X, ClipboardList, 
+    FileSpreadsheet, Users, UserSearch, Calculator, Network,
+    LayoutGrid, Search, Tag, Smartphone, Box, Package
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -49,9 +51,32 @@ import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
 
+const VIEW_ICONS: Record<string, any> = {
+    [ViewState.DASHBOARD]: LayoutDashboard,
+    [ViewState.POS]: Receipt,
+    [ViewState.INVENTORY]: Package,
+    [ViewState.REMITOS]: ClipboardList,
+    [ViewState.PRESUPUESTOS]: FileSpreadsheet,
+    [ViewState.CLIENTS]: Users,
+    [ViewState.TREASURY]: Wallet,
+    [ViewState.ANALYTICS]: BarChart3,
+    [ViewState.PURCHASES]: Truck,
+    [ViewState.CLOUD_HUB]: Network,
+    [ViewState.CONFIG_PANEL]: Settings,
+    [ViewState.MARKETING]: Tag,
+    [ViewState.ECOMMERCE_ADMIN]: Laptop2,
+    [ViewState.MASS_PRODUCT_UPDATE]: Layers,
+    [ViewState.MASS_STOCK_UPDATE]: Box,
+    [ViewState.ACCOUNTING]: Calculator,
+    [ViewState.SHORTAGES]: AlertTriangle,
+    [ViewState.REPLENISHMENT]: PackagePlus,
+};
+
 const App: React.FC = () => {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
+  const [openModules, setOpenModules] = useState<ViewState[]>([ViewState.DASHBOARD]);
+  
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
   const [itemsToReplenish, setItemsToReplenish] = useState<ReplenishmentItem[] | null>(null);
   const [selectedClientForPortal, setSelectedClientForPortal] = useState<Client | null>(null);
@@ -66,6 +91,18 @@ const App: React.FC = () => {
 
   const handleNavigate = (view: ViewState) => {
     setActiveView(view);
+    if (!openModules.includes(view)) {
+        setOpenModules(prev => [...prev, view]);
+    }
+  };
+
+  const closeModule = (e: React.MouseEvent, view: ViewState) => {
+      e.stopPropagation();
+      const nextOpen = openModules.filter(v => v !== view);
+      setOpenModules(nextOpen.length > 0 ? nextOpen : [ViewState.DASHBOARD]);
+      if (activeView === view) {
+          setActiveView(nextOpen.length > 0 ? nextOpen[nextOpen.length - 1] : ViewState.DASHBOARD);
+      }
   };
 
   const renderViewContent = (view: ViewState) => {
@@ -135,10 +172,38 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-100 font-sans overflow-hidden">
       <Sidebar activeView={activeView} onNavigate={handleNavigate} user={loggedInUser} onLogout={() => { setLoggedInUser(null); sessionStorage.removeItem('ferrecloud_session'); }} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative">
         <main className="flex-1 relative bg-white overflow-hidden">
             {renderViewContent(activeView)}
         </main>
+
+        {/* DOCK BAR: MODULOS MINIMIZADOS */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-2 bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[100] transition-all hover:bg-slate-900">
+            {openModules.map((view) => {
+                const Icon = VIEW_ICONS[view] || LayoutGrid;
+                const isActive = activeView === view;
+                return (
+                    <div key={view} className="relative group">
+                        <button 
+                            onClick={() => setActiveView(view)}
+                            className={`p-3.5 rounded-2xl transition-all relative flex items-center justify-center ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+                            title={view}
+                        >
+                            <Icon size={20} />
+                            {isActive && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-white rounded-full shadow-[0_0_8px_white]"></div>}
+                        </button>
+                        
+                        {/* Botón cerrar minúsculo */}
+                        <button 
+                            onClick={(e) => closeModule(e, view)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border border-white/10"
+                        >
+                            <X size={10} strokeWidth={4}/>
+                        </button>
+                    </div>
+                );
+            })}
+        </div>
       </div>
     </div>
   );
