@@ -56,7 +56,6 @@ const StockTransfers: React.FC = () => {
             return;
         }
         
-        // Verificación de stock disponible en origen
         const sourceStock = sourceBranchId === '1' 
             ? product.stockPrincipal 
             : product.stockDetails.find(s => s.branchId === sourceBranchId)?.quantity || 0;
@@ -117,7 +116,7 @@ const StockTransfers: React.FC = () => {
                         }
                     }
 
-                    // Actualizar artículo con el nuevo balance de stock
+                    // Actualizar artículo con el nuevo balance de stock (productDB.save ya dispara la sincronización cloud)
                     await productDB.save({
                         ...p,
                         stockPrincipal: newPrincipal,
@@ -145,10 +144,10 @@ const StockTransfers: React.FC = () => {
             setDestBranchId('');
             setNotes('');
             
-            // Notificar pulso de sincronización
+            // Disparar pulso para forzar refresco en otras terminales
             window.dispatchEvent(new Event('ferrecloud_request_pulse'));
             
-            alert("✅ Movimiento realizado con éxito y sincronizado con la nube.");
+            alert("✅ Movimiento realizado con éxito y sincronizado con la red.");
         } catch (err) {
             console.error("Error en transferencia:", err);
             alert("❌ Hubo un error al procesar el traslado.");
