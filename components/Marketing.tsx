@@ -9,11 +9,11 @@ import {
     Copy, ExternalLink, Globe, Smartphone as MobileIcon, ListOrdered, Share2, Eye,
     ShoppingBag, Link, Instagram, Facebook
 } from 'lucide-react';
-import { Coupon, LoyaltyConfig, MarketingCampaign, Client, CompanyConfig } from '../types';
+import { Coupon, LoyaltyConfig, MarketingCampaign, Client, CompanyConfig, ViewState } from '../types';
 
 type MarketingTab = 'LOYALTY' | 'COUPONS' | 'CAMPAIGNS' | 'PUBLIC_PORTAL';
 
-const Marketing: React.FC = () => {
+const Marketing: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ onNavigate }) => {
     const [activeTab, setActiveTab] = useState<MarketingTab>('LOYALTY');
 
     const [loyalty, setLoyalty] = useState<LoyaltyConfig>(() => {
@@ -187,7 +187,9 @@ const Marketing: React.FC = () => {
                                 <button className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl active:scale-95 transition-all">
                                     <QrCode size={18}/> Descargar QR Mostrador
                                 </button>
-                                <button className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-200 transition-all" title="Vista Previa"><Eye size={20}/></button>
+                                <button 
+                                    onClick={() => onNavigate?.(ViewState.PUBLIC_PORTAL)}
+                                    className="p-4 bg-slate-100 text-slate-400 rounded-2xl hover:bg-slate-200 transition-all" title="Vista Previa"><Eye size={20}/></button>
                             </div>
                         </div>
 
@@ -210,13 +212,17 @@ const Marketing: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button className="bg-gradient-to-br from-pink-600 to-purple-600 p-6 rounded-[2rem] flex flex-col items-center gap-3 shadow-lg hover:scale-105 transition-all">
-                                        <Instagram size={32}/>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Link en Bio</span>
+                                    <button 
+                                        onClick={() => onNavigate?.(ViewState.SHOP)}
+                                        className="bg-indigo-600 p-6 rounded-[2rem] flex flex-col items-center gap-3 shadow-lg hover:scale-105 transition-all">
+                                        <Eye size={32}/>
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Abrir Tienda</span>
                                     </button>
-                                    <button className="bg-blue-600 p-6 rounded-[2rem] flex flex-col items-center gap-3 shadow-lg hover:scale-105 transition-all">
-                                        <Facebook size={32}/>
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Botón FB</span>
+                                    <button 
+                                        onClick={() => window.open(`https://wa.me/${loyalty.enabled ? '5491144556677' : ''}`, '_blank')}
+                                        className="bg-green-600 p-6 rounded-[2rem] flex flex-col items-center gap-3 shadow-lg hover:scale-105 transition-all">
+                                        <MessageCircle size={32}/>
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Botón WA</span>
                                     </button>
                                 </div>
                             </div>
