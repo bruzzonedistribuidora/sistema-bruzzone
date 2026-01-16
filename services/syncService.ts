@@ -27,8 +27,12 @@ class SyncService {
     private connectionTime: Date = new Date();
 
     constructor() {
+        // CONEXIÓN AUTOMÁTICA AL INICIAR
         this.vaultId = localStorage.getItem('ferrecloud_vault_id');
-        if (this.vaultId) this.initFirebase();
+        if (this.vaultId) {
+            console.log("Iniciando Sincronización Automática con Bóveda:", this.vaultId);
+            this.initFirebase();
+        }
 
         // Escuchar cambios locales para subirlos a la nube
         window.addEventListener('ferrecloud_sync_out' as any, (e: CustomEvent) => {
@@ -66,16 +70,19 @@ class SyncService {
     getVaultId() { return this.vaultId; }
 
     private initFirebase() {
-        if (!this.vaultId || !db) return;
+        if (!this.vaultId || !db) {
+            console.warn("SyncService: No se puede inicializar Firebase sin vaultId o db.");
+            return;
+        }
         
+        // Limpiar suscripción previa
         if (this.unsubscribe) {
             this.unsubscribe();
         }
 
-        this.logActivity('IN', 'Iniciando escucha de cambios en tiempo real...');
+        this.logActivity('IN', 'Estableciendo enlace de datos en tiempo real...');
 
         try {
-            // Referencia a la subcolección deltas dentro del documento de la bóveda
             const deltasRef = collection(db, "vaults", this.vaultId, "deltas");
             
             const q = query(
@@ -88,8 +95,6 @@ class SyncService {
                 snapshot.docChanges().forEach(async (change) => {
                     if (change.type === "added") {
                         const data = change.doc.data();
-                        
-                        // Ignorar si el cambio fue originado por esta misma terminal
                         if (data.sid === this.sessionId) return;
 
                         const { type, payload } = data;
@@ -98,16 +103,16 @@ class SyncService {
                             switch (type) {
                                 case 'PRODUCT_UPDATE':
                                     await productDB.save(payload, true);
-                                    this.logActivity('IN', `Sinc: ${payload.name} actualizado`);
+                                    this.logActivity('IN', `Stock: ${payload.name} actualizado`);
                                     break;
                                 case 'PRODUCT_DELETE':
                                     await productDB.delete(payload.id, true);
-                                    this.logActivity('IN', `Sinc: Eliminado ID ${payload.id}`);
+                                    this.logActivity('IN', `Stock: Eliminado ID ${payload.id}`);
                                     break;
                                 case 'TREASURY_UPDATE':
                                     localStorage.setItem('ferrecloud_registers', JSON.stringify(payload));
                                     window.dispatchEvent(new Event('storage'));
-                                    this.logActivity('IN', `Sinc: Saldos de cajas actualizados`);
+                                    this.logActivity('IN', `Finanzas: Cajas actualizadas`);
                                     break;
                                 case 'CLIENT_UPDATE':
                                     const currentClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
@@ -115,12 +120,12 @@ class SyncService {
                                     if (!currentClients.some((c:any) => c.id === payload.id)) newClients.push(payload);
                                     localStorage.setItem('ferrecloud_clients', JSON.stringify(newClients));
                                     window.dispatchEvent(new Event('storage'));
-                                    this.logActivity('IN', `Sinc: Cliente ${payload.name} actualizado`);
+                                    this.logActivity('IN', `Cliente: ${payload.name} actualizado`);
                                     break;
                                 case 'REMITOS_SYNC':
                                     localStorage.setItem('ferrecloud_remitos', JSON.stringify(payload));
                                     window.dispatchEvent(new Event('storage'));
-                                    this.logActivity('IN', `Sinc: Libro de remitos actualizado`);
+                                    this.logActivity('IN', `Logística: Libro de remitos sincronizado`);
                                     break;
                                 case 'SYNC_PULSE':
                                     window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
@@ -129,7 +134,7 @@ class SyncService {
                                     break;
                             }
                         } catch (err: any) {
-                            this.logActivity('ERROR', `Fallo al procesar cambio entrante`);
+                            this.logActivity('ERROR', `Error al procesar paquete entrante`);
                         }
                     }
                 });
@@ -138,11 +143,11 @@ class SyncService {
                     detail: { status: 'OK', engine: 'FIREBASE' } 
                 }));
             }, (error) => {
-                this.logActivity('ERROR', `Conexión perdida: ${error.message}`);
+                this.logActivity('ERROR', `Conexión perdida. Reintentando...`);
                 window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { status: 'ERROR' } }));
             });
         } catch (e: any) {
-            this.logActivity('ERROR', `Error al inicializar Firestore: ${e.message}`);
+            this.logActivity('ERROR', `Fallo crítico de inicialización`);
         }
     }
 
@@ -155,12 +160,12 @@ class SyncService {
                 type,
                 payload,
                 sid: this.sessionId,
-                terminal: localStorage.getItem('ferrecloud_terminal_name') || 'PC-DESCONOCIDA',
+                terminal: localStorage.getItem('ferrecloud_terminal_name') || 'TERMINAL-AUTOLINK',
                 createdAt: serverTimestamp()
             });
-            this.logActivity('OUT', `Paquete enviado: ${type}`);
+            this.logActivity('OUT', `Enviando cambio: ${type}`);
         } catch (e: any) {
-            this.logActivity('ERROR', `Error al transmitir: ${e.message}`);
+            this.logActivity('ERROR', `Error de transmisión`);
         }
     }
 
@@ -171,7 +176,7 @@ class SyncService {
 
     async syncFromRemote(): Promise<boolean> {
         if (!this.vaultId) return false;
-        this.connectionTime = new Date(Date.now() - 3600000); 
+        this.connectionTime = new Date(Date.now() - 7200000); // 2 horas atrás para asegurar datos
         this.initFirebase();
         return true;
     }
