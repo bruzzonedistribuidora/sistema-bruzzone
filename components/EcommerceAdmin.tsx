@@ -8,12 +8,13 @@ import {
     ArrowRight, ShoppingBag, Plus, Trash2, Layers, Check,
     DollarSign, Smartphone, ShoppingCart, Globe2, 
     CheckSquare, Square, Zap, Power, List, CloudUpload,
-    CloudDownload, ShieldAlert, ExternalLink
+    CloudDownload, ShieldAlert, ExternalLink, Share2, Copy,
+    MessageCircle, QrCode, Printer, Mail, Instagram, Facebook
 } from 'lucide-react';
-import { Product, ViewState } from '../types';
+import { Product, ViewState, CompanyConfig } from '../types';
 import { productDB } from '../services/storageService';
 
-// --- SUBCOMPONENTES AUXILIARES (Definidos antes para evitar errores de hoisting) ---
+// --- SUBCOMPONENTES AUXILIARES ---
 
 function PlatformBtn({ active, label, color, onClick }: { active?: boolean, label: string, color: string, onClick: () => void }) {
     return (
@@ -62,6 +63,13 @@ const EcommerceAdmin: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ 
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
     const [isApplying, setIsApplying] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const companyConfig: CompanyConfig = useMemo(() => {
+        const saved = localStorage.getItem('company_config');
+        return saved ? JSON.parse(saved) : { fantasyName: 'Ferretería' };
+    }, []);
 
     const loadProducts = async () => {
         setIsApplying(true);
@@ -205,6 +213,20 @@ const EcommerceAdmin: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ 
         }
     };
 
+    const storeLink = window.location.origin + '/shop';
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(storeLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleShareWhatsApp = () => {
+        const businessName = companyConfig.fantasyName || 'nuestra ferretería';
+        const msg = `¡Hola! 👋 Te invito a conocer nuestra tienda online de ${businessName}. Podés ver todo nuestro catálogo y hacer tu pedido desde acá: ${storeLink}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
     return (
         <div className="flex h-full bg-slate-100 font-sans overflow-hidden animate-fade-in relative">
             
@@ -225,11 +247,16 @@ const EcommerceAdmin: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ 
                     <FolderBtn active={activeFolder === 'FEATURED'} onClick={() => {setActiveFolder('FEATURED'); setSelectedIds(new Set());}} icon={Star} label="Carpeta Destacados" count={stats.featured} color="text-yellow-500" />
                 
                     <div className="pt-8 space-y-3">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Accesos Directos</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2">Canales de Venta</p>
                         <button 
                             onClick={openStore}
                             className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm">
                             <ShoppingBag size={18}/> Ver mi Tienda Online
+                        </button>
+                        <button 
+                            onClick={() => setIsShareModalOpen(true)}
+                            className="w-full flex items-center gap-4 p-4 rounded-[1.5rem] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm border border-emerald-100">
+                            <Share2 size={18}/> Compartir con Clientes
                         </button>
                     </div>
                 </div>
@@ -353,6 +380,93 @@ const EcommerceAdmin: React.FC<{ onNavigate?: (view: ViewState) => void }> = ({ 
                     </div>
 
                     <button onClick={() => setSelectedIds(new Set())} className="p-3 text-slate-500 hover:text-white transition-colors"><X size={24}/></button>
+                </div>
+            )}
+
+            {/* MODAL DE COMPARTIR TIENDA (NUEVO) */}
+            {isShareModalOpen && (
+                <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 animate-fade-in">
+                    <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
+                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-emerald-500 rounded-2xl shadow-lg"><Share2 size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-black uppercase tracking-widest leading-none">Compartir Mi Tienda</h3>
+                                    <p className="text-[10px] text-indigo-400 font-bold uppercase mt-1">Marketing de Venta Directa</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsShareModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={28}/></button>
+                        </div>
+                        
+                        <div className="p-10 space-y-8 overflow-y-auto custom-scrollbar bg-slate-50/50">
+                            <div className="text-center space-y-4">
+                                <p className="text-sm text-slate-500 font-medium italic">Enviá este link a tus clientes para que compren online:</p>
+                                <div className="bg-white p-6 rounded-[2.5rem] border-2 border-dashed border-slate-200 flex items-center justify-between gap-4 shadow-inner group">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 text-left ml-1">URL de la Tienda</p>
+                                        <p className="text-lg font-mono font-black text-indigo-600 truncate">{storeLink}</p>
+                                    </div>
+                                    <button 
+                                        onClick={handleCopyLink}
+                                        className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all shadow-md ${copied ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-indigo-600'}`}>
+                                        {copied ? <Check size={14}/> : <Copy size={14}/>} {copied ? 'Copiado' : 'Copiar'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
+                                    <div className="p-4 bg-green-50 text-green-600 rounded-[2rem]"><MessageCircle size={32}/></div>
+                                    <div>
+                                        <h4 className="font-black uppercase text-sm tracking-tight">Difusión WhatsApp</h4>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1">Enviar invitación pre-armada</p>
+                                    </div>
+                                    <button 
+                                        onClick={handleShareWhatsApp}
+                                        className="w-full bg-green-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all active:scale-95">
+                                        Abrir WhatsApp
+                                    </button>
+                                </div>
+
+                                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center text-center space-y-4">
+                                    <div className="p-4 bg-indigo-50 text-indigo-600 rounded-[2rem] group relative">
+                                        <QrCode size={32}/>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black uppercase text-sm tracking-tight">QR para Mostrador</h4>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1">Imprimir para el local</p>
+                                    </div>
+                                    <button className="w-full bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 transition-all flex items-center justify-center gap-2">
+                                        <Printer size={14}/> Imprimir QR
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-slate-200">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <Sparkles size={14} className="text-indigo-500"/> Compartir en Redes Sociales
+                                </h4>
+                                <div className="flex gap-4">
+                                    <button className="p-4 bg-white border border-slate-200 rounded-2xl text-pink-600 hover:bg-pink-50 transition-all flex-1 flex flex-col items-center gap-1">
+                                        <Instagram size={20}/>
+                                        <span className="text-[8px] font-black">STORY</span>
+                                    </button>
+                                    <button className="p-4 bg-white border border-slate-200 rounded-2xl text-blue-600 hover:bg-blue-50 transition-all flex-1 flex flex-col items-center gap-1">
+                                        <Facebook size={20}/>
+                                        <span className="text-[8px] font-black">POST</span>
+                                    </button>
+                                    <button className="p-4 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:bg-slate-50 transition-all flex-1 flex flex-col items-center gap-1">
+                                        <Mail size={20}/>
+                                        <span className="text-[8px] font-black">EMAIL</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 bg-white border-t border-slate-100 flex justify-center">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bruzzone Online Store • Venta Directa Cloud</p>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
