@@ -204,9 +204,9 @@ const App: React.FC = () => {
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
       case ViewState.LICENSE_MANAGER: return <LicenseConsole key={renderKey} />;
-      case ViewState.MARKETING: return <Marketing key={renderKey} />;
+      case ViewState.MARKETING: return <Marketing key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ONLINE_SALES: return <OnlineSales key={renderKey} />;
-      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin key={renderKey} />;
+      case ViewState.ECOMMERCE_ADMIN: return <EcommerceAdmin key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.SHOP: return <Shop key={renderKey} />;
       case ViewState.COMPANY_SETTINGS: return <CompanySettings key={renderKey} />;
       case ViewState.AFIP_CONFIG: return <AfipConfig key={renderKey} />;
