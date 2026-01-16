@@ -24,17 +24,14 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'CREDITO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
     
-    // Configuración de Empresa para Cuotas
     const [companyConfig] = useState<CompanyConfig>(() => {
         const saved = localStorage.getItem('company_config');
         return saved ? JSON.parse(saved) : { paymentSystems: [] };
     });
 
-    // Estados para Crédito
     const [selectedPlatform, setSelectedPlatform] = useState<PaymentSystem | null>(null);
     const [selectedInstallment, setSelectedInstallment] = useState<CreditInstallment | null>(null);
 
-    // Estados Modales
     const [showManualModal, setShowManualModal] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
     const [manualForm, setManualForm] = useState({ name: '', price: '' });
@@ -59,10 +56,8 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Cálculo del Total Base (Suma de productos)
     const baseTotal = useMemo(() => cart.reduce((acc, curr) => acc + curr.subtotal, 0), [cart]);
 
-    // Cálculo del Total Final (Aplicando intereses de cuotas si es Crédito)
     const cartTotal = useMemo(() => {
         if (paymentMethod === 'CREDITO' && selectedInstallment) {
             return baseTotal * (1 + selectedInstallment.surcharge / 100);
@@ -78,6 +73,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         });
         setSearchTerm('');
         setSearchResults([]);
+    };
+
+    const updateQuantity = (idx: number, newQty: number) => {
+        setCart(prev => prev.map((item, i) => {
+            if (i === idx) {
+                const q = Math.max(0, newQty);
+                return { ...item, quantity: q, subtotal: q * item.appliedPrice };
+            }
+            return item;
+        }));
     };
 
     const addManualItem = () => {
@@ -197,16 +202,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                             <p className="text-[9px] font-mono text-slate-400">SKU: {item.product.internalCodes[0]}</p>
                                         </td>
                                         <td className="px-8 py-4">
-                                            <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto">
-                                                <button onClick={() => {
-                                                    const q = Math.max(1, item.quantity - 1);
-                                                    setCart(prev => prev.map((it, i) => i === idx ? {...it, quantity: q, subtotal: q * it.appliedPrice} : it));
-                                                }} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
-                                                <span className="font-black text-xs w-8 text-center">{item.quantity}</span>
-                                                <button onClick={() => {
-                                                    const q = item.quantity + 1;
-                                                    setCart(prev => prev.map((it, i) => i === idx ? {...it, quantity: q, subtotal: q * it.appliedPrice} : it));
-                                                }} className="text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
+                                            <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto shadow-inner">
+                                                <button onClick={() => updateQuantity(idx, item.quantity - 1)} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
+                                                <input 
+                                                    type="number" 
+                                                    step="any"
+                                                    className="font-black text-xs w-16 text-center bg-transparent outline-none border-none focus:ring-0" 
+                                                    value={item.quantity}
+                                                    onChange={(e) => updateQuantity(idx, parseFloat(e.target.value) || 0)}
+                                                />
+                                                <button onClick={() => updateQuantity(idx, item.quantity + 1)} className="text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                             </div>
                                         </td>
                                         <td className="px-8 py-4 text-right font-bold text-slate-400">${item.appliedPrice.toLocaleString()}</td>
@@ -254,7 +259,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             ))}
                         </div>
 
-                        {/* CONFIGURACIÓN DE CUOTAS PARA CRÉDITO */}
                         {paymentMethod === 'CREDITO' && (
                             <div className="space-y-4 pt-4 border-t border-white/10 animate-fade-in">
                                 <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Plataforma / Tarjeta</p>
@@ -320,7 +324,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 </button>
             </div>
 
-            {/* MODAL ARTÍCULO MANUAL */}
             {showManualModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden">
@@ -343,7 +346,6 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 </div>
             )}
 
-            {/* MODAL: CONSOLA DE FINALIZACIÓN */}
             {showFinishModal && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
                     <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col">
