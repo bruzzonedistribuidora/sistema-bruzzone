@@ -3,9 +3,9 @@ import {
     ShoppingCart, Trash2, Search, CheckCircle, 
     Minus, Plus, RefreshCw, PlusCircle, Package, Truck, Landmark, 
     CreditCard, Banknote, FileText, Smartphone as ECheqIcon, X,
-    Receipt, FileSpreadsheet, ClipboardList, Printer, Zap
+    Receipt, FileSpreadsheet, ClipboardList, Printer, Zap, ChevronRight
 } from 'lucide-react';
-import { InvoiceItem, Product, Client, CashRegister } from '../types';
+import { InvoiceItem, Product, Client, CompanyConfig, PaymentSystem, CreditInstallment } from '../types';
 import { productDB, addToReplenishmentQueue } from '../services/storageService';
 
 interface POSProps {
@@ -24,6 +24,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
     
+    // Configuración de Empresa para Cuotas
+    const [companyConfig] = useState<CompanyConfig>(() => {
+        const saved = localStorage.getItem('company_config');
+        return saved ? JSON.parse(saved) : { paymentSystems: [] };
+    });
+
+    // Estados para Crédito
+    const [selectedPlatform, setSelectedPlatform] = useState<PaymentSystem | null>(null);
+    const [selectedInstallment, setSelectedInstallment] = useState<CreditInstallment | null>(null);
+
     // Estados Modales
     const [showManualModal, setShowManualModal] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
@@ -49,7 +59,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    const cartTotal = useMemo(() => cart.reduce((acc, curr) => acc + curr.subtotal, 0), [cart]);
+    // Cálculo del Total Base (Suma de productos)
+    const baseTotal = useMemo(() => cart.reduce((acc, curr) => acc + curr.subtotal, 0), [cart]);
+
+    // Cálculo del Total Final (Aplicando intereses de cuotas si es Crédito)
+    const cartTotal = useMemo(() => {
+        if (paymentMethod === 'CREDITO' && selectedInstallment) {
+            return baseTotal * (1 + selectedInstallment.surcharge / 100);
+        }
+        return baseTotal;
+    }, [baseTotal, paymentMethod, selectedInstallment]);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -102,12 +121,22 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         }
 
         const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
-        history.unshift({ id: saleId, date, client: selectedClient?.name || 'Consumidor Final', total: cartTotal, method: paymentMethod, type: isInvoice ? 'FACTURA' : 'TICKET' });
+        history.unshift({ 
+            id: saleId, 
+            date, 
+            client: selectedClient?.name || 'Consumidor Final', 
+            total: cartTotal, 
+            method: paymentMethod, 
+            installmentInfo: selectedInstallment ? `${selectedInstallment.installments} cuotas` : null,
+            type: isInvoice ? 'FACTURA' : 'TICKET' 
+        });
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(history));
 
         window.dispatchEvent(new Event('ferrecloud_request_pulse'));
         setCart([]);
         setSelectedClient(null);
+        setSelectedPlatform(null);
+        setSelectedInstallment(null);
         setIsProcessing(false);
         setShowFinishModal(false);
         alert(`✅ ${isInvoice ? 'Factura' : 'Venta'} #${saleId} generada exitosamente.`);
@@ -197,8 +226,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             </div>
 
             <div className="w-96 flex flex-col gap-4">
-                <div className="bg-slate-950 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden flex-1 border-t-4 border-indigo-600">
-                    <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 border-b border-white/10 pb-6">Resumen y Pago</h3>
+                <div className="bg-slate-950 rounded-[3rem] p-8 text-white shadow-2xl relative overflow-hidden flex-1 border-t-4 border-indigo-600 overflow-y-auto custom-scrollbar">
+                    <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-8 border-b border-white/10 pb-4">Método de Cobro</h3>
+                    
                     <div className="space-y-6">
                         <div className="grid grid-cols-2 gap-2">
                             {[
@@ -210,21 +240,83 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                 { id: 'CHEQUE', icon: FileText },
                                 { id: 'ECHEQ', icon: ECheqIcon },
                             ].map(m => (
-                                <button key={m.id} onClick={() => setPaymentMethod(m.id as any)} className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-2 ${paymentMethod === m.id ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'}`}>
+                                <button 
+                                    key={m.id} 
+                                    onClick={() => {
+                                        setPaymentMethod(m.id as any);
+                                        if (m.id !== 'CREDITO') {
+                                            setSelectedPlatform(null);
+                                            setSelectedInstallment(null);
+                                        }
+                                    }} 
+                                    className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-2 ${paymentMethod === m.id ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'}`}>
                                     <m.icon size={14}/> {m.label || m.id}
                                 </button>
                             ))}
                         </div>
-                        <div className="pt-10 border-t border-white/10">
-                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Total a Cobrar</p>
+
+                        {/* CONFIGURACIÓN DE CUOTAS PARA CRÉDITO */}
+                        {paymentMethod === 'CREDITO' && (
+                            <div className="space-y-4 pt-4 border-t border-white/10 animate-fade-in">
+                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Plataforma / Tarjeta</p>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {(companyConfig.paymentSystems || []).map(sys => (
+                                        <button 
+                                            key={sys.id}
+                                            onClick={() => { setSelectedPlatform(sys); setSelectedInstallment(null); }}
+                                            className={`p-3 rounded-xl border flex justify-between items-center transition-all ${selectedPlatform?.id === sys.id ? 'bg-white/10 border-indigo-500' : 'border-white/5 hover:bg-white/5'}`}
+                                        >
+                                            <span className="text-[10px] font-black uppercase">{sys.name}</span>
+                                            {selectedPlatform?.id === sys.id && <CheckCircle size={14} className="text-indigo-400"/>}
+                                        </button>
+                                    ))}
+                                    {(companyConfig.paymentSystems || []).length === 0 && (
+                                        <p className="text-[9px] text-slate-500 italic">No hay plataformas configuradas en Mi Empresa.</p>
+                                    )}
+                                </div>
+
+                                {selectedPlatform && (
+                                    <>
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Plan de Cuotas</p>
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {selectedPlatform.creditInstallments.map(inst => (
+                                                <button 
+                                                    key={inst.id}
+                                                    onClick={() => setSelectedInstallment(inst)}
+                                                    className={`p-3 rounded-xl border flex justify-between items-center transition-all ${selectedInstallment?.id === inst.id ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 hover:bg-white/5'}`}
+                                                >
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-black uppercase">{inst.label}</p>
+                                                        <p className="text-[8px] text-slate-400">Recargo: {inst.surcharge}%</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[11px] font-black text-indigo-200">
+                                                            {inst.installments}x ${( (baseTotal * (1 + inst.surcharge/100)) / inst.installments ).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                                        </p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="pt-8 border-t border-white/10">
+                            <div className="flex justify-between items-end mb-2">
+                                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Final</p>
+                                {paymentMethod === 'CREDITO' && selectedInstallment && (
+                                    <span className="text-[9px] font-black text-green-400 uppercase">Incluye {selectedInstallment.surcharge}% interés</span>
+                                )}
+                            </div>
                             <p className="text-6xl font-black tracking-tighter">${cartTotal.toLocaleString('es-AR')}</p>
                         </div>
                     </div>
                 </div>
                 <button 
                     onClick={() => setShowFinishModal(true)}
-                    disabled={cart.length === 0 || isProcessing}
-                    className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
+                    disabled={cart.length === 0 || isProcessing || (paymentMethod === 'CREDITO' && !selectedInstallment)}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
                     <CheckCircle size={24}/> FINALIZAR VENTA
                 </button>
             </div>
@@ -271,6 +363,9 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                             <div className="text-center">
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Total a Procesar</p>
                                 <h2 className="text-6xl font-black text-slate-900 tracking-tighter">${cartTotal.toLocaleString('es-AR')}</h2>
+                                {paymentMethod === 'CREDITO' && selectedInstallment && (
+                                    <p className="text-xs font-black text-indigo-600 uppercase mt-2">{selectedInstallment.label} - {selectedInstallment.installments} Pagos</p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
