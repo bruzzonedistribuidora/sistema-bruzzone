@@ -5,7 +5,8 @@ import {
     DollarSign, Activity, Cloud, Laptop2, Globe2, BarChart3,
     AlertTriangle, PackagePlus, Tags, X, ClipboardList, 
     FileSpreadsheet, Users, UserSearch, Calculator, Network,
-    LayoutGrid, Search, Tag, Smartphone, Box, Package
+    LayoutGrid, Search, Tag, Smartphone, Box, Package as PackageIcon,
+    ArrowLeftRight
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -54,7 +55,7 @@ import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem 
 const VIEW_ICONS: Record<string, any> = {
     [ViewState.DASHBOARD]: LayoutDashboard,
     [ViewState.POS]: Receipt,
-    [ViewState.INVENTORY]: Package,
+    [ViewState.INVENTORY]: Box,
     [ViewState.REMITOS]: ClipboardList,
     [ViewState.PRESUPUESTOS]: FileSpreadsheet,
     [ViewState.CLIENTS]: Users,
@@ -70,6 +71,7 @@ const VIEW_ICONS: Record<string, any> = {
     [ViewState.ACCOUNTING]: Calculator,
     [ViewState.SHORTAGES]: AlertTriangle,
     [ViewState.REPLENISHMENT]: PackagePlus,
+    [ViewState.STOCK_TRANSFERS]: ArrowLeftRight,
 };
 
 const App: React.FC = () => {
@@ -162,6 +164,7 @@ const App: React.FC = () => {
       case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment />;
       case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
+      case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
