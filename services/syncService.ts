@@ -1,7 +1,14 @@
-// Added comment above the fix
-// Migrated to Firebase v8 syntax to fix 'no exported member' errors (collection, addDoc, etc.) in the modular imports
-import firebase from "firebase/app";
-import "firebase/firestore";
+import { 
+    collection, 
+    addDoc, 
+    onSnapshot, 
+    query, 
+    serverTimestamp, 
+    orderBy, 
+    where,
+    Timestamp,
+    doc
+} from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { productDB } from "./storageService";
 
@@ -52,7 +59,7 @@ class SyncService {
         this.vaultId = cleanId;
         localStorage.setItem('ferrecloud_vault_id', cleanId);
         this.logActivity('OUT', `Vínculo establecido con bóveda: ${cleanId}`);
-        this.connectionTime = new Date(); // Reset connection time to now
+        this.connectionTime = new Date(); 
         this.initFirebase();
     }
 
@@ -61,105 +68,102 @@ class SyncService {
     private initFirebase() {
         if (!this.vaultId || !db) return;
         
-        // Limpiar suscripción previa si existe
         if (this.unsubscribe) {
             this.unsubscribe();
         }
 
         this.logActivity('IN', 'Iniciando escucha de cambios en tiempo real...');
 
-        // Updated to v8 style query: doc().collection().where().orderBy()
-        const q = db.collection("vaults").doc(this.vaultId).collection("deltas")
-            .where("createdAt", ">", firebase.firestore.Timestamp.fromDate(this.connectionTime))
-            .orderBy("createdAt", "asc");
-
-        this.unsubscribe = q.onSnapshot((snapshot) => {
-            snapshot.docChanges().forEach(async (change) => {
-                if (change.type === "added") {
-                    const data = change.doc.data();
-                    
-                    // IMPORTANTE: Ignorar si el cambio fue originado por esta misma terminal
-                    if (data.sid === this.sessionId) return;
-
-                    const { type, payload } = data;
-
-                    try {
-                        switch (type) {
-                            case 'PRODUCT_UPDATE':
-                                await productDB.save(payload, true);
-                                this.logActivity('IN', `Sinc: ${payload.name} actualizado`);
-                                break;
-                            case 'PRODUCT_DELETE':
-                                await productDB.delete(payload.id, true);
-                                this.logActivity('IN', `Sinc: Eliminado ID ${payload.id}`);
-                                break;
-                            case 'TREASURY_UPDATE':
-                                localStorage.setItem('ferrecloud_registers', JSON.stringify(payload));
-                                window.dispatchEvent(new Event('storage'));
-                                this.logActivity('IN', `Sinc: Saldos de cajas actualizados`);
-                                break;
-                            case 'CLIENT_UPDATE':
-                                const currentClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
-                                const newClients = currentClients.map((c: any) => c.id === payload.id ? payload : c);
-                                if (!currentClients.some((c:any) => c.id === payload.id)) newClients.push(payload);
-                                localStorage.setItem('ferrecloud_clients', JSON.stringify(newClients));
-                                window.dispatchEvent(new Event('storage'));
-                                this.logActivity('IN', `Sinc: Cliente ${payload.name} actualizado`);
-                                break;
-                            // Added handler for REMITOS_SYNC to enable real-time updates of remitos
-                            case 'REMITOS_SYNC':
-                                localStorage.setItem('ferrecloud_remitos', JSON.stringify(payload));
-                                window.dispatchEvent(new Event('storage'));
-                                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                                    detail: { status: 'OK', engine: 'FIREBASE' } 
-                                }));
-                                this.logActivity('IN', `Sinc: Libro de remitos actualizado`);
-                                break;
-                            case 'SYNC_PULSE':
-                                // Solo dispara un refresco visual de componentes
-                                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                                    detail: { status: 'OK', engine: 'FIREBASE' } 
-                                }));
-                                break;
-                        }
-                    } catch (err: any) {
-                        console.error("Sync Error:", err);
-                        this.logActivity('ERROR', `Fallo al procesar cambio entrante`);
-                    }
-                }
-            });
+        try {
+            // Referencia a la subcolección deltas dentro del documento de la bóveda
+            const deltasRef = collection(db, "vaults", this.vaultId, "deltas");
             
-            // Emitir pulso de conexión exitosa
-            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
-                detail: { status: 'OK', engine: 'FIREBASE' } 
-            }));
-        }, (error) => {
-            console.error("Firestore error:", error);
-            this.logActivity('ERROR', `Conexión perdida: ${error.message}`);
-            window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { status: 'ERROR' } }));
-        });
+            const q = query(
+                deltasRef,
+                where("createdAt", ">", Timestamp.fromDate(this.connectionTime)),
+                orderBy("createdAt", "asc")
+            );
+
+            this.unsubscribe = onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach(async (change) => {
+                    if (change.type === "added") {
+                        const data = change.doc.data();
+                        
+                        // Ignorar si el cambio fue originado por esta misma terminal
+                        if (data.sid === this.sessionId) return;
+
+                        const { type, payload } = data;
+
+                        try {
+                            switch (type) {
+                                case 'PRODUCT_UPDATE':
+                                    await productDB.save(payload, true);
+                                    this.logActivity('IN', `Sinc: ${payload.name} actualizado`);
+                                    break;
+                                case 'PRODUCT_DELETE':
+                                    await productDB.delete(payload.id, true);
+                                    this.logActivity('IN', `Sinc: Eliminado ID ${payload.id}`);
+                                    break;
+                                case 'TREASURY_UPDATE':
+                                    localStorage.setItem('ferrecloud_registers', JSON.stringify(payload));
+                                    window.dispatchEvent(new Event('storage'));
+                                    this.logActivity('IN', `Sinc: Saldos de cajas actualizados`);
+                                    break;
+                                case 'CLIENT_UPDATE':
+                                    const currentClients = JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]');
+                                    const newClients = currentClients.map((c: any) => c.id === payload.id ? payload : c);
+                                    if (!currentClients.some((c:any) => c.id === payload.id)) newClients.push(payload);
+                                    localStorage.setItem('ferrecloud_clients', JSON.stringify(newClients));
+                                    window.dispatchEvent(new Event('storage'));
+                                    this.logActivity('IN', `Sinc: Cliente ${payload.name} actualizado`);
+                                    break;
+                                case 'REMITOS_SYNC':
+                                    localStorage.setItem('ferrecloud_remitos', JSON.stringify(payload));
+                                    window.dispatchEvent(new Event('storage'));
+                                    this.logActivity('IN', `Sinc: Libro de remitos actualizado`);
+                                    break;
+                                case 'SYNC_PULSE':
+                                    window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                                        detail: { status: 'OK', engine: 'FIREBASE' } 
+                                    }));
+                                    break;
+                            }
+                        } catch (err: any) {
+                            this.logActivity('ERROR', `Fallo al procesar cambio entrante`);
+                        }
+                    }
+                });
+                
+                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { 
+                    detail: { status: 'OK', engine: 'FIREBASE' } 
+                }));
+            }, (error) => {
+                this.logActivity('ERROR', `Conexión perdida: ${error.message}`);
+                window.dispatchEvent(new CustomEvent('ferrecloud_sync_pulse', { detail: { status: 'ERROR' } }));
+            });
+        } catch (e: any) {
+            this.logActivity('ERROR', `Error al inicializar Firestore: ${e.message}`);
+        }
     }
 
     async pushDelta(type: string, payload: any) {
         if (!this.vaultId || !db) return;
 
         try {
-            // v8 style collection.add instead of modular addDoc
-            await db.collection("vaults").doc(this.vaultId).collection("deltas").add({
+            const deltasRef = collection(db, "vaults", this.vaultId, "deltas");
+            await addDoc(deltasRef, {
                 type,
                 payload,
                 sid: this.sessionId,
                 terminal: localStorage.getItem('ferrecloud_terminal_name') || 'PC-DESCONOCIDA',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                createdAt: serverTimestamp()
             });
             this.logActivity('OUT', `Paquete enviado: ${type}`);
         } catch (e: any) {
-            console.error("Push Delta Error:", e);
             this.logActivity('ERROR', `Error al transmitir: ${e.message}`);
         }
     }
 
-    // Fixed: Added pushToCloud method to fix "Property 'pushToCloud' does not exist on type 'SyncService'" error in Remitos.tsx
     async pushToCloud() {
         const remitos = JSON.parse(localStorage.getItem('ferrecloud_remitos') || '[]');
         await this.pushDelta('REMITOS_SYNC', remitos);
@@ -167,7 +171,7 @@ class SyncService {
 
     async syncFromRemote(): Promise<boolean> {
         if (!this.vaultId) return false;
-        this.connectionTime = new Date(Date.now() - 3600000); // Intenta traer cambios de la última hora
+        this.connectionTime = new Date(Date.now() - 3600000); 
         this.initFirebase();
         return true;
     }
