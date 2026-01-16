@@ -8,7 +8,7 @@ import {
     Smartphone, Heart, ShoppingBag, Laptop, Cloud, CloudOff, Building2,
     LayoutGrid, ShoppingCart as OrderIcon, AlertTriangle, PackagePlus, BarChart3,
     Scale, Activity, Settings2, DollarSign, Key, LogOut, Laptop2, Network,
-    Boxes as BoxesIcon, Tags
+    Boxes as BoxesIcon, Tags, UserSearch
 } from 'lucide-react';
 import { ViewState, User, CloudSyncStatus, CompanyConfig, SystemLicense } from '../types';
 
@@ -190,7 +190,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, user, onLogou
 
                 <NavDropdown id="compras" label="Compras" icon={Truck}>
                     {isModuleEnabled(ViewState.PURCHASES) && <DropdownItem view={ViewState.PURCHASES} label="Gestión Compras" icon={Truck} active={activeView === ViewState.PURCHASES} onClick={() => handleNav(ViewState.PURCHASES)} />}
-                    {isModuleEnabled(ViewState.PROVIDERS) && <DropdownItem view={ViewState.PROVIDERS} label="Fichero Prov." icon={Users} active={activeView === ViewState.PROVIDERS} onClick={() => handleNav(ViewState.PROVIDERS)} />}
+                    {isModuleEnabled(ViewState.PROVIDERS) && <DropdownItem view={ViewState.PROVIDERS} label="Fichero Prov." icon={UserSearch} active={activeView === ViewState.PROVIDERS} onClick={() => handleNav(ViewState.PROVIDERS)} />}
                     {isModuleEnabled(ViewState.PROVIDER_BALANCES) && <DropdownItem view={ViewState.PROVIDER_BALANCES} label="Ctas Ctes Prov." icon={DollarSign} active={activeView === ViewState.PROVIDER_BALANCES} onClick={() => handleNav(ViewState.PROVIDER_BALANCES)} />}
                 </NavDropdown>
                 
