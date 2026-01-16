@@ -41,8 +41,8 @@ const Inventory: React.FC = () => {
       otrosCodigos3: '',
       otrosCodigos4: '',
       listCost: 0,
-      purchasePackageQuantity: 1, // Divisor de compra
-      salePackageQuantity: 1,     // Multiplicador de venta
+      purchasePackageQuantity: 1, 
+      salePackageQuantity: 1,     
       discounts: [0, 0, 0, 0],
       profitMargin: 30,
       vatRate: 21,
@@ -87,7 +87,6 @@ const Inventory: React.FC = () => {
   }, [searchTerm]);
 
   const calculatePrices = (data: Partial<Product>) => {
-      // Costo de lista dividido por cantidad en bulto (Compra)
       const baseList = parseFloat(data.listCost as any) || 0;
       const purchaseQty = parseFloat(data.purchasePackageQuantity as any) || 1;
       const unitListCost = baseList / purchaseQty;
@@ -103,7 +102,6 @@ const Inventory: React.FC = () => {
       const priceNeto = netCost * (1 + margin/100);
       const vat = parseFloat(data.vatRate as any) || 21;
       
-      // Multiplicado por cantidad de venta (si vende pack)
       const saleQty = parseFloat(data.salePackageQuantity as any) || 1;
       const final = (priceNeto * (1 + vat/100)) * saleQty;
 
@@ -150,6 +148,22 @@ const Inventory: React.FC = () => {
       setIsModalOpen(false);
       await loadProducts();
       setIsLoading(false);
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+      if (window.confirm(`¿Está seguro de eliminar permanentemente el artículo "${product.name}"? Esta acción no se puede deshacer.`)) {
+          setIsLoading(true);
+          try {
+              await productDB.delete(product.id);
+              await loadProducts();
+              alert("✅ Producto eliminado correctamente.");
+          } catch (err) {
+              console.error(err);
+              alert("❌ Error al intentar eliminar el producto.");
+          } finally {
+              setIsLoading(false);
+          }
+      }
   };
 
   const quickAdd = (type: 'BRAND' | 'PROVIDER' | 'CATEGORY') => {
@@ -221,7 +235,7 @@ const Inventory: React.FC = () => {
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-[11px]">
                                   {products.map(p => (
-                                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                      <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
                                           <td className="px-6 py-3">
                                               <p className="font-black text-slate-800 uppercase leading-none mb-1">{p.name}</p>
                                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{p.brand} • {p.category}</p>
@@ -240,6 +254,7 @@ const Inventory: React.FC = () => {
                                               <div className="flex justify-center gap-1">
                                                   <button title="Editar Ficha" onClick={() => { setFormData(p); setActiveProductTab('GENERAL'); setIsModalOpen(true); }} className="p-2 text-slate-400 bg-slate-50 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Pen size={14}/></button>
                                                   <button title="Añadir a Reposición" onClick={() => addToReplenishmentQueue(p)} className="p-2 text-emerald-600 bg-emerald-50 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><Truck size={14}/></button>
+                                                  <button title="Eliminar Artículo" onClick={() => handleDeleteProduct(p)} className="p-2 text-red-400 bg-red-50 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={14}/></button>
                                               </div>
                                           </td>
                                       </tr>
@@ -254,11 +269,9 @@ const Inventory: React.FC = () => {
           )}
       </div>
 
-      {/* MODAL FICHA TÉCNICA REDISEÑADA (ESTILO ESCRITORIO COMPACTO) */}
       {isModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
               <div className="bg-slate-200 rounded-[2rem] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col border border-white/20">
-                  {/* Header Compacto */}
                   <div className="p-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
                       <div className="flex items-center gap-3">
                           <FileText size={18} className="text-indigo-400"/>
@@ -267,7 +280,6 @@ const Inventory: React.FC = () => {
                       <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-white/10 rounded-lg transition-colors"><X size={24}/></button>
                   </div>
                   
-                  {/* Selector de Solapas */}
                   <div className="flex bg-slate-300/50 p-1 shrink-0 gap-1 border-b border-slate-300">
                       {[
                           { id: 'GENERAL', label: 'General', icon: Info },
@@ -379,7 +391,7 @@ const Inventory: React.FC = () => {
                                           <Calculator size={14} className="text-indigo-300"/>
                                       </div>
                                       <div className="flex justify-between items-baseline">
-                                          <span className="text-xs font-bold text-slate-500">Costo Neto Unitario</span>
+                                          <span className="text-xs font-bold text-slate-50">Costo Neto Unitario</span>
                                           <span className="text-xl font-black text-slate-900">${formData.costAfterDiscounts?.toLocaleString()}</span>
                                       </div>
                                       <div className="flex justify-between items-center gap-4">
