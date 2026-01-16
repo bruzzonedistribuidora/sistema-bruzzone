@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     X, Smartphone, ShoppingBag, LayoutDashboard, Database, 
@@ -58,7 +57,7 @@ import MobileApp from './components/MobileApp';
 import LicenseConsole from './components/LicenseConsole';
 import LabelPrinting from './components/LabelPrinting';
 import PrintSettings from './components/PrintSettings';
-import { ViewState, User, Client, InvoiceItem, SystemLicense, Product } from './types';
+import { ViewState, User, Client, InvoiceItem, SystemLicense, Product, ReplenishmentItem } from './types';
 import { syncService } from './services/syncService';
 
 const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> = {
@@ -83,6 +82,7 @@ const App: React.FC = () => {
   const [openViews, setOpenViews] = useState<ViewState[]>([ViewState.DASHBOARD]);
   const [activeView, setActiveView] = useState<ViewState>(ViewState.DASHBOARD);
   const [itemsToBill, setItemsToBill] = useState<InvoiceItem[] | null>(null);
+  const [itemsToReplenish, setItemsToReplenish] = useState<ReplenishmentItem[] | null>(null);
   const [selectedClientForPortal, setSelectedClientForPortal] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
@@ -200,7 +200,24 @@ const App: React.FC = () => {
       case ViewState.ACCOUNTING: return <Accounting key={renderKey} />;
       case ViewState.REPORTS: return <Reports key={renderKey} />;
       case ViewState.STATISTICS: return <Statistics key={renderKey} />;
-      case ViewState.REPLENISHMENT: return <Replenishment key={renderKey} />;
+      case ViewState.REPLENISHMENT: 
+        return (
+            <Replenishment 
+                key={renderKey} 
+                initialItems={itemsToReplenish || undefined} 
+                onItemsConsumed={() => setItemsToReplenish(null)} 
+            />
+        );
+      case ViewState.SHORTAGES:
+        return (
+            <Shortages 
+                key={renderKey}
+                onGenerateOrders={(items) => {
+                    setItemsToReplenish(items);
+                    handleNavigate(ViewState.REPLENISHMENT);
+                }}
+            />
+        );
       case ViewState.INITIAL_IMPORT: return <InitialImport onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.LABEL_PRINTING: return <LabelPrinting key={renderKey} />;
       case ViewState.LICENSE_MANAGER: return <LicenseConsole key={renderKey} />;
