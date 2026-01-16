@@ -77,6 +77,7 @@ const VIEW_CONFIG: Record<string, { icon: any, label: string, color: string }> =
     [ViewState.REPORTS]: { icon: FileBarChart2, label: "Reportes", color: "bg-indigo-800" },
     [ViewState.SHORTAGES]: { icon: AlertTriangle, label: "Faltantes", color: "bg-orange-600" },
     [ViewState.REPLENISHMENT]: { icon: PackagePlus, label: "Reposición", color: "bg-emerald-600" },
+    [ViewState.MASS_PRODUCT_UPDATE]: { icon: Layers, label: "Cambios Masivos", color: "bg-slate-700" },
 };
 
 const App: React.FC = () => {
@@ -88,16 +89,14 @@ const App: React.FC = () => {
   const [selectedClientForPortal, setSelectedClientForPortal] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
-  const [isPublicShop, setIsPublicShop] = useState(false);
+  
+  // Detección inmediata de ruta pública para evitar flash de Login
+  const [isPublicShop, setIsPublicShop] = useState(() => window.location.pathname.includes('/shop'));
   
   const [renderKey, setRenderKey] = useState(0);
 
   useEffect(() => {
-    // Detección de ruta pública de la tienda
-    if (window.location.pathname.includes('/shop')) {
-        setIsPublicShop(true);
-        return;
-    }
+    if (isPublicShop) return;
 
     const savedSession = sessionStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
@@ -118,7 +117,7 @@ const App: React.FC = () => {
     return () => {
         window.removeEventListener('ferrecloud_sync_pulse', handleSyncPulse);
     };
-  }, []);
+  }, [isPublicShop]);
 
   const handleNavigate = (view: ViewState) => {
     if (!openViews.includes(view)) {
