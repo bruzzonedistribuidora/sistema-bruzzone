@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ShoppingCart, Trash2, Search, CheckCircle, 
@@ -22,7 +21,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
     const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [clients] = useState<Client[]>(() => JSON.parse(localStorage.getItem('ferrecloud_clients') || '[]'));
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'TARJETA' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
+    const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'DEBITO' | 'CREDITO' | 'TRANSFERENCIA' | 'CTACTE' | 'CHEQUE' | 'ECHEQ'>('EFECTIVO');
     const [isProcessing, setIsProcessing] = useState(false);
     
     // Estados Modales
@@ -204,14 +203,15 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                         <div className="grid grid-cols-2 gap-2">
                             {[
                                 { id: 'EFECTIVO', icon: Banknote },
-                                { id: 'TARJETA', icon: CreditCard },
+                                { id: 'DEBITO', label: 'DÉBITO', icon: CreditCard },
+                                { id: 'CREDITO', label: 'CRÉDITO', icon: CreditCard },
                                 { id: 'TRANSFERENCIA', icon: Landmark },
                                 { id: 'CTACTE', icon: FileText },
                                 { id: 'CHEQUE', icon: FileText },
                                 { id: 'ECHEQ', icon: ECheqIcon },
                             ].map(m => (
                                 <button key={m.id} onClick={() => setPaymentMethod(m.id as any)} className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-2 ${paymentMethod === m.id ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-white/5 text-slate-500'}`}>
-                                    <m.icon size={14}/> {m.id}
+                                    <m.icon size={14}/> {m.label || m.id}
                                 </button>
                             ))}
                         </div>
