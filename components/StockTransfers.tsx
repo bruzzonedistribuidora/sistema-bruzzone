@@ -52,16 +52,17 @@ const StockTransfers: React.FC = () => {
 
     const addToCart = (product: Product) => {
         if (!sourceBranchId) {
-            alert("Seleccione primero la sucursal de origen.");
+            alert("⚠️ Por favor, seleccione primero la sucursal de ORIGEN.");
             return;
         }
         
-        const sourceStock = product.stockDetails.find(s => s.branchId === sourceBranchId)?.quantity || 0;
-        // Si no hay stock específico en esa sucursal, usamos el stock principal como referencia si es la sucursal 1
-        const availableInSource = sourceBranchId === '1' ? product.stockPrincipal : sourceStock;
+        // Verificación de stock disponible en origen
+        const sourceStock = sourceBranchId === '1' 
+            ? product.stockPrincipal 
+            : product.stockDetails.find(s => s.branchId === sourceBranchId)?.quantity || 0;
 
-        if (availableInSource <= 0) {
-            alert("Este producto no tiene stock disponible en la sucursal de origen seleccionada.");
+        if (sourceStock <= 0) {
+            alert(`❌ Stock insuficiente en sucursal de origen para: ${product.name}`);
             return;
         }
 
@@ -77,7 +78,7 @@ const StockTransfers: React.FC = () => {
     const handleExecuteTransfer = async () => {
         if (!sourceBranchId || !destBranchId || cart.length === 0) return;
         if (sourceBranchId === destBranchId) {
-            alert("Origen y Destino no pueden ser la misma sucursal.");
+            alert("❌ Origen y Destino no pueden ser la misma sucursal.");
             return;
         }
 
@@ -90,11 +91,10 @@ const StockTransfers: React.FC = () => {
             for (const item of cart) {
                 const p = await productDB.getById(item.productId);
                 if (p) {
-                    // Actualizamos stockPrincipal si es sucursal 1, o buscamos en stockDetails
                     let newPrincipal = p.stockPrincipal;
                     let newDetails = [...p.stockDetails];
 
-                    // Restar de origen
+                    // --- RESTAR DE ORIGEN ---
                     if (sourceBranchId === '1') {
                         newPrincipal = Math.max(0, newPrincipal - item.quantity);
                     } else {
@@ -103,7 +103,7 @@ const StockTransfers: React.FC = () => {
                         );
                     }
 
-                    // Sumar a destino
+                    // --- SUMAR A DESTINO ---
                     if (destBranchId === '1') {
                         newPrincipal = newPrincipal + item.quantity;
                     } else {
@@ -117,6 +117,7 @@ const StockTransfers: React.FC = () => {
                         }
                     }
 
+                    // Actualizar artículo con el nuevo balance de stock
                     await productDB.save({
                         ...p,
                         stockPrincipal: newPrincipal,
@@ -143,9 +144,13 @@ const StockTransfers: React.FC = () => {
             setSourceBranchId('');
             setDestBranchId('');
             setNotes('');
-            alert("✅ Movimiento de mercadería realizado con éxito.");
+            
+            // Notificar pulso de sincronización
+            window.dispatchEvent(new Event('ferrecloud_request_pulse'));
+            
+            alert("✅ Movimiento realizado con éxito y sincronizado con la nube.");
         } catch (err) {
-            console.error(err);
+            console.error("Error en transferencia:", err);
             alert("❌ Hubo un error al procesar el traslado.");
         } finally {
             setIsExecuting(false);
@@ -157,11 +162,11 @@ const StockTransfers: React.FC = () => {
             <div className="flex justify-between items-end">
                 <div>
                     <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Traslados de Mercadería</h2>
-                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Control de Stock por sucursales y depósitos</p>
+                    <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Sincronización de Stock entre Sucursales</p>
                 </div>
                 <div className="flex bg-slate-100 rounded-2xl p-1 shadow-inner">
-                    <button onClick={() => setActiveTab('NEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'NEW' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Nueva Transferencia</button>
-                    <button onClick={() => setActiveTab('HISTORY')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'HISTORY' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Historial</button>
+                    <button onClick={() => setActiveTab('NEW')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'NEW' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Nueva Operación</button>
+                    <button onClick={() => setActiveTab('HISTORY')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all tracking-widest ${activeTab === 'HISTORY' ? 'bg-white text-indigo-600 shadow-md' : 'text-gray-400'}`}>Historial Logístico</button>
                 </div>
             </div>
 
@@ -169,54 +174,57 @@ const StockTransfers: React.FC = () => {
                 <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden animate-fade-in">
                     <div className="lg:w-1/3 space-y-4 flex flex-col">
                         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-6 space-y-6">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Move size={14} className="text-indigo-600"/> Origen y Destino</h3>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building2 size={14} className="text-indigo-600"/> Ruta de Movimiento</h3>
                             <div className="space-y-4">
                                 <select className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl font-black text-xs uppercase outline-none" value={sourceBranchId} onChange={e => {setSourceBranchId(e.target.value); setCart([]);}}>
-                                    <option value="">-- SELECCIONE ORIGEN --</option>
+                                    <option value="">-- ORIGEN --</option>
                                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                 </select>
                                 <div className="flex justify-center"><ArrowRight className="text-slate-200 rotate-90 lg:rotate-0" size={24}/></div>
                                 <select className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl font-black text-xs uppercase outline-none" value={destBranchId} onChange={e => setDestBranchId(e.target.value)}>
-                                    <option value="">-- SELECCIONE DESTINO --</option>
+                                    <option value="">-- DESTINO --</option>
                                     {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                 </select>
                             </div>
                         </div>
 
                         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-6 flex-1 flex flex-col overflow-hidden">
-                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Search size={14} className="text-indigo-600"/> Buscar Artículos</h3>
+                            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2"><Search size={14} className="text-indigo-600"/> Maestro de Artículos</h3>
                             <input 
                                 className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl font-black text-xs uppercase outline-none mb-4"
-                                placeholder="NOMBRE O SKU..."
+                                placeholder="Escanear o Escribir SKU..."
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 disabled={!sourceBranchId}
                             />
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
                                 {searchResults.map(p => (
-                                    <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex justify-between items-center group text-left">
+                                    <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-400 hover:bg-indigo-50 transition-all flex justify-between items-center group text-left shadow-sm">
                                         <div className="flex-1 pr-2 min-w-0">
                                             <p className="font-black text-slate-800 uppercase text-[10px] truncate leading-tight mb-1">{p.name}</p>
-                                            <p className="text-[9px] font-mono font-bold text-slate-400">SKU: {p.internalCodes[0]}</p>
+                                            <p className="text-[9px] font-mono font-bold text-indigo-400">SKU: {p.internalCodes[0]}</p>
                                         </div>
-                                        <Plus size={16} className="text-indigo-200 group-hover:text-indigo-600"/>
+                                        <Plus size={16} className="text-indigo-200 group-hover:text-indigo-600 shrink-0"/>
                                     </button>
                                 ))}
+                                {searchTerm.length > 2 && searchResults.length === 0 && (
+                                    <p className="text-[9px] text-slate-300 font-bold text-center py-4 uppercase">Sin resultados</p>
+                                )}
                             </div>
                         </div>
                     </div>
 
                     <div className="lg:flex-1 bg-white rounded-[3rem] border border-slate-200 shadow-sm flex flex-col overflow-hidden">
                         <div className="p-6 border-b border-slate-100 bg-slate-900 text-white flex justify-between items-center shrink-0">
-                            <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><Package size={16} className="text-indigo-400"/> Lista de Envío</h3>
+                            <h3 className="text-xs font-black uppercase tracking-widest flex items-center gap-2"><Package size={16} className="text-indigo-400"/> Lista de Carga</h3>
                             <span className="text-[10px] font-black bg-indigo-600 px-3 py-1 rounded-full uppercase tracking-widest">{cart.length} ITEMS</span>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30">
                             <table className="w-full text-left">
-                                <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b sticky top-0">
+                                <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b sticky top-0 z-10">
                                     <tr>
                                         <th className="px-6 py-4">Artículo</th>
-                                        <th className="px-6 py-4 text-center">Cant.</th>
+                                        <th className="px-6 py-4 text-center">Cant. a Trasladar</th>
                                         <th className="px-6 py-4"></th>
                                     </tr>
                                 </thead>
@@ -230,7 +238,7 @@ const StockTransfers: React.FC = () => {
                                                 <input 
                                                     type="text" 
                                                     inputMode="decimal"
-                                                    className="w-24 p-2 bg-slate-50 border rounded-xl font-black text-center text-indigo-700 outline-none" 
+                                                    className="w-24 p-2 bg-slate-50 border rounded-xl font-black text-center text-indigo-700 outline-none focus:border-indigo-500" 
                                                     value={item.quantity.toString().replace('.', ',')} 
                                                     onChange={e => {
                                                         const val = parseFloat(e.target.value.replace(',', '.')) || 0;
@@ -244,7 +252,7 @@ const StockTransfers: React.FC = () => {
                                         </tr>
                                     ))}
                                     {cart.length === 0 && (
-                                        <tr><td colSpan={3} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest opacity-30">Carrito de traslado vacío</td></tr>
+                                        <tr><td colSpan={3} className="py-32 text-center text-slate-300 font-black uppercase tracking-widest opacity-30">No hay artículos para el movimiento</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -255,7 +263,7 @@ const StockTransfers: React.FC = () => {
                                 disabled={cart.length === 0 || isExecuting}
                                 className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-2xl hover:bg-indigo-600 transition-all flex items-center justify-center gap-3">
                                 {isExecuting ? <RefreshCw className="animate-spin" size={20}/> : <ArrowLeftRight size={20}/>}
-                                PROCESAR MOVIMIENTO
+                                FINALIZAR TRASLADO
                             </button>
                         </div>
                     </div>
@@ -263,18 +271,18 @@ const StockTransfers: React.FC = () => {
             ) : (
                 <div className="flex-1 bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-fade-in">
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest sticky top-0">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-900 text-[9px] font-black text-slate-300 uppercase tracking-widest sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-8 py-5">ID / Fecha</th>
+                                    <th className="px-8 py-5">ID Operación</th>
                                     <th className="px-8 py-5">Ruta</th>
-                                    <th className="px-8 py-5">Items</th>
+                                    <th className="px-8 py-5 text-center">Items</th>
                                     <th className="px-8 py-5 text-center">Estado</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-[11px]">
                                 {transfers.map(tr => (
-                                    <tr key={tr.id} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={tr.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-8 py-4">
                                             <p className="font-black text-slate-800">{tr.id}</p>
                                             <p className="text-[9px] font-bold text-slate-400">{tr.date}</p>
@@ -286,12 +294,15 @@ const StockTransfers: React.FC = () => {
                                                 <span>{tr.destBranchName}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-4 font-black text-slate-900">{tr.items.length} ítems</td>
+                                        <td className="px-8 py-4 text-center font-black text-slate-900">{tr.items.length}</td>
                                         <td className="px-8 py-4 text-center">
                                             <span className="px-3 py-1 rounded-full bg-green-50 text-green-700 border border-green-100 font-black uppercase text-[8px] tracking-widest">Ejecutado</span>
                                         </td>
                                     </tr>
                                 ))}
+                                {transfers.length === 0 && (
+                                    <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-black uppercase tracking-widest">Sin registros de movimientos</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
