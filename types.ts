@@ -154,8 +154,34 @@ export interface CloudConfig { enabled: boolean; vaultId: string; lastSync: stri
 export type TaxCondition = 'Consumidor Final' | 'Responsable Inscripto' | 'Monotributo' | 'Exento';
 export type DocumentType = 'FACTURA' | 'REMITO' | 'PRESUPUESTO' | 'CLI_RESUMEN_CUENTA' | 'PROD_BARRAS';
 export type PaperSize = 'A4' | 'A5' | 'TICKET_80MM' | 'ROLLO_62MM' | 'A4_QUARTER' | 'CUSTOM';
-export interface Position { x: number; y: number; visible: boolean; }
-export interface PrintTemplate { id: string; name: string; paperSize: PaperSize; orientation: 'VERTICAL' | 'HORIZONTAL'; titleText: string; docLetterText: string; docCodeText: string; headerText: string; subHeaderText: string; footerText: string; totalsLabel: string; voucherPointOfSale: string; voucherNumber: string; voucherCuitEmisor: string; voucherIIBBEmisor: string; showPrices: boolean; showSkus: boolean; showBrands: boolean; showIvaColumn: boolean; positions: Record<string, Position>; }
+export interface Position { x: number; y: number; visible: boolean; width?: number; height?: number; }
+export interface PrintTemplate { 
+    id: string; 
+    name: string; 
+    paperSize: PaperSize; 
+    orientation: 'VERTICAL' | 'HORIZONTAL'; 
+    titleText: string; 
+    docLetterText: string; 
+    docCodeText: string; 
+    headerText: string; 
+    subHeaderText: string; 
+    footerText: string; 
+    totalsLabel: string; 
+    voucherPointOfSale: string; 
+    voucherNumber: string; 
+    voucherCuitEmisor: string; 
+    voucherIIBBEmisor: string; 
+    showPrices: boolean; 
+    showSkus: boolean; 
+    showBrands: boolean; 
+    showIvaColumn: boolean; 
+    // Sub-visibilidad granular
+    showVoucherDate: boolean;
+    showVoucherCuit: boolean;
+    showVoucherTitle: boolean;
+    showVoucherNumber: boolean;
+    positions: Record<string, Position>; 
+}
 export interface StockAdjustmentLog { id: string; date: string; productId: string; productName: string; location: 'PRINCIPAL' | 'DEPOSITO' | 'SUCURSAL'; oldQty: number; newVal: number; reason: string; user: string; }
 export interface Role { id: string; name: string; color: string; permissions: string[]; }
 export interface Branch { id: string; code: string; name: string; address: string; phone: string; manager: string; type: 'SUCURSAL' | 'DEPOSITO' | 'VIRTUAL'; active: boolean; }
