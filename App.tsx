@@ -90,8 +90,8 @@ const App: React.FC = () => {
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
   
-  // Detección inmediata de ruta pública para evitar flash de Login
-  const [isPublicShop, setIsPublicShop] = useState(() => window.location.pathname.includes('/shop'));
+  // Detección inmediata de ruta pública de tienda para evitar parpadeo de Login
+  const [isPublicShop] = useState(() => window.location.pathname.endsWith('/shop'));
   
   const [renderKey, setRenderKey] = useState(0);
 
@@ -135,6 +135,8 @@ const App: React.FC = () => {
   };
 
   const renderViewContent = (view: ViewState) => {
+    if (isPublicShop) return <Shop key="public-shop" />;
+    
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard key={renderKey} onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard key={renderKey} onNavigate={handleNavigate} />;
