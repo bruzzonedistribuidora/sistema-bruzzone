@@ -88,10 +88,17 @@ const App: React.FC = () => {
   const [selectedClientForPortal, setSelectedClientForPortal] = useState<Client | null>(null);
   const [systemLicense, setSystemLicense] = useState<SystemLicense | null>(null);
   const [cloudStatus, setCloudStatus] = useState<'IDLE' | 'SYNCING' | 'UP_TO_DATE' | 'OFFLINE'>('IDLE');
+  const [isPublicShop, setIsPublicShop] = useState(false);
   
   const [renderKey, setRenderKey] = useState(0);
 
   useEffect(() => {
+    // Detección de ruta pública de la tienda
+    if (window.location.pathname.includes('/shop')) {
+        setIsPublicShop(true);
+        return;
+    }
+
     const savedSession = sessionStorage.getItem('ferrecloud_session');
     if (savedSession) setLoggedInUser(JSON.parse(savedSession));
 
@@ -108,23 +115,8 @@ const App: React.FC = () => {
     };
     window.addEventListener('ferrecloud_sync_pulse', handleSyncPulse);
 
-    const handleQuickAddPOS = (e: any) => {
-        const product: Product = e.detail.product;
-        if (product) {
-            setItemsToBill([{ 
-                product, 
-                quantity: 1, 
-                appliedPrice: product.priceFinal, 
-                subtotal: product.priceFinal 
-            }]);
-            handleNavigate(ViewState.POS);
-        }
-    };
-    window.addEventListener('ferrecloud_add_to_pos', handleQuickAddPOS);
-
     return () => {
         window.removeEventListener('ferrecloud_sync_pulse', handleSyncPulse);
-        window.removeEventListener('ferrecloud_add_to_pos', handleQuickAddPOS);
     };
   }, []);
 
@@ -242,6 +234,7 @@ const App: React.FC = () => {
     }
   };
 
+  if (isPublicShop) return <Shop />;
   if (!loggedInUser) return <Login onLogin={(u) => { setLoggedInUser(u); sessionStorage.setItem('ferrecloud_session', JSON.stringify(u)); }} />;
 
   return (
