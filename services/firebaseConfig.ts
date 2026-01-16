@@ -1,6 +1,9 @@
-import { initializeApp, getApp, getApps } from "firebase/app";
-import { getFirestore, Firestore } from "firebase/firestore";
+// Added comment above the fix
+// Using Firebase v8 compat style to resolve missing named exports (like initializeApp) in the environment
+import firebase from "firebase/app";
+import "firebase/firestore";
 
+// Configuración oficial para el proyecto Ferretería Bruzzone
 const firebaseConfig = {
   apiKey: "AIzaSyCzBPwTL4idkBKgDLVwOW3TlqjIpkZLULA",
   authDomain: "sistemagestionbruzzone.firebaseapp.com",
@@ -10,9 +13,10 @@ const firebaseConfig = {
   appId: "1:569643821205:web:72a6ba8eca5669c12f139c"
 };
 
-// Evita errores de re-inicialización en entornos con Hot Module Replacement (Vite)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const firestore: Firestore = getFirestore(app);
+// Inicializamos la App
+// Use compat check to avoid double initialization
+const app = !firebase.apps.length ? firebase.initializeApp(firebaseConfig) : firebase.app();
 
-// Exportación nominal explícita para compatibilidad total con Rollup
-export { firestore as db };
+// Inicializamos la Base de Datos (Firestore) y la exportamos como db
+// Esto es vital para que syncService.ts reconozca la base de datos centralizada
+export const db = app.firestore();
