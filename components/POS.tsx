@@ -75,10 +75,16 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
         setSearchResults([]);
     };
 
-    const updateQuantity = (idx: number, newQty: number) => {
+    const normalizeQuantity = (val: string): number => {
+        const normalized = val.replace(',', '.');
+        const parsed = parseFloat(normalized);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const updateQuantity = (idx: number, newVal: string | number) => {
+        const q = typeof newVal === 'string' ? normalizeQuantity(newVal) : Math.max(0, newVal);
         setCart(prev => prev.map((item, i) => {
             if (i === idx) {
-                const q = Math.max(0, newQty);
                 return { ...item, quantity: q, subtotal: q * item.appliedPrice };
             }
             return item;
@@ -205,11 +211,11 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                                             <div className="flex items-center justify-center gap-2 bg-slate-50 border rounded-xl p-1 w-fit mx-auto shadow-inner">
                                                 <button onClick={() => updateQuantity(idx, item.quantity - 1)} className="text-slate-400 hover:text-red-500"><Minus size={14}/></button>
                                                 <input 
-                                                    type="number" 
-                                                    step="any"
+                                                    type="text" 
+                                                    inputMode="decimal"
                                                     className="font-black text-xs w-16 text-center bg-transparent outline-none border-none focus:ring-0" 
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateQuantity(idx, parseFloat(e.target.value) || 0)}
+                                                    value={item.quantity.toString().replace('.', ',')}
+                                                    onChange={(e) => updateQuantity(idx, e.target.value)}
                                                 />
                                                 <button onClick={() => updateQuantity(idx, item.quantity + 1)} className="text-slate-400 hover:text-indigo-600"><Plus size={14}/></button>
                                             </div>
@@ -319,14 +325,14 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 <button 
                     onClick={() => setShowFinishModal(true)}
                     disabled={cart.length === 0 || isProcessing || (paymentMethod === 'CREDITO' && !selectedInstallment)}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
+                    className="w-full bg-indigo-600 hover:bg-indigo-50 text-white py-6 rounded-[2.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all disabled:opacity-30">
                     <CheckCircle size={24}/> FINALIZAR VENTA
                 </button>
             </div>
 
             {showManualModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
                         <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
                             <h3 className="font-black uppercase text-sm tracking-widest">Carga Manual</h3>
                             <button onClick={() => setShowManualModal(false)}><X size={24}/></button>
