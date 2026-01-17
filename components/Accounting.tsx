@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
     Calculator, Landmark, Download, TrendingUp, Activity, 
     ArrowUpRight, ArrowDownLeft, Scale, ShieldCheck, 
@@ -17,18 +17,37 @@ const Accounting: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // --- CARGA DE DATOS DESDE STORAGE ---
-  const sales: any[] = useMemo(() => {
+  const [sales, setSales] = useState<any[]>(() => {
     try {
         const saved = localStorage.getItem('ferrecloud_sales_history');
         return saved ? JSON.parse(saved) : [];
     } catch (e) { return []; }
-  }, []);
+  });
 
-  const purchases: Purchase[] = useMemo(() => {
+  const [purchases, setPurchases] = useState<Purchase[]>(() => {
     try {
         const saved = localStorage.getItem('ferrecloud_purchases');
         return saved ? JSON.parse(saved) : [];
     } catch (e) { return []; }
+  });
+
+  useEffect(() => {
+    const handleSalesUpdate = () => {
+      const saved = localStorage.getItem('ferrecloud_sales_history');
+      setSales(saved ? JSON.parse(saved) : []);
+    };
+    const handlePurchasesUpdate = () => {
+      const saved = localStorage.getItem('ferrecloud_purchases');
+      setPurchases(saved ? JSON.parse(saved) : []);
+    };
+
+    window.addEventListener('ferrecloud_sales_history_updated', handleSalesUpdate);
+    window.addEventListener('ferrecloud_purchases_updated', handlePurchasesUpdate);
+
+    return () => {
+      window.removeEventListener('ferrecloud_sales_history_updated', handleSalesUpdate);
+      window.removeEventListener('ferrecloud_purchases_updated', handlePurchasesUpdate);
+    };
   }, []);
 
   // --- LÓGICA FISCAL (LIBRO DE IVA Y DECISIÓN) ---
@@ -109,7 +128,7 @@ const Accounting: React.FC = () => {
     <div className="p-6 h-full flex flex-col space-y-6 bg-slate-50 overflow-hidden font-sans">
       
       {/* CABECERA DINÁMICA */}
-      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-6 rounded-[2.5rem] border border-gray-200 shadow-sm shrink-0 gap-4">
         <div className="flex items-center gap-5">
             <div className="p-4 bg-slate-900 text-indigo-400 rounded-3xl shadow-xl">
                 <Calculator size={32}/>
