@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     Search, ShoppingCart, Package, Truck, 
@@ -27,6 +26,7 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
     useEffect(() => {
         const checkStatus = async () => {
             const stats = await productDB.getStats();
+            // Si no hay productos y hay un vaultId configurado, se necesita sincronización inicial
             if (stats.count === 0 && syncService.getVaultId()) {
                 setNeedsInitialSync(true);
             }
@@ -68,11 +68,13 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
 
     const handleInitialSync = async () => {
         setIsSyncing(true);
+        // Ahora syncFromRemote() manejará la sincronización de TODO el localStorage
         const success = await syncService.syncFromRemote();
         setIsSyncing(false);
         if (success) {
             setNeedsInitialSync(false);
-            alert("✅ Sistema listo para usar con 140k artículos.");
+            alert("✅ Sistema listo para usar con 140k artículos y todos los datos.");
+            window.location.reload(); // Recargar para asegurar que todos los datos de localStorage se carguen en los estados
         } else {
             alert("❌ No se pudo conectar con la nube. Revisa tu ID de Bóveda.");
         }
@@ -130,7 +132,7 @@ const MobileApp: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogo
                         <div className="space-y-2">
                             <h2 className="text-2xl font-black uppercase tracking-tighter">Dispositivo Nuevo</h2>
                             <p className="text-slate-400 text-sm font-medium leading-relaxed">
-                                Hemos detectado que este celular no tiene la base de datos de artículos. Pulsa abajo para descargarla de tu nube.
+                                Hemos detectado que este celular no tiene la base de datos completa. Pulsa abajo para descargarla de tu nube.
                             </p>
                         </div>
                         <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
