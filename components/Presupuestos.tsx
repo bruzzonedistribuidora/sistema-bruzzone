@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, Trash2, Save, FileText, X, 
@@ -13,7 +14,8 @@ interface PresupuestosProps {
     onConvertToRemito?: (items: InvoiceItem[]) => void;
 }
 
-const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsumed, onConvertToSale, onConvertToRemito }) => {
+// Fix: Changed default export to named export
+export const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsumed, onConvertToSale, onConvertToRemito }) => {
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');
   const [cart, setCart] = useState<InvoiceItem[]>([]);
   const [clientName, setClientName] = useState('');
@@ -193,5 +195,3 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
     </div>
   );
 };
-
-export default Presupuestos;
