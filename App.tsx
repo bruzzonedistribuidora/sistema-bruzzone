@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     LayoutDashboard, Database, 
     Receipt, Truck, Wallet, Bot, Settings, Layers,
@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import { LicenseManager } from '@components/LicenseManager'; // Updated to use the alias configured in vite.config.ts
+import { LicenseManager } from './components/LicenseManager.tsx'; // Updated to use explicit .tsx extension
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
@@ -114,6 +114,11 @@ const App: React.FC = () => {
       }
   };
 
+  // Fix: Wrap onCartUsed in useCallback
+  const onCartUsed = useCallback(() => {
+      setItemsToBill(null);
+  }, [setItemsToBill]);
+
   const renderViewContent = (view: ViewState) => {
     if (isPublicShop) return <Shop />;
     
@@ -138,7 +143,7 @@ const App: React.FC = () => {
             <SalesManagement 
                 initialTab={initialSalesTab}
                 itemsToBill={itemsToBill}
-                onCartUsed={() => setItemsToBill(null)}
+                onCartUsed={onCartUsed}
                 // No need to pass onTransformToRemito/Budget here, SalesManagement handles its internal navigation
             />
         );
