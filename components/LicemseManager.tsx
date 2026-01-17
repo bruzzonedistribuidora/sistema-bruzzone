@@ -189,4 +189,4 @@ const LicenseManager: React.FC = () => {
     );
 };
 
-export default LicenseManager;
+export { LicenseManager };
