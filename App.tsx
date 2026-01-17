@@ -5,8 +5,7 @@ import {
     DollarSign, Activity, Cloud, Laptop2, Globe2, BarChart3,
     AlertTriangle, PackagePlus, Tags, X, ClipboardList, 
     FileSpreadsheet, Users, UserSearch, Calculator, Network,
-    LayoutGrid, Search, Tag, Smartphone, Box, Package as PackageIcon,
-    ArrowLeftRight
+    LayoutGrid, Search, Tag, Smartphone, Box, Package
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -17,7 +16,7 @@ import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
-import ProviderBalances from './components/ProviderBalances';
+import ProviderBalances from './components/components/ProviderBalances';
 import Providers from './components/Providers';
 import Treasury from './components/Treasury';
 import Accounting from './components/Accounting';
@@ -50,12 +49,13 @@ import Login from './components/Login';
 import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
+import SalesManagement from './components/SalesManagement';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
 
 const VIEW_ICONS: Record<string, any> = {
     [ViewState.DASHBOARD]: LayoutDashboard,
     [ViewState.POS]: Receipt,
-    [ViewState.INVENTORY]: Box,
+    [ViewState.INVENTORY]: Package,
     [ViewState.REMITOS]: ClipboardList,
     [ViewState.PRESUPUESTOS]: FileSpreadsheet,
     [ViewState.CLIENTS]: Users,
@@ -71,7 +71,9 @@ const VIEW_ICONS: Record<string, any> = {
     [ViewState.ACCOUNTING]: Calculator,
     [ViewState.SHORTAGES]: AlertTriangle,
     [ViewState.REPLENISHMENT]: PackagePlus,
-    [ViewState.STOCK_TRANSFERS]: ArrowLeftRight,
+    // Add SalesManagement views that were previously individual components in the dock
+    [ViewState.SALES_ORDERS]: ListOrdered,
+    [ViewState.CREDIT_NOTES]: RotateCcw,
 };
 
 const App: React.FC = () => {
@@ -110,20 +112,38 @@ const App: React.FC = () => {
   const renderViewContent = (view: ViewState) => {
     if (isPublicShop) return <Shop />;
     
+    // Group sales-related views under SalesManagement
+    if (
+        view === ViewState.POS ||
+        view === ViewState.REMITOS ||
+        view === ViewState.PRESUPUESTOS ||
+        view === ViewState.SALES_ORDERS ||
+        view === ViewState.CREDIT_NOTES
+    ) {
+        let initialSalesTab: 'POS' | 'ORDERS' | 'CREDIT_NOTES' | 'REMITOS' | 'BUDGETS';
+        switch (view) {
+            case ViewState.REMITOS: initialSalesTab = 'REMITOS'; break;
+            case ViewState.PRESUPUESTOS: initialSalesTab = 'BUDGETS'; break;
+            case ViewState.SALES_ORDERS: initialSalesTab = 'ORDERS'; break;
+            case ViewState.CREDIT_NOTES: initialSalesTab = 'CREDIT_NOTES'; break;
+            default: initialSalesTab = 'POS'; break;
+        }
+
+        return (
+            <SalesManagement 
+                initialTab={initialSalesTab}
+                itemsToBill={itemsToBill}
+                onCartUsed={() => setItemsToBill(null)}
+                // No need to pass onTransformToRemito/Budget here, SalesManagement handles its internal navigation
+            />
+        );
+    }
+    
     switch (view) {
       case ViewState.DASHBOARD: return <Dashboard onNavigate={handleNavigate} />;
       case ViewState.ANALYTICS: return <AnalyticsDashboard onNavigate={handleNavigate} />;
       case ViewState.INVENTORY: return <Inventory onNavigate={handleNavigate} />;
       case ViewState.PRICE_LISTS: return <PriceLists />;
-      case ViewState.POS: 
-        return (
-            <POS 
-                initialCart={itemsToBill || undefined} 
-                onCartUsed={() => setItemsToBill(null)} 
-                onTransformToRemito={(items) => { setItemsToBill(items); handleNavigate(ViewState.REMITOS); }}
-                onTransformToBudget={(items) => { setItemsToBill(items); handleNavigate(ViewState.PRESUPUESTOS); }}
-            />
-        );
       case ViewState.PURCHASES: return <Purchases onNavigate={handleNavigate} />;
       case ViewState.PROVIDERS: return <Providers />;
       case ViewState.TREASURY: return <Treasury />;
@@ -139,8 +159,6 @@ const App: React.FC = () => {
         return <CustomerPortal client={selectedClientForPortal} onLogout={() => { setSelectedClientForPortal(null); handleNavigate(ViewState.CLIENTS); }} />;
       case ViewState.CLIENT_BALANCES: return <ClientBalances onNavigateToHistory={() => handleNavigate(ViewState.CLIENT_BALANCES)} />;
       case ViewState.PROVIDER_BALANCES: return <ProviderBalances />;
-      case ViewState.REMITOS: return <Remitos initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
-      case ViewState.PRESUPUESTOS: return <Presupuestos initialItems={itemsToBill || undefined} onItemsConsumed={() => setItemsToBill(null)} />;
       case ViewState.CLOUD_HUB: return <CloudHub />;
       case ViewState.CONFIG_PANEL: return <ConfigPanel onNavigate={handleNavigate} />;
       case ViewState.ACCOUNTING: return <Accounting />;
@@ -164,7 +182,11 @@ const App: React.FC = () => {
       case ViewState.MASS_STOCK_UPDATE: return <MassStockUpdate onComplete={() => handleNavigate(ViewState.INVENTORY)} />;
       case ViewState.STOCK_ADJUSTMENT: return <StockAdjustment />;
       case ViewState.DAILY_MOVEMENTS: return <DailyMovements />;
+      case ViewState.AI_ASSISTANT: return <Assistant />;
       case ViewState.STOCK_TRANSFERS: return <StockTransfers />;
+      case ViewState.LICENSE_MANAGER: return <LicenseManager />;
+      case ViewState.PRICE_AUDIT: return <PriceAudit />;
+      case ViewState.CURRENCIES: return <Currencies />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
