@@ -115,7 +115,6 @@ const LicenseManager: React.FC = () => {
                     onClick={handleSave}
                     disabled={isSaving}
                     className="bg-white text-slate-950 px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-100 transition-all flex items-center gap-3">
-                    {isSaving ? <RefreshCw className="animate-spin" size={18}/> : <Save size={18}/>}
                     {isSaving ? 'Guardando...' : 'Aplicar Configuración'}
                 </button>
             </div>
