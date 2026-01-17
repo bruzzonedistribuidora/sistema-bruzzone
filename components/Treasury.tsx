@@ -53,11 +53,18 @@ const Treasury: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('ferrecloud_registers', JSON.stringify(registers));
+    window.dispatchEvent(new Event('ferrecloud_registers_updated'));
+  }, [registers]);
+
+  useEffect(() => {
     localStorage.setItem('ferrecloud_treasury_movements', JSON.stringify(movements));
+    window.dispatchEvent(new Event('ferrecloud_treasury_movements_updated'));
+  }, [movements]);
+
+  useEffect(() => {
     localStorage.setItem('ferrecloud_checks', JSON.stringify(checks));
-    // Emitir evento para sincronización en la nube
-    window.dispatchEvent(new Event('ferrecloud_request_pulse'));
-  }, [registers, movements, checks]);
+    window.dispatchEvent(new Event('ferrecloud_checks_updated'));
+  }, [checks]);
 
   const handleCreateRegister = () => {
     if (!newRegisterForm.name) return;
