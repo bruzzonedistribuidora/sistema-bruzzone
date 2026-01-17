@@ -15,11 +15,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "baseUrl": ".", 
-    "paths": {
-      "@components/*": ["./components/*"]
-    }
+    "jsx": "react-jsx"
+    // Eliminadas baseUrl y paths para usar resolución estándar de módulos
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
