@@ -6,7 +6,7 @@ import {
     AlertTriangle, PackagePlus, Tags, X, ClipboardList, 
     FileSpreadsheet, Users, UserSearch, Calculator, Network,
     LayoutGrid, Search, Tag, Smartphone, Box, Package,
-    ListOrdered, RotateCcw, Key // Added missing Lucide icon: Key
+    ListOrdered, RotateCcw, Key 
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import LicenseManager from './components/LicenseManager';
+import { LicenseManager } from './components/LicenseManager'; // Updated to named import
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
@@ -78,7 +78,7 @@ const VIEW_ICONS: Record<string, any> = {
     // SalesManagement views
     [ViewState.SALES_ORDERS]: ListOrdered, 
     [ViewState.CREDIT_NOTES]: RotateCcw,
-    [ViewState.LICENSE_MANAGER]: Key, // Explicitly defined icon for LicenseManager
+    [ViewState.LICENSE_MANAGER]: Key, 
 };
 
 const App: React.FC = () => {
