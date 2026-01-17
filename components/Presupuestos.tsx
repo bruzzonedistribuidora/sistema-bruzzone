@@ -91,6 +91,7 @@ const Presupuestos: React.FC<PresupuestosProps> = ({ initialItems, onItemsConsum
 
   useEffect(() => {
     localStorage.setItem('ferrecloud_budgets', JSON.stringify(budgets));
+    window.dispatchEvent(new Event('ferrecloud_budgets_updated')); // Disparar evento para sincronización
   }, [budgets]);
 
   return (
