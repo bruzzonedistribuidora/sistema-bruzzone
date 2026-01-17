@@ -52,15 +52,15 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
   useEffect(() => {
     window.addEventListener('ferrecloud_sync_pulse', loadDataFromStorage);
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'ferrecloud_remitos') loadDataFromStorage();
-    });
+    window.addEventListener('storage', loadDataFromStorage); // Escucha cambios genéricos en storage
+    window.addEventListener('ferrecloud_remitos_updated', loadDataFromStorage); // Escucha nuestro evento específico
     
     loadDataFromStorage();
 
     return () => {
       window.removeEventListener('ferrecloud_sync_pulse', loadDataFromStorage);
       window.removeEventListener('storage', loadDataFromStorage);
+      window.removeEventListener('ferrecloud_remitos_updated', loadDataFromStorage);
     };
   }, []);
 
@@ -146,9 +146,11 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
 
     setExistingRemitos(updatedRemitos);
     localStorage.setItem('ferrecloud_remitos', JSON.stringify(updatedRemitos));
+    window.dispatchEvent(new Event('ferrecloud_remitos_updated')); // Disparar evento para sincronización
 
-    await syncService.pushToCloud();
-    
+    // The syncService is listening to 'ferrecloud_remitos_updated' and will push the changes.
+    // await syncService.pushToCloud(); // REMOVED: Redundant call
+
     setCart([]);
     setSelectedClient(null);
     setEditingRemitoId(null);
@@ -162,7 +164,9 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
           const updated = current.filter((r: any) => r.id !== id);
           setExistingRemitos(updated);
           localStorage.setItem('ferrecloud_remitos', JSON.stringify(updated));
-          await syncService.pushToCloud();
+          window.dispatchEvent(new Event('ferrecloud_remitos_updated')); // Disparar evento para sincronización
+          // The syncService is listening to 'ferrecloud_remitos_updated' and will push the changes.
+          // await syncService.pushToCloud(); // REMOVED: Redundant call
       }
   };
 
@@ -379,9 +383,7 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
                 </div>
             </div>
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 export default Remitos;
