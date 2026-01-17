@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Plus, Printer, CheckSquare, Square, FileText, 
@@ -17,7 +18,8 @@ interface RemitosProps {
     onBillRemitos?: (items: InvoiceItem[]) => void;
 }
 
-const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBillRemitos }) => {
+// Fix: Changed default export to named export
+export const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBillRemitos }) => {
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [cart, setCart] = useState<RemitoItem[]>([]);
@@ -385,5 +387,3 @@ const Remitos: React.FC<RemitosProps> = ({ initialItems, onItemsConsumed, onBill
         </div>
     );
 };
-
-export default Remitos;
