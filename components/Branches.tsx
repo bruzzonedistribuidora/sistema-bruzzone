@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Store, MapPin, Phone, User, Plus, Search, Edit3, Trash2, CheckCircle, XCircle, X, Save } from 'lucide-react';
 import { Branch } from '../types';
@@ -24,6 +23,7 @@ const Branches: React.FC = () => {
   // Guardar cada vez que cambie la lista
   useEffect(() => {
       localStorage.setItem('ferrecloud_branches', JSON.stringify(branches));
+      window.dispatchEvent(new Event('ferrecloud_branches_updated')); // Disparar evento para sincronización
   }, [branches]);
 
   const handleOpenModal = (branch?: Branch) => {
@@ -133,7 +133,7 @@ const Branches: React.FC = () => {
                       </div>
 
                       <div className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
-                          <button onClick={() => handleOpenModal(branch)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 border border-gray-200 rounded-lg text-slate-600 font-bold text-[10px] uppercase hover:bg-slate-100 transition-colors">
+                          <button onClick={() => handleOpenModal(branch)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-slate-50 border border-gray-200 rounded-lg text-slate-600 and font-bold text-[10px] uppercase hover:bg-slate-100 transition-colors">
                               <Edit3 size={12} /> Editar
                           </button>
                           <button onClick={() => toggleStatus(branch.id)} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 border rounded-lg font-bold text-[10px] uppercase transition-colors ${branch.active ? 'border-red-100 text-red-600 hover:bg-red-50' : 'border-green-100 text-green-600 hover:bg-green-50'}`}>
