@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import { LicenseManager } from './components/LicenseManager.tsx'; // Updated to named import
+import { LicenseManager } from './components/LicenseManager'; // Updated to remove .tsx extension
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
