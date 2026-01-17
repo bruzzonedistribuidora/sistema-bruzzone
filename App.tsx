@@ -17,7 +17,7 @@ import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
-import ProviderBalances from './components/ProviderBalances';
+import ProviderBalances from './components/Providers';
 import Providers from './components/Providers';
 import Treasury from './components/Treasury';
 import Accounting from './components/Accounting';
@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import { LicenseManager } from './components/LicenseManager.tsx'; // Updated to use explicit .tsx extension
+import { LicenseManager } from '@components/LicenseManager'; // Reverted to use alias
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
