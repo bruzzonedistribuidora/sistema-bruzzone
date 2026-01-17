@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
     Receipt, ListOrdered, RotateCcw, ClipboardList, FileSpreadsheet, 
@@ -6,8 +7,10 @@ import {
 import POS from './POS';
 import SalesOrders from './SalesOrders';
 import CreditNotes from './CreditNotes';
-import Remitos from './Remitos';
-import Presupuestos from './Presupuestos';
+// Fix: Changed default import to named import
+import { Remitos } from './Remitos';
+// Fix: Changed default import to named import
+import { Presupuestos } from './Presupuestos';
 import { InvoiceItem } from '../types';
 
 interface SalesManagementProps {
