@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
     ShieldCheck, Lock, Unlock, Zap, Globe, 
@@ -33,7 +32,7 @@ const INITIAL_LICENSE: SystemLicense = {
     }
 };
 
-const LicenseConsole: React.FC = () => {
+const LicenseManager: React.FC = () => {
     const [license, setLicense] = useState<SystemLicense>(() => {
         const saved = localStorage.getItem('ferrecloud_license');
         return saved ? JSON.parse(saved) : INITIAL_LICENSE;
@@ -108,8 +107,8 @@ const LicenseConsole: React.FC = () => {
                         <Key size={32}/>
                     </div>
                     <div>
-                        <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Consola de Licencia</h2>
-                        <p className="text-indigo-400 text-xs font-bold uppercase tracking-widest mt-2">Control Maestro de Activación</p>
+                        <h2 className="text-3xl font-black uppercase tracking-tighter">Consola Maestra de Licencias</h2>
+                        <p className="text-indigo-400 text-xs font-bold uppercase tracking-widest mt-1">Control de Activación para Clientes</p>
                     </div>
                 </div>
                 <button 
@@ -117,7 +116,7 @@ const LicenseConsole: React.FC = () => {
                     disabled={isSaving}
                     className="bg-white text-slate-950 px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-indigo-100 transition-all flex items-center gap-3">
                     {isSaving ? <RefreshCw className="animate-spin" size={18}/> : <Save size={18}/>}
-                    {isSaving ? 'Guardando...' : 'Aplicar Cambios'}
+                    {isSaving ? 'Guardando...' : 'Aplicar Configuración'}
                 </button>
             </div>
 
@@ -125,29 +124,35 @@ const LicenseConsole: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-white/5 space-y-8">
-                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4">Status del Sistema</h3>
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-4">Status de Suscripción</h3>
                             <div className="space-y-6">
                                 <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase block mb-2 tracking-tighter">Vencimiento Global</label>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase block mb-2">Vencimiento Global</label>
                                     <input 
                                         type="date" 
-                                        className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-600"
+                                        className="w-full p-4 bg-white/5 border border-white/5 rounded-2xl font-black text-white outline-none focus:ring-2 focus:ring-indigo-600"
                                         value={license.expiryDate}
                                         onChange={e => setLicense({...license, expiryDate: e.target.value})}
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black text-slate-400 uppercase block mb-2 tracking-tighter">Estado Operativo</label>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase block mb-2">Estado del Sistema</label>
                                     <select 
-                                        className={`w-full p-4 border border-white/10 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-600 ${license.status === 'LOCKED' ? 'bg-red-900/20 text-red-500' : 'bg-white/5 text-green-400'}`}
+                                        className={`w-full p-4 border border-white/5 rounded-2xl font-black text-xs uppercase outline-none focus:ring-2 focus:ring-indigo-600 ${license.status === 'LOCKED' ? 'bg-red-900/20 text-red-500' : 'bg-white/5 text-green-400'}`}
                                         value={license.status}
                                         onChange={e => setLicense({...license, status: e.target.value as any})}
                                     >
                                         <option value="ACTIVE" className="bg-slate-900 text-green-400">ACTIVO / NORMAL</option>
-                                        <option value="LOCKED" className="bg-slate-900 text-red-500">BLOQUEADO</option>
-                                        <option value="TRIAL" className="bg-slate-900 text-yellow-400">PRUEBA</option>
-                                        <option value="EXPIRED" className="bg-slate-900 text-red-400">VENCIDO</option>
+                                        <option value="LOCKED" className="bg-slate-900 text-red-500">BLOQUEADO POR IMPAGO</option>
+                                        <option value="TRIAL" className="bg-slate-900 text-yellow-400">PERÍODO DE PRUEBA</option>
+                                        <option value="EXPIRED" className="bg-slate-900 text-red-400">LICENCIA VENCIDA</option>
                                     </select>
+                                </div>
+                                <div className="p-6 bg-amber-600/10 rounded-2xl border border-amber-500/20 flex items-start gap-4">
+                                    <AlertTriangle className="text-amber-400 shrink-0" size={20}/>
+                                    <p className="text-[10px] text-amber-300 font-medium leading-relaxed uppercase">
+                                        Si bloqueas el sistema, todos los usuarios del local (incluyendo ADMIN) perderán acceso total a la operatividad.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -162,14 +167,14 @@ const LicenseConsole: React.FC = () => {
                                         <div 
                                             key={mod.id} 
                                             onClick={() => toggleModule(mod.id as ViewState)}
-                                            className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer group ${license.enabledModules[mod.id] ? 'bg-indigo-600/10 border-indigo-600' : 'bg-transparent border-white/5 opacity-40 hover:opacity-100'}`}>
+                                            className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer group ${license.enabledModules[mod.id] ? 'bg-white/5 border-indigo-600' : 'bg-transparent border-white/5 opacity-40 hover:opacity-100'}`}>
                                             <div className="flex items-center gap-4">
                                                 <div className={`p-2.5 rounded-xl ${license.enabledModules[mod.id] ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'}`}>
                                                     <mod.icon size={18}/>
                                                 </div>
                                                 <span className="text-xs font-black uppercase tracking-tight">{mod.label}</span>
                                             </div>
-                                            <div className={`w-10 h-5 rounded-full relative transition-all ${license.enabledModules[mod.id] ? 'bg-green-500' : 'bg-slate-700'}`}>
+                                            <div className={`w-10 h-5 rounded-full relative transition-all ${license.enabledModules[mod.id] ? 'bg-green-50' : 'bg-slate-700'}`}>
                                                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${license.enabledModules[mod.id] ? 'right-1' : 'left-1'}`}></div>
                                             </div>
                                         </div>
@@ -184,4 +189,4 @@ const LicenseConsole: React.FC = () => {
     );
 };
 
-export default LicenseConsole;
+export { LicenseManager };
