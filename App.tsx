@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import { LicenseManager } from '@components/LicenseManager'; // Updated to use path alias
+import { LicenseManager } from '@components/LicenseManager'; // Updated to use the alias configured in vite.config.ts
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
