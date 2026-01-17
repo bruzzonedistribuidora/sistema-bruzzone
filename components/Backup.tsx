@@ -5,7 +5,7 @@ import {
     Save, Eraser, Settings2, CheckSquare, Square, 
     Package, Tag, Layers, ShoppingBag, ClipboardList, 
     FileText, Users, Truck, Wallet, Landmark, UploadCloud, FileUp, X,
-    History, ArrowLeftRight
+    History, ArrowLeftRight, Activity, Building2, ShieldCheck, List, Sparkles, Printer, ShoppingCart, Key
 } from 'lucide-react';
 import { productDB } from '../services/storageService';
 
@@ -25,7 +25,20 @@ const Backup: React.FC = () => {
       budgets: false,
       clients: false,
       providers: false,
-      treasury: false
+      treasury: false,
+      dailymovements: false, // Nueva clave para DailyMovements
+      users: false,
+      roles: false,
+      branches: false,
+      companyconfig: false,
+      afipconfig: false,
+      pricelists: false,
+      replenishmentorders: false,
+      coupons: false,
+      campaigns: false,
+      printtemplates: false,
+      stocktransfers: false,
+      salesorders: false
   });
 
   const backups = [
@@ -35,15 +48,29 @@ const Backup: React.FC = () => {
   ];
 
   const resetOptions = [
-      { id: 'products', label: 'Artículos', icon: Package, key: 'ferrecloud_products' },
+      { id: 'products', label: 'Artículos (Maestro)', icon: Package, key: 'ferrecloud_products' }, // IndexedDB handled
       { id: 'brands', label: 'Marcas', icon: Tag, key: 'ferrecloud_brands' },
       { id: 'categories', label: 'Categorías', icon: Layers, key: 'ferrecloud_categories' },
-      { id: 'sales', label: 'Ventas', icon: ShoppingBag, key: 'ferrecloud_sales_history' },
+      { id: 'sales', label: 'Ventas (Historial)', icon: ShoppingBag, key: 'ferrecloud_sales_history' },
       { id: 'remitos', label: 'Remitos', icon: ClipboardList, key: 'ferrecloud_remitos' },
       { id: 'budgets', label: 'Presupuestos', icon: FileText, key: 'ferrecloud_budgets' },
-      { id: 'clients', label: 'Clientes', icon: Users, key: 'ferrecloud_clients' },
-      { id: 'providers', label: 'Proveedores', icon: Truck, key: 'ferrecloud_providers' },
+      { id: 'clients', label: 'Clientes (Fichero)', icon: Users, key: 'ferrecloud_clients' },
+      { id: 'providers', label: 'Proveedores (Fichero)', icon: Truck, key: 'ferrecloud_providers' },
       { id: 'treasury', label: 'Caja y Fondos', icon: Wallet, key: 'ferrecloud_treasury_movements' },
+      { id: 'dailymovements', label: 'Gastos Diarios', icon: Activity, key: 'daily_movements' },
+      { id: 'users', label: 'Usuarios', icon: Users, key: 'ferrecloud_users' },
+      { id: 'roles', label: 'Roles y Permisos', icon: Settings2, key: 'ferrecloud_roles' },
+      { id: 'branches', label: 'Sucursales', icon: Building2, key: 'ferrecloud_branches' },
+      { id: 'companyconfig', label: 'Config. Empresa', icon: Landmark, key: 'company_config' },
+      { id: 'afipconfig', label: 'Config. ARCA/AFIP', icon: ShieldCheck, key: ['afip_backend_url', 'afip_sales_point', 'afip_environment', 'afip_cuit'] }, // Special handling for multiple keys
+      { id: 'pricelists', label: 'Listas de Precios', icon: List, key: 'ferrecloud_price_lists' },
+      { id: 'replenishmentorders', label: 'Órdenes Reposición', icon: Package, key: 'ferrecloud_replenishment_orders' },
+      { id: 'coupons', label: 'Cupones', icon: Tag, key: 'ferrecloud_coupons' },
+      { id: 'campaigns', label: 'Campañas Mkt', icon: Sparkles, key: 'ferrecloud_campaigns' },
+      { id: 'printtemplates', label: 'Plantillas Impresión', icon: Printer, key: 'ferrecloud_print_templates_v8' },
+      { id: 'stocktransfers', label: 'Mov. entre Suc.', icon: ArrowLeftRight, key: 'ferrecloud_stock_transfers' },
+      { id: 'salesorders', label: 'Pedidos de Venta', icon: ShoppingCart, key: 'ferrecloud_sales_orders' },
+      { id: 'license', label: 'Licencia del Sistema', icon: Key, key: 'ferrecloud_license' }
   ];
 
   const triggerFileDownload = async () => {
@@ -56,24 +83,20 @@ const Backup: React.FC = () => {
           console.error("Error al exportar base de datos IndexedDB", e);
       }
 
-      const keysToExport = [
-          'ferrecloud_products', 'ferrecloud_clients', 'ferrecloud_sales_history',
-          'ferrecloud_providers', 'ferrecloud_purchases', 'ferrecloud_employees',
-          'ferrecloud_price_templates', 'company_config', 'daily_movements',
-          'afip_backend_url', 'afip_sales_point', 'afip_environment',
-          'ferrecloud_roles', 'ferrecloud_users', 'ferrecloud_checks',
-          'ferrecloud_registers', 'ferrecloud_treasury_movements',
-          'ferrecloud_provider_movements', 'ferrecloud_movements',
-          'ferrecloud_manual_shortages', 'ferrecloud_remitos',
-          'ferrecloud_budgets', 'ferrecloud_sales_orders', 'ferrecloud_stock_transfers',
-          'ferrecloud_brands', 'ferrecloud_categories'
-      ];
-
-      keysToExport.forEach(key => {
-          const value = localStorage.getItem(key);
-          if (value) {
-              try { appData[key] = JSON.parse(value); } catch (e) { appData[key] = value; }
-          }
+      // Recorrer todas las claves a sincronizar
+      resetOptions.forEach(option => {
+        const keys = Array.isArray(option.key) ? option.key : [option.key];
+        keys.forEach(key => {
+            const value = localStorage.getItem(key);
+            if (value) {
+                try { 
+                    // Intentar parsear a JSON si es posible, sino guardar como string
+                    appData[key] = JSON.parse(value); 
+                } catch (e) { 
+                    appData[key] = value; 
+                }
+            }
+        });
       });
 
       const jsonString = JSON.stringify(appData, null, 2);
@@ -97,6 +120,12 @@ const Backup: React.FC = () => {
           setLastBackup(now);
           localStorage.setItem('ferrecloud_last_backup_date', now);
           triggerFileDownload();
+          // Disparar eventos de actualización para que todos los datos se sincronicen a la nube
+          resetOptions.forEach(option => {
+            const keys = Array.isArray(option.key) ? option.key : [option.key];
+            keys.forEach(key => window.dispatchEvent(new Event(`${key}_updated`)));
+          });
+          window.dispatchEvent(new Event('ferrecloud_products_updated')); // Para IndexedDB
       }, 2000);
   };
 
@@ -121,7 +150,10 @@ const Backup: React.FC = () => {
         } else {
             localStorage.setItem(key, JSON.stringify(value));
         }
+        // Disparar evento de actualización para cada clave restaurada
+        window.dispatchEvent(new Event(`${key}_updated`));
     });
+    window.dispatchEvent(new Event('ferrecloud_products_updated')); // Para IndexedDB
 
     setTimeout(() => {
         setIsRestoring(false);
@@ -161,6 +193,7 @@ const Backup: React.FC = () => {
         alert("Simulando descarga de respaldo desde la nube...");
         setIsRestoring(false);
         alert("Restauración simulada completada. En un entorno productivo los datos se habrían sobrescrito.");
+        window.location.reload(); // Recargar para aplicar los cambios simulados
     }, 2000);
   };
 
@@ -187,31 +220,17 @@ const Backup: React.FC = () => {
               for (const id of selectedIds) {
                   const option = resetOptions.find(o => o.id === id);
                   if (option) {
-                      // Caso especial: Artículos (IndexedDB)
-                      if (id === 'products') {
-                          await productDB.clearAll();
-                          localStorage.removeItem('ferrecloud_products'); // Limpia también rastro en localStorage
-                      }
-                      
-                      // Limpiar localStorage para la opción seleccionada
-                      localStorage.removeItem(option.key);
-
-                      // Limpiar dependencias
-                      if (id === 'treasury') {
-                          localStorage.removeItem('ferrecloud_registers');
-                          localStorage.removeItem('ferrecloud_checks');
-                          localStorage.removeItem('daily_movements');
-                          localStorage.removeItem('ferrecloud_treasury_movements');
-                      }
-                      if (id === 'clients') {
-                          localStorage.removeItem('ferrecloud_movements');
-                      }
-                      if (id === 'providers') {
-                          localStorage.removeItem('ferrecloud_purchases');
-                          localStorage.removeItem('ferrecloud_provider_movements');
-                      }
-                      if (id === 'sales') {
-                          localStorage.removeItem('ferrecloud_sales_history');
+                      const keysToDelete = Array.isArray(option.key) ? option.key : [option.key];
+                      for (const key of keysToDelete) {
+                          // Caso especial: Artículos (IndexedDB)
+                          if (id === 'products' && key === 'ferrecloud_products') {
+                              await productDB.clearAll();
+                          }
+                          
+                          // Limpiar localStorage para la opción seleccionada
+                          localStorage.removeItem(key);
+                          // Disparar evento de actualización con payload null para indicar borrado
+                          window.dispatchEvent(new Event(`${key}_updated`));
                       }
                   }
               }
