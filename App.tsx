@@ -51,7 +51,7 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import { LicenseManager } from '@components/LicenseManager'; // Reverted to use alias
+import { LicenseManager } from './components/LicenseManager'; // Ruta relativa directa, sin .tsx
 import PriceAudit from './components/PriceAudit';
 import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
