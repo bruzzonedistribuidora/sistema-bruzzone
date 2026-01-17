@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 // Added missing Trash2 import from lucide-react
 import { 
@@ -84,7 +83,7 @@ const StockAdjustment: React.FC = () => {
                     productName: selectedProduct.name,
                     location: loc,
                     oldQty: oldVal,
-                    newVal: newVal,
+                    newVal: newVal, // Corrected from newQty
                     reason: adjustmentReason.toUpperCase(),
                     user
                 });
