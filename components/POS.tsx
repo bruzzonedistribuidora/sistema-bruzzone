@@ -129,6 +129,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
                 c.id === selectedClient.id ? { ...c, balance: c.balance + cartTotal } : c
             );
             localStorage.setItem('ferrecloud_clients', JSON.stringify(updatedClients));
+            window.dispatchEvent(new Event('ferrecloud_clients_updated')); // Disparar evento para sincronización
         }
 
         const history = JSON.parse(localStorage.getItem('ferrecloud_sales_history') || '[]');
@@ -142,6 +143,7 @@ const POS: React.FC<POSProps> = ({ initialCart, onCartUsed, onTransformToRemito,
             type: isInvoice ? 'FACTURA' : 'TICKET' 
         });
         localStorage.setItem('ferrecloud_sales_history', JSON.stringify(history));
+        window.dispatchEvent(new Event('ferrecloud_sales_history_updated')); // Disparar evento para sincronización
 
         window.dispatchEvent(new Event('ferrecloud_request_pulse'));
         setCart([]);
