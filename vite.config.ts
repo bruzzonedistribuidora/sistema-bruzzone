@@ -1,7 +1,5 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path'; // Importamos el módulo path
-import { fileURLToPath } from 'url'; // Import fileURLToPath
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,8 +8,6 @@ export default defineConfig({
     port: 3000
   },
   resolve: {
-    alias: {
-      '@components': path.resolve(path.dirname(fileURLToPath(import.meta.url)), './components'),
-    },
+    // Eliminada la configuración de alias para @components
   },
 });
