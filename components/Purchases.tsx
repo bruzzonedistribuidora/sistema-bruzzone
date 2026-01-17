@@ -32,6 +32,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
 
   useEffect(() => {
       localStorage.setItem('ferrecloud_purchases', JSON.stringify(purchases));
+      window.dispatchEvent(new Event('ferrecloud_purchases_updated')); // Disparar evento para sincronización
   }, [purchases]);
 
   // Lógica de búsqueda mejorada
@@ -106,7 +107,7 @@ const Purchases: React.FC<PurchasesProps> = ({ defaultTab = 'PURCHASES', onNavig
   };
 
   const deletePurchase = (id: string) => {
-    if (confirm('¿Está seguro de que desea eliminar este comprobante de compra? Esta acción no se puede deshacer.')) {
+    if (confirm('¿Está seguro de que desea eliminar este comprobante de compra? Esta acción no se puede rehacer.')) {
         setPurchases(prev => prev.filter(p => p.id !== id));
     }
   };
