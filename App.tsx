@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
     LayoutDashboard, Database, 
@@ -7,7 +6,7 @@ import {
     AlertTriangle, PackagePlus, Tags, X, ClipboardList, 
     FileSpreadsheet, Users, UserSearch, Calculator, Network,
     LayoutGrid, Search, Tag, Smartphone, Box, Package,
-    ListOrdered, RotateCcw // Added missing Lucide icons
+    ListOrdered, RotateCcw, Key // Added missing Lucide icon: Key
 } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -18,7 +17,7 @@ import POS from './components/POS';
 import Purchases from './components/Purchases';
 import Clients from './components/Clients';
 import ClientBalances from './components/ClientBalances';
-import ProviderBalances from './components/ProviderBalances'; // Corrected import path
+import ProviderBalances from './components/ProviderBalances';
 import Providers from './components/Providers';
 import Treasury from './components/Treasury';
 import Accounting from './components/Accounting';
@@ -41,9 +40,7 @@ import EcommerceAdmin from './components/EcommerceAdmin';
 import Shop from './components/Shop';
 import InitialImport from './components/InitialImport';
 import CustomerPortal from './components/CustomerPortal';
-// Fix: Changed default import to named import
 import { Remitos } from './components/Remitos';
-// Fix: Changed default import to named import
 import { Presupuestos } from './components/Presupuestos';
 import MassProductUpdate from './components/MassProductUpdate';
 import MassStockUpdate from './components/MassStockUpdate';
@@ -54,9 +51,9 @@ import Replenishment from './components/Replenishment';
 import Shortages from './components/Shortages';
 import PrintSettings from './components/PrintSettings';
 import SalesManagement from './components/SalesManagement';
-import LicenseManager from './components/LicenseManager'; // Added missing import
-import PriceAudit from './components/PriceAudit'; // Added missing import
-import Currencies from './components/Currencies'; // Added missing import
+import LicenseManager from './components/LicenseManager';
+import PriceAudit from './components/PriceAudit';
+import Currencies from './components/Currencies';
 import { ViewState, User, Client, InvoiceItem, SystemLicense, ReplenishmentItem } from './types';
 
 const VIEW_ICONS: Record<string, any> = {
@@ -81,6 +78,7 @@ const VIEW_ICONS: Record<string, any> = {
     // SalesManagement views
     [ViewState.SALES_ORDERS]: ListOrdered, 
     [ViewState.CREDIT_NOTES]: RotateCcw,
+    [ViewState.LICENSE_MANAGER]: Key, // Explicitly defined icon for LicenseManager
 };
 
 const App: React.FC = () => {
